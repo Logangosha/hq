@@ -39,7 +39,7 @@ We build one small step at a time. Each feature ends with a **user check** befor
 - [ ] F3.7 Plan
 - [ ] F3.8 Build: Claude makes the change in a PR
 - [ ] F3.9 QA: a separate agent runs the checklist and posts evidence
-- [x] F3.1 Add some fake starter content to `hq-test-sandbox`
+- [ ] F3.10 Human review: user approves and merges
 - [ ] ✅ User check: read the Issue top to bottom. Is it clear what happened?
 
 ## F4: Reusable agents (capabilities)
