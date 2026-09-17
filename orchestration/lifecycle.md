@@ -27,11 +27,35 @@ REQUIREMENTS → VERIFICATION → PLAN → BUILD → QA → HUMAN REVIEW → DON
 - **QA fails 3 times** → stop and ask the user.
 - **The user rejects** → back to **Requirements**, with the user's comments.
 
+## When the user is involved
+
+The user drops in twice, and no more than that:
+
+1. **At the start**, to say what they want.
+2. **At stage 6**, to review the finished result.
+
+Everything between those two points is the agents' problem. Do **not** stop to get
+requirements or a plan approved.
+
+The only other reason to interrupt them is that the work is genuinely stuck:
+
+- The work would be destructive, or can't be undone.
+- Two reasonable readings of the request lead to very different results, and picking
+  wrong would waste real effort.
+- Something outside the agents' control is blocking it (access, a missing decision only
+  the user can make, a bill to pay).
+- QA has failed 3 times.
+
+Anything less than that is a decision the agents make themselves. **Choose the option
+that is easiest to undo, write the choice and the reason in the Decisions section, and
+flag it at stage 6.** The user can reject it then, and rejection is cheap because the
+choice was reversible.
+
 ## Waiting
 
 A Work Item can be paused at any stage. It keeps its stage and resumes from there.
 
-- **Waiting on the user**: a question or decision is needed.
+- **Waiting on the user**: the work is stuck for one of the reasons above.
 - **Waiting on other work**: another Work Item must finish first.
 
 ## Writing a good check
