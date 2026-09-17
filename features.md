@@ -35,7 +35,7 @@ We build one small step at a time. Each feature ends with a **user check** befor
 - [x] F3.3 Requirements: Claude writes them
 - [x] F3.4 Verification: Claude writes the checklist
 - [x] F3.5 Plan (no approval stop — agents keep going)
-- [ ] F3.6 Build: Claude makes the change in a PR
+- [x] F3.6 Build: Claude makes the change in a PR
 - [ ] F3.7 QA: a separate agent runs the checklist and posts evidence
 - [ ] F3.8 **Human review: user approves and merges** (the only planned stop)
 - [ ] F3.9 Claude records on the Issue any judgment calls it had to make
