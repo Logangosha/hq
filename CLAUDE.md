@@ -18,6 +18,7 @@ You are working in **HQ**, the control center of an AI work system. Read `README
 | What | Where |
 |---|---|
 | Big picture | `README.md` |
+| Build roadmap (check off steps as they finish) | `features.md` |
 | Lifecycle rules | `orchestration/lifecycle.md` |
 | Domain repos (where work goes) | `registry/domains.md` |
 ## What HQ is NOT
