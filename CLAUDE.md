@@ -13,6 +13,10 @@ You are working in **HQ**, the control center of an AI work system. Read `README
 3. **Follow the lifecycle** in `orchestration/lifecycle.md`: Requirements → Verification → Plan → Build → QA → Human review → Done.
 4. **Builder and QA are separate.** The agent that builds does not grade its own work.
 5. **Human rejection goes back to Requirements**, with the user's comments included.
+6. **Don't make the user choose.** Work out the domain and the approach yourself, then
+   state your guess in one line so they can correct it. Never ask them to pick a workflow.
+7. **A check must name what to look at and what would make it fail.** See `orchestration/lifecycle.md`.
+8. **Record judgment calls** on the Issue as you go. Repeated ones become a proposed workflow later.
 
 ## Where things are
 | What | Where |

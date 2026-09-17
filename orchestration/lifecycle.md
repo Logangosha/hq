@@ -34,6 +34,36 @@ A Work Item can be paused at any stage. It keeps its stage and resumes from ther
 - **Waiting on the user**: a question or decision is needed.
 - **Waiting on other work**: another Work Item must finish first.
 
+## Writing a good check
+
+This is the most important rule in the system. It's what stops an agent from claiming
+success without proof.
+
+> **A check must name what to look at, and what would make it fail.**
+
+| Good | Bad |
+|---|---|
+| Open `docs/menu.md`. It must not contain the word "daily". Fail if it does. | Confirm the menu is accurate. |
+| Run `npm test`. All tests must pass. Fail on any error. | Make sure the code works. |
+| Each claim in section 2 must have a source link. Fail if any claim has none. | Check that the research is solid. |
+
+The user should be able to read the checklist and answer one question:
+*"If all of these pass, am I happy?"*
+
+## Workflows
+
+The stages above are all a Work Item needs. **There is no workflow to choose.**
+Claude works out the details from the work itself: checking a document means reading it,
+checking code means running it.
+
+A **workflow** is an optional short overlay that gets added later, only after the same
+kind of work has come up several times. It holds the lessons learned, never a copy of
+the stages. If no workflow exists, follow this file and carry on.
+
+To make that possible, at the end of every Work Item the agent records on the Issue
+any judgment call it had to make. Those notes are the raw material for a future workflow,
+which the user approves before it becomes a rule.
+
 ## Rules
 
 - Every stage change is written as a comment on the Issue: what changed, and why.

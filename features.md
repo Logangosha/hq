@@ -31,19 +31,19 @@ We build one small step at a time. Each feature ends with a **user check** befor
 *Goal: prove the lifecycle works, using fake content only.*
 
 - [x] F3.1 Add some fake starter content to `hq-test-sandbox`
-- [ ] F3.2 Write the first workflow file (`document-update`)
-- [ ] F3.3 Create a test Work Item Issue
-- [ ] F3.4 Requirements: Claude writes them
-- [ ] F3.5 Verification: Claude writes the checklist
-- [ ] F3.6 User approves requirements and checklist
-- [ ] F3.7 Plan
-- [ ] F3.8 Build: Claude makes the change in a PR
-- [ ] F3.9 QA: a separate agent runs the checklist and posts evidence
-- [ ] F3.10 Human review: user approves and merges
+- [ ] F3.2 Create the Work Item Issue (no workflow file — the framework is enough)
+- [ ] F3.3 Requirements: Claude writes them
+- [ ] F3.4 Verification: Claude writes the checklist
+- [ ] F3.5 **User approves requirements and checklist** (blueprint inspection)
+- [ ] F3.6 Plan
+- [ ] F3.7 Build: Claude makes the change in a PR
+- [ ] F3.8 QA: a separate agent runs the checklist and posts evidence
+- [ ] F3.9 **Human review: user approves and merges** (taste test)
+- [ ] F3.10 Claude records on the Issue any judgment calls it had to make
 - [ ] ✅ User check: read the Issue top to bottom. Is it clear what happened?
 
-## F4: Reusable agents (capabilities)
-*Goal: agent roles are defined once and used everywhere.*
+## F4: Reusable agents, and workflows that write themselves
+*Goal: agent roles are defined once, and repeated lessons become reusable rules the user only has to approve.*
 
 - [ ] F4.1 Decide where capabilities live (own repo or inside HQ) *(ask first)*
 - [ ] F4.2 Write the requirements agent
@@ -52,7 +52,9 @@ We build one small step at a time. Each feature ends with a **user check** befor
 - [ ] F4.5 Write the builder agent
 - [ ] F4.6 Record in HQ where capabilities live
 - [ ] F4.7 Re-run a small sandbox Work Item using these agents
-- [ ] ✅ User check: did the agents behave as well as in F3, or better?
+- [ ] F4.8 Add the "propose a workflow" step: after a few similar Work Items, Claude reads the judgment calls it recorded and offers a short overlay (about 15 lines) for the user to approve
+- [ ] F4.9 Store approved overlays in `orchestration/workflows/` and use them automatically
+- [ ] ✅ User check: read a proposed workflow. Is it 5 lines you agree with?
 
 ## F5: HQ creates work from plain English
 *Goal: the user says what they want, and HQ creates the Issue in the right place.*
