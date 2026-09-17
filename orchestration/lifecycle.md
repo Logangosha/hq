@@ -21,11 +21,45 @@ REQUIREMENTS → VERIFICATION → PLAN → BUILD → QA → HUMAN REVIEW → DON
 | 6 | **Human review** | The user | Look at the result | The user approves or rejects |
 | 7 | **Done** | — | Work is complete | — |
 
+## When an agent finds a problem with earlier work
+
+No agent checks its own output. Each stage is the first fresh look at the one before it,
+so finding a problem upstream is normal work, not an exception.
+
+**The mechanism is always the same: the `stage:` label goes back, and a comment says why.**
+The label is the queue. A fresh agent for that stage picks the item up and reads the
+comments above it. There is no separate "needs rework" state to keep in sync.
+
+### Three responses, chosen by cost
+
+| Response | When | What happens |
+|---|---|---|
+| **Fix in place** | The problem is factual and objectively correctable — a miscount, a wrong path, a typo'd filename | The finding agent corrects it in **its own** comment and says it did. No bounce. Never for anything needing judgment. |
+| **Bounce** | The problem needs a decision the earlier stage owns — something is wrong, contradicts something else, or is out of scope | The `stage:` label goes back. The comment names what's wrong and what would settle it. |
+| **Stop** | The goal itself is wrong or can't be done | Add `waiting:user` and ask. |
+
+Bouncing is expensive — it re-runs a whole stage. Fix in place when you honestly can,
+bounce when a judgment call belongs to someone else.
+
+### Rules
+
+- **Scan everything, bounce once.** Keep reading after the first problem and report them
+  all in one comment. Don't do your own stage's work first — it's wasted if the earlier
+  stage changes.
+- **Nothing is ever rewritten.** A correction is a new comment. The wrong version stays
+  where it is, with the correction below it. The Issue is the memory, and the memory
+  includes the mistake.
+- **A re-run is a new comment**, headed `## 1b. Requirements (re-run) — requirements ✅`,
+  so the Issue still reads top to bottom.
+- **Three strikes at any stage.** If a Work Item lands on the same stage a third time,
+  stop and ask the user. Two agents must never ping-pong on a disagreement neither can
+  resolve.
+
 ## Loops
 
 - **QA fails** → back to **Build**, with a note on what failed.
-- **QA fails 3 times** → stop and ask the user.
 - **The user rejects** → back to **Requirements**, with the user's comments.
+- **Any stage reached 3 times** → stop and ask the user.
 
 ## When the user is involved
 
@@ -44,7 +78,7 @@ The only other reason to interrupt them is that the work is genuinely stuck:
   wrong would waste real effort.
 - Something outside the agents' control is blocking it (access, a missing decision only
   the user can make, a bill to pay).
-- QA has failed 3 times.
+- A Work Item has landed on the same stage 3 times.
 
 Anything less than that is a decision the agents make themselves. **Choose the option
 that is easiest to undo, write the choice and the reason in the Decisions section, and
@@ -91,7 +125,9 @@ which the user approves before it becomes a rule.
 ## Rules
 
 - Every stage change is written as a comment on the Issue: what changed, and why.
-- The builder never marks its own work as passed.
+- **No agent checks its own output.** Each stage checks the one before it. The builder
+  never marks its own work as passed, and an agent that spots its own mistake after
+  posting leaves it for the next stage rather than quietly editing it.
 - QA never changes the work to make a check pass.
 - If the builder finds a requirement is wrong, it stops and records it. It does not quietly change the requirement.
 - A Work Item can be **cancelled** at any time by the user.
