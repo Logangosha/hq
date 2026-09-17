@@ -23,7 +23,7 @@ We build one small step at a time. Each feature ends with a **user check** befor
 - [x] F2.2 Define the labels (stage, waiting, domain, workflow)
 - [x] F2.3 Add the template to the repo
 - [x] F2.4 Write a script that creates the labels in a repo
-- [ ] F2.5 Create the `hq-test-sandbox` repo *(ask first)*
+- [x] F2.5 Create the `hq-test-sandbox` repo
 - [ ] F2.6 From an HQ session, create a test Issue in `hq-test-sandbox`
 - [ ] ✅ User check: open the test Issue. Is it easy to read?
 

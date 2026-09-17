@@ -13,7 +13,7 @@ To add a domain, add a row. Only send work to domains with status `active`.
 
 | Domain | Repo | Status | What belongs here |
 |---|---|---|---|
-| hq-test-sandbox | `hq-test-sandbox` | planned | Fake test content for trying out the system. Safe to break. |
+| hq-test-sandbox | `hq-test-sandbox` | active | Fake test content for trying out the system. Safe to break. |
 
 ## Status meanings
 
