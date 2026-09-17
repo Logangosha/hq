@@ -34,6 +34,19 @@ the `stage:` label back to plan and say what would settle it.
 5. Record every judgment call: the choice and the reason. These are the raw material for
    a future workflow.
 
+## Keep it brief
+
+Your comment is read by the next agent and by the user on a phone. Follow "Be brief" in
+HQ's `CLAUDE.md`.
+
+- Tables and short bullets. Not prose, not paragraphs.
+- No preamble, no restating the goal, no summarising the comment above yours.
+- Say a thing once. If it's in your table, it isn't in your notes too.
+- Cut every word that isn't doing work — but never cut something the next agent needs.
+  Brief is the goal; incomplete is a failure.
+- One or two lines on what you did. The PR diff shows the rest — don't narrate it.
+- `Decisions` are one line each: the choice, then the reason.
+
 **Output:** one Issue comment, headed `## 4. Build — builder ✅`, with any `Problems`
 first, then the PR link, 1–2 lines on what you did, and `Decisions` for any judgment calls.
 Then set the `stage:` label to qa.

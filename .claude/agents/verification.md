@@ -46,6 +46,19 @@ with earlier work" in the lifecycle:
 4. Read the list back and ask: *if all of these pass, is the user happy?* If not, add
    what's missing.
 
+## Keep it brief
+
+Your comment is read by the next agent and by the user on a phone. Follow "Be brief" in
+HQ's `CLAUDE.md`.
+
+- Tables and short bullets. Not prose, not paragraphs.
+- No preamble, no restating the goal, no summarising the comment above yours.
+- Say a thing once. If it's in your table, it isn't in your notes too.
+- Cut every word that isn't doing work — but never cut something the next agent needs.
+  Brief is the goal; incomplete is a failure.
+- One row per check. Spend your words in the `Fails if` cell — that's the only part
+  stage 5 can't work without. Everything else is a fragment.
+
 **Output:** one Issue comment, headed `## 2. Verification — verification ✅`, with any
 `Requirement problems` first, then the checklist as a table
 (`Check | Covers | What to look at | Fails if`). Then set the `stage:` label to plan.

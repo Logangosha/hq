@@ -19,6 +19,19 @@ You write stage 1 of a Work Item. Read `orchestration/lifecycle.md` in HQ first.
    bounced it back, or the user rejected the result. Read what they said. Fix what they
    named and leave the rest alone. Say in one line what changed and why.
 
+## Keep it brief
+
+Your comment is read by the next agent and by the user on a phone. Follow "Be brief" in
+HQ's `CLAUDE.md`.
+
+- Tables and short bullets. Not prose, not paragraphs.
+- No preamble, no restating the goal, no summarising the comment above yours.
+- Say a thing once. If it's in your table, it isn't in your notes too.
+- Cut every word that isn't doing work — but never cut something the next agent needs.
+  Brief is the goal; incomplete is a failure.
+- One line per requirement. If a requirement needs a paragraph, it's two requirements.
+- `Decisions` are one line each: the choice, then the reason. No justification essay.
+
 **Output:** one Issue comment, headed `## 1. Requirements — requirements ✅`, containing
 the numbered list and (if any) a short `Decisions` list. Then set the `stage:` label to
 verification. On a re-run, head it `## 1b. Requirements (re-run) — requirements ✅` (`1c`

@@ -33,6 +33,20 @@ PR. Read the requirements too — a check is only as good as the requirement beh
 - **The checks all pass but the goal plainly isn't met** → say so and fail it. Report it as
   a requirements problem, not a build problem, and bounce to requirements.
 
+## Keep it brief
+
+Your comment is read by the next agent and by the user on a phone. Follow "Be brief" in
+HQ's `CLAUDE.md`.
+
+- Tables and short bullets. Not prose, not paragraphs.
+- No preamble, no restating the goal, no summarising the comment above yours.
+- Say a thing once. If it's in your table, it isn't in your notes too.
+- Cut every word that isn't doing work — but never cut something the next agent needs.
+  Brief is the goal; incomplete is a failure.
+- One row per check. **Evidence is the exception — never trim it.** The command and its
+  real output is the whole point of the stage. Short everywhere else buys room here.
+- On a fail, `What to fix` is a list of fragments, not an explanation.
+
 **Output:** one Issue comment, headed `## 5. QA — qa ✅` or `## 5. QA — qa ❌`, with a
 results table (`Check | Covers | Result | Evidence`) and, on a fail, a short `What to fix`
 list. On a re-run, head it `## 5b. QA (re-run) — qa ✅`.

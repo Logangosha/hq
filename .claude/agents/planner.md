@@ -36,6 +36,19 @@ problem with earlier work" in the lifecycle:
    you chose it anyway.
 5. **Don't stop for approval.** The user reviews at stage 6, not here.
 
+## Keep it brief
+
+Your comment is read by the next agent and by the user on a phone. Follow "Be brief" in
+HQ's `CLAUDE.md`.
+
+- Tables and short bullets. Not prose, not paragraphs.
+- No preamble, no restating the goal, no summarising the comment above yours.
+- Say a thing once. If it's in your table, it isn't in your notes too.
+- Cut every word that isn't doing work — but never cut something the next agent needs.
+  Brief is the goal; incomplete is a failure.
+- One line per step. A step that needs a paragraph is two steps.
+- The coverage map is one line total, not a table.
+
 **Output:** one Issue comment, headed `## 3. Plan — planner ✅`, with any `Problems` first,
 then the numbered steps, then a one-line coverage map (`R1 → step 2; R2 → steps 1,3`).
 Then set the `stage:` label to build.
