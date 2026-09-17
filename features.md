@@ -33,7 +33,7 @@ We build one small step at a time. Each feature ends with a **user check** befor
 - [x] F3.1 Add some fake starter content to `hq-test-sandbox`
 - [x] F3.2 Create the Work Item Issue (no workflow file — the framework is enough)
 - [x] F3.3 Requirements: Claude writes them
-- [ ] F3.4 Verification: Claude writes the checklist
+- [x] F3.4 Verification: Claude writes the checklist
 - [ ] F3.5 Plan (no approval stop — agents keep going)
 - [ ] F3.6 Build: Claude makes the change in a PR
 - [ ] F3.7 QA: a separate agent runs the checklist and posts evidence
