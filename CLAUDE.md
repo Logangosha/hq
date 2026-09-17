@@ -38,8 +38,12 @@ Brief, not clipped. Full sentences are fine; padding is not.
 | Build roadmap (check off steps as they finish) | `features.md` |
 | Lifecycle rules | `orchestration/lifecycle.md` |
 | Domain repos (where work goes) | `registry/domains.md` |
+| Reusable agents (one per lifecycle stage) | `.claude/agents/` |
 ## What HQ is NOT
 - Not a place for personal files. Those belong in their own domain repos.
+- Not a place for project-specific agents or skills. HQ holds **generic** capabilities that
+  work across many repos. Anything that names a particular app, service or dataset lives in
+  that project's own repo. See `.claude/agents/README.md`.
 - Never store passwords, keys, or secrets anywhere in git.
 
 ## Ask the user first before

@@ -44,12 +44,12 @@ We build one small step at a time. Each feature ends with a **user check** befor
 ## F4: Reusable agents, and workflows that write themselves
 *Goal: agent roles are defined once, and repeated lessons become reusable rules the user only has to approve.*
 
-- [ ] F4.1 Decide where capabilities live (own repo or inside HQ) *(ask first)*
-- [ ] F4.2 Write the requirements agent
-- [ ] F4.3 Write the QA agent
-- [ ] F4.4 Write the planner agent
-- [ ] F4.5 Write the builder agent
-- [ ] F4.6 Record in HQ where capabilities live
+- [x] F4.1 Decide where capabilities live (own repo or inside HQ) *(ask first)*
+- [x] F4.2 Write the requirements agent (+ a separate verification agent)
+- [x] F4.3 Write the QA agent
+- [x] F4.4 Write the planner agent
+- [x] F4.5 Write the builder agent
+- [x] F4.6 Record in HQ where capabilities live
 - [ ] F4.7 Re-run a small sandbox Work Item using these agents
 - [ ] F4.8 Add the "propose a workflow" step: after a few similar Work Items, Claude reads the judgment calls it recorded and offers a short overlay (about 15 lines) for the user to approve
 - [ ] F4.9 Store approved overlays in `orchestration/workflows/` and use them automatically
