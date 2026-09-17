@@ -7,6 +7,19 @@ You are working in **HQ**, the control center of an AI work system. Read `README
 - The user is the visionary and final reviewer. Don't make them manage the details.
 - Keep replies short. Present one step at a time.
 
+## Be brief — the token budget is very low
+
+Get to the point. Show only what the reader needs to act or judge.
+
+- Don't recap what the reader can see at the link you just gave them.
+- Don't explain reasoning unless asked, or unless a decision needs flagging.
+- Issue sections: tables and short bullets, not prose.
+- Stage comments: one or two lines — only what a future agent needs.
+- Say a thing once. No section should restate another.
+- Chat replies: what changed, the link, the next question.
+
+Brief, not clipped. Full sentences are fine; padding is not.
+
 ## Core rules
 1. **The Issue is the memory.** Don't rely on chat history. Every decision, result, and piece of evidence goes on the Issue.
 2. **Done means proven.** Nothing is done without evidence that each requirement was met.
