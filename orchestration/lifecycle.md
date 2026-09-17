@@ -95,3 +95,24 @@ which the user approves before it becomes a rule.
 - QA never changes the work to make a check pass.
 - If the builder finds a requirement is wrong, it stops and records it. It does not quietly change the requirement.
 - A Work Item can be **cancelled** at any time by the user.
+
+## How the Issue is written
+
+Body layout (see the Work Item template):
+
+```
+**Stage:** <n> <name> · **PR:** <number or —>
+
+## Goal
+**Current state:** ...
+**Desired state:** ...
+
+## 1..6 <stage> — pending
+```
+
+- Only the **Stage** line and **PR** number change as work moves. Everything else is
+  appended by the agent that owns that stage.
+- A stage heading becomes `## 3. Plan — planner ✅` plus 1–2 lines of what was done.
+- Requirements live under stage 1, their proofs under stage 2, their results under stage 5.
+- A proof must name a file or command and what makes it fail.
+- Detail, evidence, commands and failures go in the **comments**, not the body.
