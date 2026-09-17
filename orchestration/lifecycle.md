@@ -107,3 +107,11 @@ which the user approves before it becomes a rule.
   repeated in the body.
 - Requirements go in the stage 1 comment, their proofs in stage 2, their results in stage 5.
 - A proof must name a file or command and what makes it fail.
+
+## How the user approves or rejects
+
+- **Approve = merge the PR.** The PR says `Closes #<n>`, so merging closes the Work Item.
+  Nothing else to click. Works from the GitHub phone app.
+- **Reject = comment** what's wrong. An agent picks the comment up, moves the Work Item
+  back to the stage that needs fixing, and works on it again.
+- No labels for this. Merged means approved.
