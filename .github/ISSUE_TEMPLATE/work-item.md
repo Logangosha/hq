@@ -6,46 +6,20 @@ labels: ["stage:requirements"]
 ---
 
 ## Goal
-<!-- One or two sentences: what the user wants, in plain language. -->
+<!-- What's wrong now, and what should be true instead. 1-3 lines. -->
 
-## Current state
-<!-- How things are today. -->
+## Done when
+<!-- One row per requirement. Proof must name a file or command and what fails. -->
 
-## Desired state
-<!-- How things should be when this is done. -->
-
----
-
-## 1. Requirements
-<!-- Filled in by the requirements agent. Each one numbered and checkable. -->
-
-| # | Requirement |
-|---|---|
-| R1 | |
-
-## 2. Verification checklist
-<!-- Filled in by the QA agent. Every requirement needs at least one check. -->
-
-| # | Checks | How to check it | Result |
+| # | Must be true | Proof | Result |
 |---|---|---|---|
-| V1 | R1 | | not run |
+| 1 | | | not run |
 
-## 3. Plan
-<!-- Filled in by the planner agent. Must cover every requirement. -->
+## Plan
+<!-- What gets changed. 1-3 lines. -->
 
-## 4. Build
-<!-- Filled in by the builder agent: what was done, and links to the PR or commits. -->
-
-## 5. QA evidence
-<!-- Filled in by the QA agent: the result of each check, with proof. -->
-
-## 6. Result
-<!-- Filled in after human review: what changed, and anything left over. -->
-
----
+## Result
+<!-- Links (PR, commit), and the QA tally. -->
 
 ## Decisions
-<!-- Any choice worth remembering, and why. -->
-
-## Log
-<!-- Stage changes go in the comments below, not here. -->
+<!-- One line each: the choice, and why. -->
