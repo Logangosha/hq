@@ -5,21 +5,24 @@ title: "Work Item: "
 labels: ["stage:requirements"]
 ---
 
-## Goal
-<!-- What's wrong now, and what should be true instead. 1-3 lines. -->
+# Overview
+Goal: <!-- what's wrong now, and what should be true instead. 1-2 lines -->
+Stage: 1 requirements
 
-## Done when
-<!-- One row per requirement. Proof must name a file or command and what fails. -->
+<!--
+The "Done when" table goes here once stage 1 writes it. Columns fill left to right:
+Must be true (stage 1) | Proof (stage 2) | Result (stage 5).
+A proof must name a file or command and what makes it fail.
+-->
 
-| # | Must be true | Proof | Result |
-|---|---|---|---|
-| 1 | | | not run |
+## 1. Requirements — pending
+## 2. Verification — pending
+## 3. Plan — pending
+## 4. Build — pending
+## 5. QA — pending
+## 6. Review — pending
 
-## Plan
-<!-- What gets changed. 1-3 lines. -->
-
-## Result
-<!-- Links (PR, commit), and the QA tally. -->
-
-## Decisions
-<!-- One line each: the choice, and why. -->
+<!--
+Each stage: replace "pending" with the agent that did it, a tick, and 1-2 lines of
+what they did. Detail, evidence and failures go in the comments, not here.
+-->
