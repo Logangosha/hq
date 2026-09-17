@@ -32,7 +32,7 @@ We build one small step at a time. Each feature ends with a **user check** befor
 
 - [x] F3.1 Add some fake starter content to `hq-test-sandbox`
 - [x] F3.2 Create the Work Item Issue (no workflow file — the framework is enough)
-- [ ] F3.3 Requirements: Claude writes them
+- [x] F3.3 Requirements: Claude writes them
 - [ ] F3.4 Verification: Claude writes the checklist
 - [ ] F3.5 **User approves requirements and checklist** (blueprint inspection)
 - [ ] F3.6 Plan
