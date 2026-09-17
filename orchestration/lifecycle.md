@@ -98,21 +98,12 @@ which the user approves before it becomes a rule.
 
 ## How the Issue is written
 
-Body layout (see the Work Item template):
-
-```
-**Stage:** <n> <name> · **PR:** <number or —>
-
-## Goal
-**Current state:** ...
-**Desired state:** ...
-
-## 1..6 <stage> — pending
-```
-
-- Only the **Stage** line and **PR** number change as work moves. Everything else is
-  appended by the agent that owns that stage.
-- A stage heading becomes `## 3. Plan — planner ✅` plus 1–2 lines of what was done.
-- Requirements live under stage 1, their proofs under stage 2, their results under stage 5.
+- **Body: the goal only** — current state and desired state. It is written once and not
+  edited again.
+- **Each stage is its own comment**, headed `## 3. Plan — planner ✅`, with 1–2 lines of
+  what was done plus any evidence. Comments are already in order, so the Issue reads top
+  to bottom.
+- The `stage:` **label** shows where the work is. The PR is linked by GitHub. Neither is
+  repeated in the body.
+- Requirements go in the stage 1 comment, their proofs in stage 2, their results in stage 5.
 - A proof must name a file or command and what makes it fail.
-- Detail, evidence, commands and failures go in the **comments**, not the body.
