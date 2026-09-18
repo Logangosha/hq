@@ -13,6 +13,31 @@ HQ is the control center for an AI work system.
   6. **Human review**: the user checks it. If it looks good, it's **Done**. If not, it goes back to step 1 with their comments.
 - HQ holds the rules and registries. The user's actual files live in their own repos, not here.
 
+## Skills and agents
+
+**Skills are what you type.** Use them in a Claude Code session on `hq`.
+
+| Skill | What it does |
+|---|---|
+| `/new-work-item` | Turns what you want into a Work Item in the repo you name. Everyday use. |
+| `/setup-hq` | First-time setup on a new account: repos, workflow, Claude app, token, test run. |
+| `/add-domain` | Lets HQ start working in another repo. |
+| `/check-setup` | Checks that everything is connected, and fixes what it can. |
+
+**Agents do the work.** You never call them. Each one runs on GitHub when a Work Item
+reaches its stage, does its part, and hands off to the next one.
+
+| Agent | Stage | What it does |
+|---|---|---|
+| `requirements` | 1 | Writes what must be true when the work is done (R1, R2, …) |
+| `verification` | 2 | Checks the requirements, then writes a pass/fail check for each (V1, V2, …) |
+| `planner` | 3 | Checks stages 1–2, then writes the plan |
+| `builder` | 4 | Checks the plan, then does the work in a PR |
+| `qa` | 5 | Runs every check and posts the evidence. It never fixes anything itself. |
+
+Each agent checks the stage before it and can send the work back if something's wrong.
+Skills live in `.claude/skills/`, agents in `.claude/agents/`.
+
 ## How to use
 
 ### Set it up (once, on a new computer)
