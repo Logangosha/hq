@@ -20,7 +20,7 @@ owner's repos, so a fresh copy starts empty.
 ## Adding and removing
 
 - **Add:** `/add-domain <repo>` — installs the workflow and sets the description.
-- **Retire:** delete `.github/workflows/work-item.yml` from that repo. HQ stops seeing it.
+- **Remove:** `/remove-domain <repo>` — unregisters it; the repo and its Issues stay.
 
 ## How to reach a domain
 

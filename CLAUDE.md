@@ -42,6 +42,7 @@ Brief, not clipped. Full sentences are fine; padding is not.
 | Turning a request into an Issue | `new-work-item` skill |
 | Setting HQ up for a new user | `setup-hq` skill |
 | Adding a repo | `add-domain` skill |
+| Unregistering a repo | `remove-domain` skill |
 | Is everything set up? | `check-setup` skill |
 | List my domains | `domains` skill |
 | What runs the agents on GitHub | `orchestration/work-item.yml`, installed by `scripts/enable-agents.sh` |
