@@ -27,7 +27,7 @@ Solid arrows are the normal path. Dotted arrows are bounces — see "Bouncing ba
 | 3 | **Plan** | Planner agent | Check stages 1–2, then decide how to do the work | Every requirement is covered by the plan |
 | 4 | **Build** | Builder agent | Check the plan, then do the work in a PR | PR open, saying `Closes #<n>` |
 | 5 | **QA** | QA agent (not the builder) | Run every check and record the evidence | Every check has passed |
-| 6 | **Human review** | The user | Look at the result | The user merges or comments |
+| 6 | **Human review** | The user | Look at the result (`/review`) | The user merges or comments |
 | 7 | **Done** | — | The merged PR closes the Issue | — |
 
 ## Bouncing back

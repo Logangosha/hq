@@ -78,6 +78,8 @@ disagree. An agent that forgets to @ the next one would stall silently with a co
 - [ ] F8.3 Auto-add Issues from all domain repos
 - [ ] F8.4 "Needs my decision" view — `stage:review` and `waiting:user` across every repo
 - [ ] F8.5 "How's X going?" summaries from HQ
+- [ ] F8.6 `/review <repo>#<n>`: run the PR on your computer, then approve (merge) or reject
+      (back to Requirements) — no git by hand
 - [ ] ✅ User check: open the board on your phone. Is it clear what needs you?
 
 ## F9: Big goals become smaller Work Items
