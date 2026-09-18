@@ -39,6 +39,7 @@ Brief, not clipped. Full sentences are fine; padding is not.
 | Lifecycle rules | `orchestration/lifecycle.md` |
 | Domain repos (where work goes) | `registry/domains.md` |
 | Which repo a request goes to | `registry/routing.md` |
+| Turning a request into an Issue | `new-work-item` skill |
 | Reusable agents (one per lifecycle stage) | `.claude/agents/` |
 ## What HQ is NOT
 - Not a place for personal files. Those belong in their own domain repos.

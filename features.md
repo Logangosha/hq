@@ -82,7 +82,7 @@ You appear twice: at step 1 and step 4.
 
 - [x] F5.1 Write `scripts/create-work-item.sh`: takes a repo, title and goal, builds the body from the template, creates the Issue, and adds the `stage:` and `domain:` labels (creating any label that's missing)
 - [x] F5.2 Write the routing rules (request → domain; no workflow is chosen up front)
-- [ ] F5.3 `new-work-item` skill: the front door. Takes *"I want X done in Y"*, applies
+- [x] F5.3 `new-work-item` skill: the front door. Takes *"I want X done in Y"*, applies
       `routing.md`, runs the script, replies with one line and the link
 - [ ] F5.4 Test: a plain request becomes an Issue in `hq-test-sandbox`
 - [ ] F5.5 Test with 2 more requests, including one where the repo isn't named
