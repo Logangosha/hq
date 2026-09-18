@@ -52,8 +52,8 @@ first and last step.
 truth for where the work is, so using it as the trigger means state and trigger can never
 disagree. An agent that forgets to @ the next one would stall silently with a correct label.
 
-- [ ] F7.1 Decide how a domain repo reaches HQ's agents at run time (they live in a
-      different repo) *(ask first)*
+- [x] F7.1 Decide how a domain repo reaches HQ's agents at run time → **HQ is public;
+      each domain repo's Action fetches HQ's agents when it runs.** No token, one place to edit.
 - [ ] F7.2 Install the Claude GitHub App *(user does this, with guidance)*
 - [ ] F7.3 Add the API key as a repo secret *(user does this)*
 - [ ] F7.4 Add a GitHub Action that fires on a `stage:` label change and runs that stage's agent
