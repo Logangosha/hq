@@ -38,6 +38,7 @@ Brief, not clipped. Full sentences are fine; padding is not.
 | Build roadmap (check off steps as they finish) | `features.md` |
 | Lifecycle rules | `orchestration/lifecycle.md` |
 | Domain repos (where work goes) | `registry/domains.md` |
+| Which repo a request goes to | `registry/routing.md` |
 | Reusable agents (one per lifecycle stage) | `.claude/agents/` |
 ## What HQ is NOT
 - Not a place for personal files. Those belong in their own domain repos.

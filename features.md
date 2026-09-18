@@ -63,7 +63,7 @@ We build one small step at a time. Each feature ends with a **user check** befor
 *Goal: the user says what they want, and HQ creates the Issue in the right place.*
 
 - [x] F5.1 Write `scripts/create-work-item.sh`: takes a repo, title and goal, builds the body from the template, creates the Issue, and adds the `stage:` and `domain:` labels (creating any label that's missing)
-- [ ] F5.2 Write the routing rules (request → domain + workflow)
+- [x] F5.2 Write the routing rules (request → domain; no workflow is chosen up front)
 - [ ] F5.3 Add a "new Work Item" instruction to `CLAUDE.md` that uses the script
 - [ ] F5.4 Test: a plain request becomes an Issue in `hq-test-sandbox`
 - [ ] F5.5 Test with 2 more sandbox requests
