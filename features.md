@@ -50,15 +50,19 @@ We build one small step at a time. Each feature ends with a **user check** befor
 - [x] F4.4 Write the planner agent
 - [x] F4.5 Write the builder agent
 - [x] F4.6 Record in HQ where capabilities live
-- [ ] F4.7 Re-run a small sandbox Work Item using these agents
+- [x] F4.7 Re-run a small sandbox Work Item using these agents
 - [ ] F4.8 Add the "propose a workflow" step: after a few similar Work Items, Claude reads the judgment calls it recorded and offers a short overlay (about 15 lines) for the user to approve
 - [ ] F4.9 Store approved overlays in `orchestration/workflows/` and use them automatically
 - [ ] ✅ User check: read a proposed workflow. Is it 5 lines you agree with?
 
+> **Deferred:** F4.8/F4.9 need several similar Work Items to generalise from. Revisit once
+> there is a real backlog. The bounce-back path is likewise best tested in F7, where agents
+> hand off through GitHub rather than through a chat session.
+
 ## F5: HQ creates work from plain English
 *Goal: the user says what they want, and HQ creates the Issue in the right place.*
 
-- [ ] F5.1 Write `scripts/create-work-item.sh`: takes a repo, title and goal, builds the body from the template, creates the Issue, and adds the `stage:` and `domain:` labels (creating any label that's missing)
+- [x] F5.1 Write `scripts/create-work-item.sh`: takes a repo, title and goal, builds the body from the template, creates the Issue, and adds the `stage:` and `domain:` labels (creating any label that's missing)
 - [ ] F5.2 Write the routing rules (request → domain + workflow)
 - [ ] F5.3 Add a "new Work Item" instruction to `CLAUDE.md` that uses the script
 - [ ] F5.4 Test: a plain request becomes an Issue in `hq-test-sandbox`
