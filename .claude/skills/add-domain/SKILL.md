@@ -10,7 +10,7 @@ command — the only thing they do by hand is the token, because it's a credenti
 
 ## 1. What and where
 
-- **Owner:** from `registry/domains.md`.
+- **Owner:** whoever owns this copy of HQ — `gh repo view --json owner --jq .owner.login`.
 - **Repo name and what belongs there:** from the user. If they didn't say what belongs
   there, work it out from the repo's README and state it in one line.
 

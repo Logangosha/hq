@@ -2,7 +2,7 @@
 # Report what's set up and what's missing. Changes nothing.
 # Usage: bash scripts/check-setup.sh
 #
-# Reads the owner and the active domains from registry/domains.md.
+# The owner is whoever owns this copy of HQ. Domains come from registry/domains.md.
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
@@ -32,12 +32,11 @@ else
     || bad "$HQ_REPO is $VIS" "domain repos fetch the agents from it, so it must be public"
 fi
 
-OWNER="$(sed -nE 's/.*\*\*GitHub owner:\*\* `([^`]+)`.*/\1/p' "$REG")"
-if [ -z "$OWNER" ] || [ "$OWNER" = "your-github-name" ]; then
-  bad "no GitHub owner in registry/domains.md" "run /setup-hq"
-  echo; exit 1
-fi
-ok "owner: $OWNER"
+[ -z "$HQ_REPO" ] && { echo; exit 1; }
+OWNER="${HQ_REPO%%/*}"
+ME="$(gh api user --jq .login)"
+[ "$OWNER" = "$ME" ] && ok "owner: $OWNER" \
+  || bad "this HQ belongs to $OWNER, but gh is logged in as $ME" "copy HQ into your own account (README → How to use)"
 
 # Rows look like: | name | `repo` | active | ... |
 DOMAINS="$(sed -nE 's/^\|[^|]+\| *`([^`]+)` *\| *active *\|.*/\1/p' "$REG")"

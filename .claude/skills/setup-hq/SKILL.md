@@ -17,13 +17,16 @@ stop until it passes — nothing else works without `gh`.
 
 ## 2. Owner and domains
 
-- **Owner:** don't ask. Use `gh api user --jq .login` and state it in one line.
+- **Owner:** nothing to set — it's whoever owns this copy of HQ. State it in one line
+  (`gh repo view --json owner --jq .owner.login`). If it isn't them, they cloned someone
+  else's HQ instead of copying it: send them to README → How to use, step 2.
 - **Domains:** ask what kinds of work they want HQ to handle, in their words. Turn each
   answer into a row: a short repo name and one line of "What belongs here".
-- Always offer `hq-test-sandbox` too — fake content, safe to break, for trying things.
+- `hq-test-sandbox` is already in the registry — the starter domain every copy gets.
+  Keep it unless they say no.
 
-Rewrite `registry/domains.md`: set the owner, replace the table rows with theirs, status
-`active` for repos that will exist after step 3. Keep the rest of the file.
+Add their rows to `registry/domains.md`, status `active` for repos that will exist after
+step 3.
 
 ## 3. Repos *(ask first)*
 

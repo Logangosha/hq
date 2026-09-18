@@ -3,17 +3,22 @@
 A **domain** is a repo where a certain kind of work and files belong.
 HQ uses this list to decide where each Work Item goes.
 
-To add a domain, add a row. Only send work to domains with status `active`.
+To add a domain, use `/add-domain`. Only send work to domains with status `active`.
 
-## Settings
+This file is public (HQ is public). Keep repo names and descriptions generic — the
+content lives in the private domain repos.
 
-- **GitHub owner:** `Logangosha`
+## Owner
+
+Not stored. Every domain repo lives under the same GitHub account as this copy of HQ —
+find it with `gh repo view --json owner --jq .owner.login`. That way a fresh copy of HQ is
+already correct for whoever made it.
 
 ## Domains
 
 | Domain | Repo | Status | What belongs here |
 |---|---|---|---|
-| hq-test-sandbox | `hq-test-sandbox` | active | Fake test content for trying out the system. Safe to break. |
+| hq-test-sandbox | `hq-test-sandbox` | active | Starter domain every copy of HQ gets. Fake content for trying out the system. Safe to break. |
 
 ## Status meanings
 
