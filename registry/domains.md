@@ -13,8 +13,9 @@ HQ is public, so any list in this file would show your repos to anyone. Instead:
 | **Which repos are domains** | The owner's repos that have the Work Item workflow installed |
 | **What belongs in each** | That repo's GitHub description |
 
-See them with `bash scripts/list-domains.sh`. Every copy of HQ finds only its own owner's
-repos, so a fresh copy starts empty.
+**See your list:** type `/domains` in HQ, or on GitHub open your repositories filtered by
+the topic `hq-domain` (`/domains` gives you the link). Every copy of HQ finds only its own
+owner's repos, so a fresh copy starts empty.
 
 ## Adding and removing
 

@@ -28,8 +28,11 @@ The repo's GitHub description is how HQ knows what belongs there — there's no 
 Set it if it's empty or doesn't say:
 
 ```bash
-gh repo edit <owner>/<repo> --description "<what belongs here>"
+gh repo edit <owner>/<repo> --description "<what belongs here>" --add-topic hq-domain
 ```
+
+The `hq-domain` topic is what lets the user see all their domains on GitHub in one link
+(the `domains` skill gives it). Always add it, even if the description is already fine.
 
 ## 4. Workflow and labels
 

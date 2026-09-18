@@ -43,6 +43,7 @@ Brief, not clipped. Full sentences are fine; padding is not.
 | Setting HQ up for a new user | `setup-hq` skill |
 | Adding a repo | `add-domain` skill |
 | Is everything set up? | `check-setup` skill |
+| List my domains | `domains` skill |
 | What runs the agents on GitHub | `orchestration/work-item.yml`, installed by `scripts/enable-agents.sh` |
 | Reusable agents (one per lifecycle stage) | `.claude/agents/` |
 ## What HQ is NOT

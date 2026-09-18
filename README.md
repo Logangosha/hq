@@ -22,6 +22,7 @@ HQ is the control center for an AI work system.
 | `/new-work-item` | Turns what you want into a Work Item in the repo you name. Everyday use. |
 | `/setup-hq` | First-time setup on a new account: repos, workflow, Claude app, token, test run. |
 | `/add-domain` | Lets HQ start working in another repo. |
+| `/domains` | Lists the repos HQ can send work to. |
 | `/check-setup` | Checks that everything is connected, and fixes what it can. |
 
 **Agents do the work.** You never call them. Each one runs on GitHub when a Work Item
