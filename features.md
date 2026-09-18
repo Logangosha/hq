@@ -63,6 +63,7 @@ disagree. An agent that forgets to @ the next one would stall silently with a co
 - [x] F7.7 Each stage sets the next label, so the chain runs itself (sandbox #13 ran
       requirements → review unattended; needs `allowed_bots: "claude"`)
 - [ ] F7.8 A bounce works: an agent sets the label *backwards* and the right agent picks it up
+      *(deferred — test issues #15, #19 in the sandbox)*
 - [x] F7.9 Stop and wait when the user is needed (`waiting:*` skips the run), or when a
       stage is reached 3 times (workflow counts that agent's stage comments)
 - [ ] ✅ User check: create an Issue from your phone and watch it move
