@@ -22,7 +22,10 @@ HQ is the control center for an AI work system.
 | `/new-work-item` | Turns what you want into a Work Item in the repo you name. Everyday use. |
 | `/setup-hq` | First-time setup on a new account: repos, workflow, Claude app, token, test run. |
 | `/add-domain` | Lets HQ start working in another repo. |
+| `/review` | Runs a finished Work Item on your computer, then approves or rejects it. |
 | `/domains` | Lists the repos HQ can send work to. |
+| `/repos` | Lists all your GitHub repos: which are domains, which are on this computer. |
+| `/remove-domain` | Stops HQ working in a repo. The repo and its Issues stay. |
 | `/check-setup` | Checks that everything is connected, and fixes what it can. |
 
 **Agents do the work.** You never call them. Each one runs on GitHub when a Work Item
@@ -65,11 +68,15 @@ To see what's set up and what's missing at any time, type `/check-setup`.
    `/new-work-item add opening hours for Sundays in my-website`
 3. Walk away. The agents take it through requirements, checks, plan, build and QA, posting
    each step as a comment on the Issue.
-4. When it reaches `stage:review`, read the Issue and **merge the PR to approve**, or
-   comment what's wrong to send it back.
+4. When it reaches `stage:review`, type `/review my-website#12`. Claude switches your copy
+   of the repo to the PR, starts the app and shows it to you with the QA results.
+   Say **approve** to merge it, or say what's wrong to send it back to Requirements.
+   Claude handles all the git, and puts your copy back on `main` afterwards.
 
-### Adding a new repo later
+### Adding or removing a repo
 
-Type `/add-domain <repo name>` and say what kind of work goes there. Claude creates the
-repo if needed (asking first), installs the workflow, and walks you through
-adding the token on the GitHub website.
+Type `/repos` to see what you could add. Then `/add-domain <repo name>` and say what kind
+of work goes there. Claude creates the repo if needed (asking first), installs the
+workflow, and walks you through adding the token on the GitHub website.
+
+`/remove-domain <repo name>` takes a repo off the list without touching its contents.
