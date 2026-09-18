@@ -1,0 +1,23 @@
+# Secrets — never in git (see CLAUDE.md)
+.env
+.env.*
+*.pem
+*.key
+*token*.txt
+
+# Personal Claude Code settings (the shared ones are in .claude/settings.json)
+.claude/settings.local.json
+CLAUDE.local.md
+
+# OS and editor clutter
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+
+# Scratch
+*.log
+*.tmp
+__pycache__/
