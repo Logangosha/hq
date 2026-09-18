@@ -45,6 +45,7 @@ Brief, not clipped. Full sentences are fine; padding is not.
 | Unregistering a repo | `remove-domain` skill |
 | Is everything set up? | `check-setup` skill |
 | List my domains | `domains` skill |
+| All my repos (domain? local?) | `repos` skill |
 | What runs the agents on GitHub | `orchestration/work-item.yml`, installed by `scripts/enable-agents.sh` |
 | Reusable agents (one per lifecycle stage) | `.claude/agents/` |
 ## What HQ is NOT

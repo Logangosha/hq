@@ -9,7 +9,7 @@
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
-read -r OWNER SELF < <(cd "$HERE" && gh repo view --json owner,name --jq "(.owner.login) (.name)") || exit 1
+read -r OWNER SELF < <(cd "$HERE" && gh repo view --json owner,name --jq '"\(.owner.login) \(.name)"') || exit 1
 ROOT="${HQ_LOCAL_ROOT:-$(cd "$HERE/../.." && pwd)}"
 
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
@@ -28,6 +28,7 @@ done > "$TMP/local"
 gh repo list "$OWNER" --limit 1000 --no-archived --json name,isPrivate,description \
   --jq '.[] | "\(.name)\t\(.isPrivate)\t\(.description // "")"' | sort -f |
 while IFS=$'\t' read -r NAME PRIV DESC; do
+  [ "$NAME" = "$SELF" ] && continue  # HQ itself is never a domain
   KEY="$(printf '%s' "$NAME" | tr 'A-Z' 'a-z')"
   grep -qxF "$KEY" "$TMP/domains" && DOM=yes || DOM=no
   LOC="$(awk -F'\t' -v k="$KEY" '$1==k {print $2}' "$TMP/local" | paste -sd, -)"
