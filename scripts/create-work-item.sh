@@ -19,6 +19,24 @@ USAGE
   exit 1
 fi
 
+# --- can we work there? -----------------------------------------------------
+# A domain is a repo with the Work Item workflow (see registry/domains.md).
+# HQ itself is the one exception: work on the system is tracked there.
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
+HQ_REPO="$(cd "$HERE" && gh repo view --json nameWithOwner --jq .nameWithOwner)"
+
+if ! gh repo view "$REPO" >/dev/null 2>&1; then
+  echo "NO REPO: $REPO doesn't exist (or you can't see it). Nothing created." >&2
+  echo "To start working there: /add-domain ${REPO##*/}" >&2
+  exit 2
+fi
+if [ "$REPO" != "$HQ_REPO" ] && \
+   ! gh api "repos/$REPO/contents/.github/workflows/work-item.yml" --silent 2>/dev/null; then
+  echo "NOT A DOMAIN: $REPO exists but has no Work Item workflow, so no agent would run." >&2
+  echo "Nothing created. To set it up: /add-domain ${REPO##*/}" >&2
+  exit 3
+fi
+
 # --- the goal ---------------------------------------------------------------
 if [ "${3:-}" = "-" ]; then
   GOAL="$(cat)"

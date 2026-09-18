@@ -15,6 +15,20 @@ you picked if it wasn't obvious. A wrong route is undone with `gh issue transfer
 Stop only if no domain fits. Then say what's missing and propose one; creating a repo
 needs the user's yes.
 
+**Check it's a domain before anything else.** The owner is whoever owns this copy of HQ.
+A repo is a domain only if it has the Work Item workflow — otherwise no agent would run:
+
+```bash
+gh api repos/<owner>/<repo>/contents/.github/workflows/work-item.yml --silent
+```
+
+- **Repo doesn't exist** → stop. One line: it doesn't exist; `/add-domain <repo>` creates
+  and sets it up.
+- **Exists, no workflow** → stop. One line: it isn't set up yet; `/add-domain <repo>`.
+- `hq` itself is the exception — system work is tracked there without the workflow.
+
+The script refuses both cases too (exit 2 and 3), so nothing half-made is ever left behind.
+
 ## 2. Write the goal
 
 Their sentence is not the goal. The goal is two halves, and you work them out by **reading
