@@ -47,6 +47,11 @@ jobs:
           esac
           test -f ".claude/agents/$NAME.md" || { echo "No agent for $LABEL"; exit 1; }
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          case "$NAME" in
+            qa) MAX_TURNS=120 ;;
+            *)  MAX_TURNS=80 ;;
+          esac
+          echo "max_turns=$MAX_TURNS" >> "$GITHUB_OUTPUT"
         env:
           LABEL: ${{ github.event.label.name }}
 
@@ -70,6 +75,7 @@ jobs:
           fi
 
       - uses: anthropics/claude-code-action@v1
+        id: run_agent
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -77,7 +83,7 @@ jobs:
           # Each stage is started by the previous stage's label change, which the
           # claude bot makes. Without this the chain stops after stage 1.
           allowed_bots: "claude"
-          claude_args: '--allowedTools "Bash,Read,Write,Edit,Glob,Grep" --max-turns 40'
+          claude_args: '--allowedTools "Bash,Read,Write,Edit,Glob,Grep" --max-turns ${{ steps.agent.outputs.max_turns }}'
           prompt: |
             Work Item #${{ github.event.issue.number }} in ${{ github.repository }} has
             just been labelled `${{ github.event.label.name }}`, so you are the
@@ -92,3 +98,16 @@ jobs:
             Finish by posting your stage comment and setting the `stage:` label to the
             next stage (or back, if you are bouncing it). Use `gh` for both. Nothing
             else happens until that label changes.
+
+      # If the agent step above didn't complete (crash, timeout, hitting --max-turns),
+      # nothing else records that — without this the Issue would just sit silently.
+      - name: Report a failed agent step
+        if: failure() && steps.run_agent.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NUM: ${{ github.event.issue.number }}
+          NAME: ${{ steps.agent.outputs.name }}
+          LABEL: ${{ github.event.label.name }}
+        run: |
+          gh issue comment "$NUM" --repo "$GITHUB_REPOSITORY" --body \
+            "🛑 The **$NAME** agent step failed to complete for \`$LABEL\` (crash, timeout, or hit its turn limit). The Work Item is unchanged — a person needs to look."
