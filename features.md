@@ -2,6 +2,24 @@
 
 We build one small step at a time. Each feature ends with a **user check** before moving on.
 
+## The flow we're building toward
+
+1. **You say it.** In an HQ session: *"I want X done in Y."* A skill picks it up.
+2. **HQ turns it into a Work Item** — works out the repo, runs the script, opens the Issue
+   at `stage:requirements`.
+3. **GitHub runs it.** Each `stage:` label change wakes the agent for that stage. Agents
+   come from HQ; a domain repo can override or add its own.
+4. **You're alerted at `stage:review`** and approve by merging.
+
+You appear twice: at step 1 and step 4.
+
+| Step | Feature |
+|---|---|
+| 1 — say it | F5 |
+| 2 — becomes an Issue | F5 (built) |
+| 3 — GitHub runs it | F7 |
+| 4 — alerted, review | F8 |
+
 ---
 
 ## F1: HQ home base ✅
@@ -64,10 +82,11 @@ We build one small step at a time. Each feature ends with a **user check** befor
 
 - [x] F5.1 Write `scripts/create-work-item.sh`: takes a repo, title and goal, builds the body from the template, creates the Issue, and adds the `stage:` and `domain:` labels (creating any label that's missing)
 - [x] F5.2 Write the routing rules (request → domain; no workflow is chosen up front)
-- [ ] F5.3 Add a "new Work Item" instruction to `CLAUDE.md` that uses the script
+- [ ] F5.3 `new-work-item` skill: the front door. Takes *"I want X done in Y"*, applies
+      `routing.md`, runs the script, replies with one line and the link
 - [ ] F5.4 Test: a plain request becomes an Issue in `hq-test-sandbox`
-- [ ] F5.5 Test with 2 more sandbox requests
-- [ ] ✅ User check: did each request land in the right place, with the right workflow?
+- [ ] F5.5 Test with 2 more requests, including one where the repo isn't named
+- [ ] ✅ User check: did each request land in the right repo, with a goal you recognise?
 
 ## F6: Setup skill
 *Goal: anyone can copy HQ and set it up for themselves. Nothing personal is hardcoded.*
@@ -78,25 +97,33 @@ We build one small step at a time. Each feature ends with a **user check** befor
 - [ ] F6.4 Test it from a fresh copy of HQ
 - [ ] ✅ User check: run the setup yourself. Was it easy?
 
-## F7: Automatic execution (GitHub triggers Claude)
+## F7: GitHub runs it
 *Goal: create an Issue, walk away, and the work happens.*
 
-- [ ] F7.1 Install the Claude GitHub App *(user does this, with guidance)*
-- [ ] F7.2 Add the API key as a repo secret *(user does this)*
-- [ ] F7.3 Add a GitHub Action that runs when a stage label changes
-- [ ] F7.4 Test: set the Requirements stage, and Claude writes them
-- [ ] F7.5 Each stage hands off to the next automatically
-- [ ] F7.6 Stop and wait when the user is needed
-- [ ] F7.7 Stop after 3 failed QA runs
+**The trigger is the `stage:` label, not an @-mention.** The label is already the source of
+truth for where the work is, so using it as the trigger means state and trigger can never
+disagree. An agent that forgets to @ the next one would stall silently with a correct label.
+
+- [ ] F7.1 Decide how a domain repo reaches HQ's agents at run time (they live in a
+      different repo) *(ask first)*
+- [ ] F7.2 Install the Claude GitHub App *(user does this, with guidance)*
+- [ ] F7.3 Add the API key as a repo secret *(user does this)*
+- [ ] F7.4 Add a GitHub Action that fires on a `stage:` label change and runs that stage's agent
+- [ ] F7.5 A repo's own `.claude/agents/` overrides HQ's for that repo; HQ's is the fallback
+- [ ] F7.6 Test: set `stage:requirements`, and the requirements agent writes them
+- [ ] F7.7 Each stage sets the next label, so the chain runs itself
+- [ ] F7.8 A bounce works: an agent sets the label *backwards* and the right agent picks it up
+- [ ] F7.9 Stop and wait when the user is needed, or when a stage is reached 3 times
 - [ ] ✅ User check: create an Issue from your phone and watch it move
 
-## F8: Status view
-*Goal: see everything at a glance, from any device.*
+## F8: You're alerted, and you review
+*Goal: know when something needs you, without going looking.*
 
-- [ ] F8.1 GitHub Project board with a column per stage
-- [ ] F8.2 Auto-add Issues from all domain repos
-- [ ] F8.3 "Needs my decision" view
-- [ ] F8.4 "How's X going?" summaries from HQ
+- [ ] F8.1 Reaching `stage:review` notifies you (assign the Issue, so the phone app pings)
+- [ ] F8.2 GitHub Project board with a column per stage
+- [ ] F8.3 Auto-add Issues from all domain repos
+- [ ] F8.4 "Needs my decision" view — `stage:review` and `waiting:user` across every repo
+- [ ] F8.5 "How's X going?" summaries from HQ
 - [ ] ✅ User check: open the board on your phone. Is it clear what needs you?
 
 ## F9: Big goals become smaller Work Items
