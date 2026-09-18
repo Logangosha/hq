@@ -33,7 +33,7 @@ first and last step.
 - [x] F5.3 `new-work-item` skill: the front door. Takes *"I want X done in Y"*, applies
       `routing.md`, runs the script, replies with one line and the link
 - [x] F5.4 Test: a plain request becomes an Issue in `hq-test-sandbox`
-- [ ] F5.5 Test with 2 more requests, including one where the repo isn't named
+- [x] F5.5 Test with 2 more requests (the user always names the repo — no unnamed test)
 - [ ] ✅ User check: did each request land in the right repo, with a goal you recognise?
 
 ## F6: Setup skill
