@@ -59,8 +59,9 @@ disagree. An agent that forgets to @ the next one would stall silently with a co
 - [x] F7.4 `orchestration/work-item.yml` fires on a `stage:` label change and runs that
       stage's agent; `scripts/enable-agents.sh` installs it in a domain repo
 - [x] F7.5 A repo's own `.claude/agents/` overrides HQ's for that repo; HQ's is the fallback
-- [ ] F7.6 Test: set `stage:requirements`, and the requirements agent writes them
-- [ ] F7.7 Each stage sets the next label, so the chain runs itself
+- [x] F7.6 Test: set `stage:requirements`, and the requirements agent writes them
+- [x] F7.7 Each stage sets the next label, so the chain runs itself (sandbox #13 ran
+      requirements → review unattended; needs `allowed_bots: "claude"`)
 - [ ] F7.8 A bounce works: an agent sets the label *backwards* and the right agent picks it up
 - [ ] F7.9 Stop and wait when the user is needed, or when a stage is reached 3 times
 - [ ] ✅ User check: create an Issue from your phone and watch it move
