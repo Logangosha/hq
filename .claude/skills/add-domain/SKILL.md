@@ -1,6 +1,6 @@
 ---
 name: add-domain
-description: Add a new domain repo to HQ so Work Items can run in it — registry row, repo (created if missing, after asking), workflow, labels and the Claude token. Use when the user says "add a repo", "add a domain", "start using HQ in <repo>", or a Work Item is wanted in a repo not in registry/domains.md.
+description: Add a new domain repo to HQ so Work Items can run in it — repo (created if missing, after asking), description, workflow, labels and the Claude token. Use when the user says "add a repo", "add a domain", "start using HQ in <repo>", or a Work Item is wanted in a repo that has no Work Item workflow yet.
 ---
 
 # Add a domain
@@ -22,9 +22,14 @@ gh repo view <owner>/<repo>
 
 Missing → ask once, then `gh repo create <owner>/<repo> --private --add-readme -d "<what belongs here>"`.
 
-## 3. Registry
+## 3. Description
 
-Add a row to the table in `registry/domains.md`, status `active`.
+The repo's GitHub description is how HQ knows what belongs there — there's no list in HQ.
+Set it if it's empty or doesn't say:
+
+```bash
+gh repo edit <owner>/<repo> --description "<what belongs here>"
+```
 
 ## 4. Workflow and labels
 
@@ -40,11 +45,10 @@ Check first — it may already be there:
 gh secret list --repo <owner>/<repo>
 ```
 
-If `CLAUDE_CODE_OAUTH_TOKEN` is missing, walk them through step 5 of
+If `CLAUDE_CODE_OAUTH_TOKEN` is missing, walk them through step 4 of
 `.claude/skills/setup-hq/SKILL.md` (the web page route), with the repo filled in. Wait for
 "done", then check again.
 
-## 6. Save and confirm
+## 6. Confirm
 
-Commit and push `registry/domains.md`. Reply in one line: the repo is ready, and they can
-now say `/new-work-item … in <repo>`.
+One line: the repo is ready, and they can now say `/new-work-item … in <repo>`.

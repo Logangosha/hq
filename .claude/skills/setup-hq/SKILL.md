@@ -20,30 +20,18 @@ stop until it passes — nothing else works without `gh`.
 - **Owner:** nothing to set — it's whoever owns this copy of HQ. State it in one line
   (`gh repo view --json owner --jq .owner.login`). If it isn't them, they cloned someone
   else's HQ instead of copying it: send them to README → How to use, step 2.
-- **Domains:** ask what kinds of work they want HQ to handle, in their words. Turn each
-  answer into a row: a short repo name and one line of "What belongs here".
-- `hq-test-sandbox` is already in the registry — the starter domain every copy gets.
-  Keep it unless they say no.
+- **Domains:** ask what kinds of work they want HQ to handle, in their words, and which
+  repos (existing or new) that work lives in. A fresh copy of HQ has none.
+- **A place to test:** suggest one throwaway private repo of their own naming for the test
+  run in step 6, so the first Work Item doesn't touch anything real. Optional.
 
-Add their rows to `registry/domains.md`, status `active` for repos that will exist after
-step 3.
+## 3. Add each domain
 
-## 3. Repos *(ask first)*
+Run the `add-domain` skill for each repo, steps 1–4 (it asks before creating a repo, and
+sets the repo's description to what belongs there). If they chose a test repo, add a
+couple of small fake files to it so a test Work Item has something to change.
 
-List the repos that don't exist yet and ask once for all of them. On yes:
-
-```bash
-gh repo create <owner>/<repo> --private --add-readme -d "<What belongs here>"
-```
-
-For `hq-test-sandbox`, add a couple of small fake files (e.g. `docs/menu.md`) so a test
-Work Item has something to change.
-
-## 4. Workflow and labels
-
-For each domain, use the `add-domain` skill's step 4 (you run it).
-
-## 5. Claude app and token *(they do these — credentials are theirs)*
+## 4. Claude app and token *(they do these — credentials are theirs)*
 
 Give one at a time, wait for "done" between them.
 
@@ -67,13 +55,12 @@ Give one at a time, wait for "done" between them.
 If `claude` isn't found after installing, its folder isn't on PATH yet — open a new
 terminal, or on Windows add `%USERPROFILE%\.local\bin` to the user Path.
 
-## 6. Check, save, prove
+## 5. Check and prove
 
-1. `bash scripts/check-setup.sh` — must end "All set."
-2. Commit `registry/domains.md` and push.
-3. Create a test Work Item with the `new-work-item` skill in `hq-test-sandbox`, and give
-   them the link. The first comment should appear within a couple of minutes. If the run
-   fails, read it: `gh run list --repo <owner>/hq-test-sandbox` then
+1. Run the `check-setup` skill — it must end "All set."
+2. Create a small test Work Item with the `new-work-item` skill — in their test repo if
+   they made one — and give them the link. The first comment should appear within a
+   couple of minutes. If the run fails, read it: `gh run list --repo <owner>/<repo>` then
    `gh run view <id> --log-failed`.
 
 Done when a test Work Item reaches `stage:review` by itself.

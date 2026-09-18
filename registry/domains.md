@@ -1,32 +1,26 @@
-# Domain Registry
+# Domains
 
-A **domain** is a repo where a certain kind of work and files belong.
-HQ uses this list to decide where each Work Item goes.
+A **domain** is a repo where a certain kind of work and files belong. HQ sends each Work
+Item to one.
 
-To add a domain, use `/add-domain`. Only send work to domains with status `active`.
+## Nothing is listed here, on purpose
 
-This file is public (HQ is public). Keep repo names and descriptions generic — the
-content lives in the private domain repos.
+HQ is public, so any list in this file would show your repos to anyone. Instead:
 
-## Owner
+| What | Where it comes from |
+|---|---|
+| **Owner** | Whoever owns this copy of HQ |
+| **Which repos are domains** | The owner's repos that have the Work Item workflow installed |
+| **What belongs in each** | That repo's GitHub description |
 
-Not stored. Every domain repo lives under the same GitHub account as this copy of HQ —
-find it with `gh repo view --json owner --jq .owner.login`. That way a fresh copy of HQ is
-already correct for whoever made it.
+See them with `bash scripts/list-domains.sh`. Every copy of HQ finds only its own owner's
+repos, so a fresh copy starts empty.
 
-## Domains
+## Adding and removing
 
-| Domain | Repo | Status | What belongs here |
-|---|---|---|---|
-| hq-test-sandbox | `hq-test-sandbox` | active | Starter domain every copy of HQ gets. Fake content for trying out the system. Safe to break. |
-
-## Status meanings
-
-- **planned**: an idea only. The repo doesn't exist yet.
-- **active**: the repo exists and can receive Work Items.
-- **retired**: don't send new work here.
+- **Add:** `/add-domain <repo>` — installs the workflow and sets the description.
+- **Retire:** delete `.github/workflows/work-item.yml` from that repo. HQ stops seeing it.
 
 ## How to reach a domain
 
-Always work with domain repos through GitHub (for example, with the `gh` CLI).
-Don't rely on local folders — they differ on every computer.
+Always through GitHub (`gh`). Don't rely on local folders — they differ on every computer.

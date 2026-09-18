@@ -46,11 +46,11 @@ add labels by hand.
 
 One line, then the link. Nothing else — no recap of what you just wrote, they can open it.
 
-> Bakery docs → `hq-test-sandbox`. #12
+> Bakery docs → `bakery-site`. #12
 
 If you guessed the repo, or left a gap in the goal, that goes in the same line:
 
-> Guessing `hq-test-sandbox` over `hq` — bakery content, not the system. #12
+> Guessing `bakery-site` over `hq` — bakery content, not the system. #12
 
 ## If they ask for several things
 

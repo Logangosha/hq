@@ -37,7 +37,7 @@ Brief, not clipped. Full sentences are fine; padding is not.
 | Big picture | `README.md` |
 | Build roadmap (check off steps as they finish) | `features.md` |
 | Lifecycle rules | `orchestration/lifecycle.md` |
-| Domain repos (where work goes) | `registry/domains.md` |
+| Domain repos (where work goes) | `scripts/list-domains.sh` — why nothing is listed: `registry/domains.md` |
 | Which repo a request goes to | `registry/routing.md` |
 | Turning a request into an Issue | `new-work-item` skill |
 | Setting HQ up for a new user | `setup-hq` skill |

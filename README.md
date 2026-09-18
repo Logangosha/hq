@@ -61,7 +61,7 @@ To see what's set up and what's missing at any time, type `/check-setup`.
 
 1. Open a Claude Code session on `hq` — desktop, terminal, or the Claude phone app (Code tab).
 2. Say what you want and which repo it's for:
-   `/new-work-item add opening hours for Sundays in hq-test-sandbox`
+   `/new-work-item add opening hours for Sundays in my-website`
 3. Walk away. The agents take it through requirements, checks, plan, build and QA, posting
    each step as a comment on the Issue.
 4. When it reaches `stage:review`, read the Issue and **merge the PR to approve**, or
@@ -70,5 +70,5 @@ To see what's set up and what's missing at any time, type `/check-setup`.
 ### Adding a new repo later
 
 Type `/add-domain <repo name>` and say what kind of work goes there. Claude creates the
-repo if needed (asking first), registers it, installs the workflow, and walks you through
+repo if needed (asking first), installs the workflow, and walks you through
 adding the token on the GitHub website.

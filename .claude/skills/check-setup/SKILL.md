@@ -20,11 +20,10 @@ bash scripts/check-setup.sh
 | Problem | Who fixes it |
 |---|---|
 | Workflow or labels missing | You — `bash scripts/enable-agents.sh <owner>/<repo>`, then re-check |
-| Repo missing | You, after asking — see the `add-domain` skill |
-| No domains | You — run the `setup-hq` skill |
+| No domains | You — ask which repo, then the `add-domain` skill |
 | HQ belongs to someone else | The user — copy HQ into their own account (README → How to use) |
 | HQ not public | The user — GitHub → `hq` → Settings → Change visibility |
-| Token secret missing | The user — step 5 of `.claude/skills/setup-hq/SKILL.md` |
+| Token secret missing | The user — step 4 of `.claude/skills/setup-hq/SKILL.md` |
 | git / gh / gh login missing | The user — give the install link or `gh auth login` |
 
 Re-run the check after each fix, and finish on "All set".

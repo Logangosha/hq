@@ -2,11 +2,11 @@
 # Report what's set up and what's missing. Changes nothing.
 # Usage: bash scripts/check-setup.sh
 #
-# The owner is whoever owns this copy of HQ. Domains come from registry/domains.md.
+# The owner is whoever owns this copy of HQ. Domains are that owner's repos with the
+# Work Item workflow installed (scripts/list-domains.sh).
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
-REG="$HERE/registry/domains.md"
 PROBLEMS=0
 
 ok()   { echo "  ✅ $1"; }
@@ -38,24 +38,17 @@ ME="$(gh api user --jq .login)"
 [ "$OWNER" = "$ME" ] && ok "owner: $OWNER" \
   || bad "this HQ belongs to $OWNER, but gh is logged in as $ME" "copy HQ into your own account (README → How to use)"
 
-# Rows look like: | name | `repo` | active | ... |
-DOMAINS="$(sed -nE 's/^\|[^|]+\| *`([^`]+)` *\| *active *\|.*/\1/p' "$REG")"
+DOMAINS="$(bash "$HERE/scripts/list-domains.sh" | cut -f1)"
 if [ -z "$DOMAINS" ]; then
-  bad "no active domains in registry/domains.md" "run /setup-hq"
+  bad "no domains yet (no repo of yours has the Work Item workflow)" "/add-domain <repo>"
 fi
 
 for D in $DOMAINS; do
   R="$OWNER/$D"
   echo; echo "Domain: $R"
-  if ! gh repo view "$R" >/dev/null 2>&1; then
-    bad "repo doesn't exist" "run /setup-hq, or: gh repo create $R --private"
-    continue
-  fi
-  ok "repo exists"
-  gh api "repos/$R/contents/.github/workflows/work-item.yml" >/dev/null 2>&1 \
-    && ok "workflow installed" || bad "no workflow" "bash scripts/enable-agents.sh $R"
+  ok "workflow installed"
   gh label list --repo "$R" --search stage:requirements --json name --jq '.[].name' | grep -qx stage:requirements \
-    && ok "labels" || bad "labels missing" "bash scripts/create-labels.sh $R"
+    && ok "labels" || bad "labels missing" "/add-domain $D"
   gh secret list --repo "$R" 2>/dev/null | grep -q CLAUDE_CODE_OAUTH_TOKEN \
     && ok "CLAUDE_CODE_OAUTH_TOKEN secret" \
     || bad "no Claude token secret" "copy the token from 'claude setup-token', then in PowerShell:
