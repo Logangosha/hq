@@ -36,13 +36,15 @@ first and last step.
 - [x] F5.5 Test with 2 more requests (the user always names the repo — no unnamed test)
 - [ ] ✅ User check: did each request land in the right repo, with a goal you recognise?
 
-## F6: Setup skill
-*Goal: anyone can copy HQ and set it up for themselves. Nothing personal is hardcoded.*
+## F6: Setup for a new user
+*Goal: anyone can copy HQ onto a fresh computer and get a Work Item running. Nothing personal is hardcoded.*
 
-- [ ] F6.1 `setup-hq` skill asks for the GitHub owner and domains
-- [ ] F6.2 It fills in `registry/domains.md`
-- [ ] F6.3 It creates any missing repos *(asks first)*
-- [ ] F6.4 Test it from a fresh copy of HQ
+- [x] F6.1 Make `hq` a template repo, so copying is one `gh repo create --template` command
+- [x] F6.2 `scripts/check-setup.sh` — reports what's set up and what's missing
+- [x] F6.3 `setup-hq` skill: owner, domains, repos *(asks first)*, workflow, app, token,
+      then a test Work Item
+- [x] F6.4 README "How to use" section
+- [ ] F6.5 Test it from a fresh copy of HQ, on a different account
 - [ ] ✅ User check: run the setup yourself. Was it easy?
 
 ## F7: GitHub runs it

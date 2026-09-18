@@ -40,6 +40,8 @@ Brief, not clipped. Full sentences are fine; padding is not.
 | Domain repos (where work goes) | `registry/domains.md` |
 | Which repo a request goes to | `registry/routing.md` |
 | Turning a request into an Issue | `new-work-item` skill |
+| Setting HQ up for a new user | `setup-hq` skill, `scripts/check-setup.sh` |
+| What runs the agents on GitHub | `orchestration/work-item.yml`, installed by `scripts/enable-agents.sh` |
 | Reusable agents (one per lifecycle stage) | `.claude/agents/` |
 ## What HQ is NOT
 - Not a place for personal files. Those belong in their own domain repos.
