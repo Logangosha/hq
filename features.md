@@ -54,10 +54,11 @@ disagree. An agent that forgets to @ the next one would stall silently with a co
 
 - [x] F7.1 Decide how a domain repo reaches HQ's agents at run time → **HQ is public;
       each domain repo's Action fetches HQ's agents when it runs.** No token, one place to edit.
-- [ ] F7.2 Install the Claude GitHub App *(user does this, with guidance)*
-- [ ] F7.3 Add the API key as a repo secret *(user does this)*
-- [ ] F7.4 Add a GitHub Action that fires on a `stage:` label change and runs that stage's agent
-- [ ] F7.5 A repo's own `.claude/agents/` overrides HQ's for that repo; HQ's is the fallback
+- [x] F7.2 Install the Claude GitHub App *(user does this, with guidance)*
+- [x] F7.3 Add `CLAUDE_CODE_OAUTH_TOKEN` as a repo secret *(user does this, per repo)*
+- [x] F7.4 `orchestration/work-item.yml` fires on a `stage:` label change and runs that
+      stage's agent; `scripts/enable-agents.sh` installs it in a domain repo
+- [x] F7.5 A repo's own `.claude/agents/` overrides HQ's for that repo; HQ's is the fallback
 - [ ] F7.6 Test: set `stage:requirements`, and the requirements agent writes them
 - [ ] F7.7 Each stage sets the next label, so the chain runs itself
 - [ ] F7.8 A bounce works: an agent sets the label *backwards* and the right agent picks it up
