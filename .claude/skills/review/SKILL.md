@@ -38,6 +38,9 @@ Then, beside it, one short block:
 - **What changed:** the PR title and one line.
 - **QA:** the `## 5. QA` comment's table, trimmed to check + result.
 - **Try this:** one or two things to click, taken from the requirements.
+- **⚠️ Changes `.claude/`** — only if the PR does (`gh pr diff <pr> --name-only`). List
+  those files and say what each change does in one line: they change how agents and
+  Claude behave, so they need a closer look than the app.
 
 Ask: **approve**, or what's wrong?
 
