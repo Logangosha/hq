@@ -29,7 +29,7 @@ HQ is the control center for an AI work system.
    rest: your domain repos, the workflow, the Claude GitHub App and the token. It finishes
    by running a test Work Item.
 
-To see what's set up and what's missing at any time: `bash scripts/check-setup.sh`
+To see what's set up and what's missing at any time, type `/check-setup`.
 
 ### Everyday use
 
@@ -43,10 +43,6 @@ To see what's set up and what's missing at any time: `bash scripts/check-setup.s
 
 ### Adding a new repo later
 
-Add a row to `registry/domains.md`, then:
-
-```bash
-bash scripts/enable-agents.sh <owner>/<repo>
-```
-
-and add the token secret to it (`/setup-hq` shows the exact command).
+Type `/add-domain <repo name>` and say what kind of work goes there. Claude creates the
+repo if needed (asking first), registers it, installs the workflow, and walks you through
+adding the token on the GitHub website.

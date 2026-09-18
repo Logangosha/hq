@@ -10,9 +10,7 @@ time, short replies. They may be new to GitHub — give exact commands, never "c
 
 ## 1. See where they are
 
-```bash
-bash scripts/check-setup.sh
-```
+Run `bash scripts/check-setup.sh` yourself — the user never runs commands.
 
 Start from the first ❌. If tools are missing (git, gh, gh login), give them the fix and
 stop until it passes — nothing else works without `gh`.
@@ -40,11 +38,7 @@ Work Item has something to change.
 
 ## 4. Workflow and labels
 
-For each domain:
-
-```bash
-bash scripts/enable-agents.sh <owner>/<repo>
-```
+For each domain, use the `add-domain` skill's step 4 (you run it).
 
 ## 5. Claude app and token *(they do these — credentials are theirs)*
 
@@ -54,13 +48,18 @@ Give one at a time, wait for "done" between them.
 2. **Token:** needs Claude Code in a terminal. In a plain PowerShell / Terminal window
    (not inside the Claude desktop app — it won't see a fresh install):
    `claude setup-token`, then copy the token it prints.
-3. **Secret, per domain.** Strip whitespace — a terminal that wraps the long token
-   inserts line breaks when copying, and the run then fails with a bad token.
-   - Windows PowerShell:
-     `gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo <owner>/<repo> --body ((Get-Clipboard -Raw) -replace '\s','')`
-   - Mac: `pbpaste | tr -d '[:space:]' | gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo <owner>/<repo>`
+3. **Secret, per domain — on the GitHub website**, so they type no commands. Send them
+   `https://github.com/<owner>/<repo>/settings/secrets/actions/new` (filled in), then:
+   - **Name:** `CLAUDE_CODE_OAUTH_TOKEN`
+   - **Secret:** paste the token. It must be **one line** starting `sk-ant-oat01`. A
+     terminal that wraps the long token inserts line breaks when copying — if the box
+     shows more than one line, delete the breaks.
+   - **Add secret.**
 
-   Give the command once per domain, with the repo filled in.
+   If a run later fails in ~1 turn with $0 cost, the token has a stray break. Terminal
+   fallback that strips it — Windows PowerShell:
+   `gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo <owner>/<repo> --body ((Get-Clipboard -Raw) -replace '\s','')`
+   — Mac: `pbpaste | tr -d '[:space:]' | gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo <owner>/<repo>`
 
 If `claude` isn't found after installing, its folder isn't on PATH yet — open a new
 terminal, or on Windows add `%USERPROFILE%\.local\bin` to the user Path.
