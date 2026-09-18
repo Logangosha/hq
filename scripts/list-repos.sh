@@ -4,26 +4,18 @@
 # domain = yes/no. local = path(s) of clones found on this computer, or "-".
 # Usage: bash scripts/list-repos.sh
 #
-# Clones are looked for up to 3 folders below the folder two levels above HQ
-# (e.g. .../GitHub when HQ is .../GitHub/<owner>/hq). Set HQ_LOCAL_ROOT to look elsewhere.
+# Clones are found by scripts/find-clones.sh.
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 OWNER="$(cd "$HERE" && gh repo view --json owner --jq .owner.login)" || exit 1
-ROOT="${HQ_LOCAL_ROOT:-$(cd "$HERE/../.." && pwd)}"
 
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 
 # Domains, using the same rule as list-domains.sh
 bash "$HERE/scripts/list-domains.sh" | cut -f1 | tr 'A-Z' 'a-z' > "$TMP/domains"
 
-# Local clones: "lowercase-repo<TAB>path" for each one whose origin is this owner's
-find "$ROOT" -maxdepth 4 -type d -name .git -prune 2>/dev/null | while read -r G; do
-  D="$(dirname "$G")"
-  URL="$(git -C "$D" remote get-url origin 2>/dev/null)" || continue
-  NAME="$(printf '%s' "$URL" | sed -nE "s#.*[:/]$OWNER/([^/]+)\$#\1#Ip" | sed 's/\.git$//')"
-  [ -n "$NAME" ] && printf '%s\t%s\n' "$(printf '%s' "$NAME" | tr 'A-Z' 'a-z')" "$D"
-done > "$TMP/local"
+bash "$HERE/scripts/find-clones.sh" > "$TMP/local"
 
 gh repo list "$OWNER" --limit 1000 --no-archived --json name,isPrivate,description \
   --jq '.[] | "\(.name)\t\(.isPrivate)\t\(.description // "")"' | sort -f |

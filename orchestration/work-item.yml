@@ -83,7 +83,10 @@ jobs:
           # Each stage is started by the previous stage's label change, which the
           # claude bot makes. Without this the chain stops after stage 1.
           allowed_bots: "claude"
-          claude_args: '--allowedTools "Bash,Read,Write,Edit,Glob,Grep" --max-turns ${{ steps.agent.outputs.max_turns }}'
+          # bypassPermissions: no one is here to approve prompts, and without it writes
+          # to .claude/ (skills, agents) are always refused. The runner is thrown away
+          # after the run; everything still reaches main only through a reviewed PR.
+          claude_args: '--permission-mode bypassPermissions --allowedTools "Bash,Read,Write,Edit,Glob,Grep" --max-turns ${{ steps.agent.outputs.max_turns }}'
           prompt: |
             Work Item #${{ github.event.issue.number }} in ${{ github.repository }} has
             just been labelled `${{ github.event.label.name }}`, so you are the
