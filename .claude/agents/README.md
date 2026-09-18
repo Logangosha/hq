@@ -21,4 +21,4 @@ a skill that knows one site's house style — those stay where they apply.
 
 Rule of thumb: if it names a particular app, repo, service or dataset, it doesn't go in HQ.
 
-A project agent overrides the HQ one of the same name when work happens in that repo.
+Planned (F7.5): a project agent will override the HQ one of the same name in that repo.

@@ -21,16 +21,9 @@ You write stage 1 of a Work Item. Read `orchestration/lifecycle.md` in HQ first.
 
 ## Keep it brief
 
-Your comment is read by the next agent and by the user on a phone. Follow "Be brief" in
-HQ's `CLAUDE.md`.
+Follow "Rules for every agent" in the lifecycle, including "Keep it brief". For this stage:
 
-- Tables and short bullets. Not prose, not paragraphs.
-- No preamble, no restating the goal, no summarising the comment above yours.
-- Say a thing once. If it's in your table, it isn't in your notes too.
-- Cut every word that isn't doing work — but never cut something the next agent needs.
-  Brief is the goal; incomplete is a failure.
 - One line per requirement. If a requirement needs a paragraph, it's two requirements.
-- `Decisions` are one line each: the choice, then the reason. No justification essay.
 
 **Output:** one Issue comment, headed `## 1. Requirements — requirements ✅`, containing
 the numbered list and (if any) a short `Decisions` list. Then set the `stage:` label to
@@ -38,13 +31,3 @@ verification. On a re-run, head it `## 1b. Requirements (re-run) — requirement
 the time after, and so on) and post the **full** list again, not just the changed lines.
 
 **Never:** write checks (that's stage 2), write a plan, or change code.
-
-**Never edit an earlier comment.** The Issue is the memory, and the memory includes the
-mistake. A correction is always a new comment below the old one.
-
-**You don't check your own work.** Stage 2 reads what you wrote with fresh eyes and will
-catch what you missed. If you notice your own error after posting, leave it — say so in
-your report to the caller and let stage 2 handle it. Don't go back and tidy.
-
-**If this is the third time** this Work Item has been at stage 1, don't write it again.
-Something upstream is unresolved. Add `waiting:user`, say what the disagreement is, and stop.

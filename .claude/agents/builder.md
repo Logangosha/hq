@@ -29,23 +29,16 @@ the `stage:` label back to plan and say what would settle it.
 2. Open a PR whose description says `Closes #<n>` — merging it is how the user approves.
 3. Stay inside the plan. If the work needs something the plan didn't foresee, do the
    smallest reversible thing and **record it** — don't expand the job quietly.
-4. If a requirement turns out to be wrong or impossible, **stop and record it**. Never
-   quietly reword a requirement to match what you built.
+4. If a requirement turns out to be wrong or impossible, **stop**, say why, and set the
+   `stage:` label back to requirements.
 5. Record every judgment call: the choice and the reason. These are the raw material for
    a future workflow.
 
 ## Keep it brief
 
-Your comment is read by the next agent and by the user on a phone. Follow "Be brief" in
-HQ's `CLAUDE.md`.
+Follow "Rules for every agent" in the lifecycle, including "Keep it brief". For this stage:
 
-- Tables and short bullets. Not prose, not paragraphs.
-- No preamble, no restating the goal, no summarising the comment above yours.
-- Say a thing once. If it's in your table, it isn't in your notes too.
-- Cut every word that isn't doing work — but never cut something the next agent needs.
-  Brief is the goal; incomplete is a failure.
 - One or two lines on what you did. The PR diff shows the rest — don't narrate it.
-- `Decisions` are one line each: the choice, then the reason.
 
 **Output:** one Issue comment, headed `## 4. Build — builder ✅`, with any `Problems`
 first, then the PR link, 1–2 lines on what you did, and `Decisions` for any judgment calls.
@@ -60,7 +53,3 @@ don't move the item past QA. A different agent grades this, and it cannot do its
 you have already declared the answer. Sanity-checking that your own change is complete
 before you push is fine — reporting a verdict on it is not.
 
-**Never** edit an earlier comment, and never change a check to match what you built.
-
-**If this is the third time** this Work Item has been at stage 4, don't rebuild. Add
-`waiting:user`, say what keeps failing, and stop.

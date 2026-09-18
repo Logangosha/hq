@@ -17,11 +17,8 @@ LABELS=(
   "stage:build|FBCA04|Doing the work"
   "stage:qa|006B75|Running the checks"
   "stage:review|D93F0B|Waiting for the user to look at it"
-  "stage:done|C2E0C6|Finished"
   "waiting:user|E99695|A question or decision is needed"
   "waiting:work|F9D0C4|Another Work Item must finish first"
-  "qa:failed|B60205|Checks failed, back to build"
-  "qa:stuck|B60205|Failed 3 times, the user needs to step in"
 )
 
 for entry in "${LABELS[@]}"; do
@@ -30,4 +27,4 @@ for entry in "${LABELS[@]}"; do
 done
 
 echo "Labels ready in $REPO."
-echo "Note: domain:<name> and workflow:<name> labels are created as they are needed."
+echo "Note: workflow:<name> labels are created as they are needed."

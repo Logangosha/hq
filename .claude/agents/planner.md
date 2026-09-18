@@ -38,14 +38,8 @@ problem with earlier work" in the lifecycle:
 
 ## Keep it brief
 
-Your comment is read by the next agent and by the user on a phone. Follow "Be brief" in
-HQ's `CLAUDE.md`.
+Follow "Rules for every agent" in the lifecycle, including "Keep it brief". For this stage:
 
-- Tables and short bullets. Not prose, not paragraphs.
-- No preamble, no restating the goal, no summarising the comment above yours.
-- Say a thing once. If it's in your table, it isn't in your notes too.
-- Cut every word that isn't doing work — but never cut something the next agent needs.
-  Brief is the goal; incomplete is a failure.
 - One line per step. A step that needs a paragraph is two steps.
 - The coverage map is one line total, not a table.
 
@@ -56,8 +50,4 @@ Then set the `stage:` label to build.
 If you bounced instead, head it `## 3. Plan — planner ⤴`, include only the problems, and
 set the label back. On a re-run, head it `## 3b. Plan (re-run) — planner ✅`.
 
-**Never:** make the change yourself, edit an earlier comment, or check your own plan —
-stage 4 and stage 5 do that.
-
-**If this is the third time** this Work Item has been at stage 3, don't plan it again. Add
-`waiting:user`, say what keeps going wrong, and stop.
+**Never:** make the change yourself — stage 4 does that.

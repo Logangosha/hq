@@ -2,89 +2,37 @@
 
 We build one small step at a time. Each feature ends with a **user check** before moving on.
 
-## The flow we're building toward
-
-1. **You say it.** In an HQ session: *"I want X done in Y."* A skill picks it up.
-2. **HQ turns it into a Work Item** — works out the repo, runs the script, opens the Issue
-   at `stage:requirements`.
-3. **GitHub runs it.** Each `stage:` label change wakes the agent for that stage. Agents
-   come from HQ; a domain repo can override or add its own.
-4. **You're alerted at `stage:review`** and approve by merging.
-
-You appear twice: at step 1 and step 4.
-
-| Step | Feature |
-|---|---|
-| 1 — say it | F5 |
-| 2 — becomes an Issue | F5 (built) |
-| 3 — GitHub runs it | F7 |
-| 4 — alerted, review | F8 |
+The flow we're building toward: **you say it** (F5) → **it becomes an Issue** (F5) →
+**GitHub runs it** (F7) → **you're alerted and review** (F8). You appear only at the
+first and last step.
 
 ---
 
-## F1: HQ home base ✅
-*Goal: any Claude session can open HQ and understand the system.*
+## Done so far ✅
 
-- [x] F1.1 Create the `hq` folder
-- [x] F1.2 Add `README.md` (what HQ is)
-- [x] F1.3 Add `CLAUDE.md` (instructions for Claude)
-- [x] F1.4 Add `orchestration/lifecycle.md` (stages and rules)
-- [x] F1.5 Add `registry/domains.md` (list of domain repos)
-- [x] F1.6 Create the private GitHub repo and push
-- [x] F1.7 Add `features.md` (this roadmap)
-- [ ] ✅ User check: read the README on GitHub
+- **F1 HQ home base** — README, CLAUDE.md, lifecycle, domain registry, private repo.
+- **F2 Work Item format** — goal-only Issue body, stage labels, `create-labels.sh`, `hq-test-sandbox`.
+- **F3 Test run by hand** — one sandbox Work Item taken through every stage to a merge.
+- **F4 Reusable agents** — one agent per stage in `.claude/agents/`; generic ones live in HQ.
 
-## F2: Work Item template
-*Goal: every Work Item looks the same, and HQ can create one in any domain repo.*
+## F4 (deferred): workflows that write themselves
 
-- [x] F2.1 Write the Issue template (Goal, Requirements, Verification, Plan, Result)
-- [x] F2.2 Define the labels (stage, waiting, domain, workflow)
-- [x] F2.3 Add the template to the repo
-- [x] F2.4 Write a script that creates the labels in a repo
-- [x] F2.5 Create the `hq-test-sandbox` repo
-- [x] F2.6 From an HQ session, create a test Issue in `hq-test-sandbox`
-- [ ] ✅ User check: open the test Issue. Is it easy to read?
-
-## F3: Test run by hand (in the sandbox)
-*Goal: prove the lifecycle works, using fake content only.*
-
-- [x] F3.1 Add some fake starter content to `hq-test-sandbox`
-- [x] F3.2 Create the Work Item Issue (no workflow file — the framework is enough)
-- [x] F3.3 Requirements: Claude writes them
-- [x] F3.4 Verification: Claude writes the checklist
-- [x] F3.5 Plan (no approval stop — agents keep going)
-- [x] F3.6 Build: Claude makes the change in a PR
-- [x] F3.7 QA: a separate agent runs the checklist and posts evidence
-- [x] F3.8 **Human review: user approves and merges** (the only planned stop)
-- [x] F3.9 Claude records on the Issue any judgment calls it had to make
-- [ ] ✅ User check: read the Issue top to bottom. Is it clear what happened?
-
-## F4: Reusable agents, and workflows that write themselves
-*Goal: agent roles are defined once, and repeated lessons become reusable rules the user only has to approve.*
-
-- [x] F4.1 Decide where capabilities live (own repo or inside HQ) *(ask first)*
-- [x] F4.2 Write the requirements agent
-- [x] F4.3 Write the QA agent
-- [x] F4.4 Write the planner agent
-- [x] F4.5 Write the builder agent
-- [x] F4.6 Record in HQ where capabilities live
-- [x] F4.7 Re-run a small sandbox Work Item using these agents
-- [ ] F4.8 Add the "propose a workflow" step: after a few similar Work Items, Claude reads the judgment calls it recorded and offers a short overlay (about 15 lines) for the user to approve
+- [ ] F4.8 After a few similar Work Items, Claude reads the recorded `Decisions` and offers
+      a short overlay (about 15 lines) for the user to approve
 - [ ] F4.9 Store approved overlays in `orchestration/workflows/` and use them automatically
 - [ ] ✅ User check: read a proposed workflow. Is it 5 lines you agree with?
 
-> **Deferred:** F4.8/F4.9 need several similar Work Items to generalise from. Revisit once
-> there is a real backlog. The bounce-back path is likewise best tested in F7, where agents
-> hand off through GitHub rather than through a chat session.
+> Needs several similar Work Items to generalise from. Revisit once there is a real backlog.
 
 ## F5: HQ creates work from plain English
 *Goal: the user says what they want, and HQ creates the Issue in the right place.*
 
-- [x] F5.1 Write `scripts/create-work-item.sh`: takes a repo, title and goal, builds the body from the template, creates the Issue, and adds the `stage:` and `domain:` labels (creating any label that's missing)
+- [x] F5.1 Write `scripts/create-work-item.sh`: takes a repo, title and goal, creates the
+      Issue with the goal as its body, at `stage:requirements`
 - [x] F5.2 Write the routing rules (request → domain; no workflow is chosen up front)
 - [x] F5.3 `new-work-item` skill: the front door. Takes *"I want X done in Y"*, applies
       `routing.md`, runs the script, replies with one line and the link
-- [ ] F5.4 Test: a plain request becomes an Issue in `hq-test-sandbox`
+- [x] F5.4 Test: a plain request becomes an Issue in `hq-test-sandbox`
 - [ ] F5.5 Test with 2 more requests, including one where the repo isn't named
 - [ ] ✅ User check: did each request land in the right repo, with a goal you recognise?
 

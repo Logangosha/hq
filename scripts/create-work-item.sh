@@ -5,7 +5,7 @@
 #   bash scripts/create-work-item.sh owner/repo "Title" "Current state" "Desired state"
 #   bash scripts/create-work-item.sh owner/repo "Title" -   # goal body on stdin
 #
-# The Issue starts at stage:requirements. Missing labels are created.
+# The Issue starts at stage:requirements. The label is created if missing.
 set -euo pipefail
 
 REPO="${1:-}"
@@ -40,8 +40,6 @@ BODY="## Goal
 $GOAL"
 
 # --- labels -----------------------------------------------------------------
-# domain: is the repo name, so a Work Item can be found without opening it.
-DOMAIN="domain:${REPO##*/}"
 STAGE="stage:requirements"
 
 ensure_label() {  # name, color, description
@@ -51,14 +49,12 @@ ensure_label() {  # name, color, description
 }
 
 ensure_label "$STAGE" "1D76DB" "Deciding what must be true when done"
-ensure_label "$DOMAIN" "BFD4F2" "Work belonging to ${REPO##*/}"
 
 # --- create -----------------------------------------------------------------
 URL="$(gh issue create \
   --repo "$REPO" \
   --title "Work Item: $TITLE" \
   --body "$BODY" \
-  --label "$STAGE" \
-  --label "$DOMAIN")"
+  --label "$STAGE")"
 
 echo "$URL"

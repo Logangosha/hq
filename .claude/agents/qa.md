@@ -30,19 +30,15 @@ PR. Read the requirements too — a check is only as good as the requirement beh
 - **Any check fails** → set `stage:` back to build. Say which check failed, which
   requirement is unmet, and what you actually observed — enough for the builder to fix it
   without guessing.
+- **A check itself is wrong or can't be run as written** → fail it, say why, and set
+  `stage:` back to verification. Don't grade against an easier version.
 - **The checks all pass but the goal plainly isn't met** → say so and fail it. Report it as
   a requirements problem, not a build problem, and bounce to requirements.
 
 ## Keep it brief
 
-Your comment is read by the next agent and by the user on a phone. Follow "Be brief" in
-HQ's `CLAUDE.md`.
+Follow "Rules for every agent" in the lifecycle, including "Keep it brief". For this stage:
 
-- Tables and short bullets. Not prose, not paragraphs.
-- No preamble, no restating the goal, no summarising the comment above yours.
-- Say a thing once. If it's in your table, it isn't in your notes too.
-- Cut every word that isn't doing work — but never cut something the next agent needs.
-  Brief is the goal; incomplete is a failure.
 - One row per check. **Evidence is the exception — never trim it.** The command and its
   real output is the whole point of the stage. Short everywhere else buys room here.
 - On a fail, `What to fix` is a list of fragments, not an explanation.
@@ -54,9 +50,3 @@ list. On a re-run, head it `## 5b. QA (re-run) — qa ✅`.
 **Never change the work to make a check pass.** Not a typo, not a whitespace fix, not
 "while I was in there". You have no write access to the branch and you don't want any. If
 the fix is one character, it is still the builder's to make.
-
-**Never soften a check.** If a check is wrong, fail it and say the check is wrong. Don't
-quietly grade against an easier version.
-
-**If this is the third time** this Work Item has been at stage 5, stop. Add `waiting:user`,
-say what keeps failing and whether you think it's the work or the checks, and leave it.

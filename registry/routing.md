@@ -14,7 +14,7 @@ not a writing project.
 
 1. **Only `active` domains.** Never route to `planned` or `retired`.
 2. **Work on the system itself goes to `hq`** — the lifecycle, the agents, the scripts,
-   the roadmap. HQ is not a domain in `domains.md` and never gets a `domain:` label.
+   the roadmap. HQ is not a domain in `domains.md`.
 3. **Two domains fit** → pick the one that owns the files being changed. If the work
    genuinely spans both, it's two Work Items, one per repo. Say so and link them.
 4. **No domain fits** → stop. Don't invent a repo and don't force it into the closest one.
@@ -30,12 +30,4 @@ Nothing to route. The lifecycle is the same for every Work Item, and no workflow
 chosen up front — see "Workflows" in `orchestration/lifecycle.md`. A `workflow:` label
 appears only after the user has approved an overlay for that kind of work.
 
-## What to say
-
-One line, then the link:
-
-> Bakery docs → `hq-test-sandbox`. #12
-
-If you had to guess, say so in the same line:
-
-> Guessing `hq-test-sandbox` over `hq` — it changes bakery content, not the system. #12
+The reply format is in the `new-work-item` skill.
