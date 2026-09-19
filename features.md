@@ -81,7 +81,7 @@ disagree. An agent that forgets to @ the next one would stall silently with a co
 ## F8: You're alerted, and you review
 *Goal: know when something needs you, without going looking.*
 
-- [x] F8.1 Reaching `stage:review` notifies you (assign the Issue, so the phone app pings)
+- [ ] F8.1 Reaching `stage:review` notifies you (assign the Issue, so the phone app pings) *(built; test pending)*
 - [ ] F8.2 `work-items` flags what needs you — `stage:review` and `waiting:user` — so you
       can find an item without its number
 - [x] F8.3 `/review <repo>#<n>`: run the PR on your computer, then approve (merge) or reject
