@@ -89,6 +89,21 @@
   .diff .del { background: var(--del-bg); color: var(--del); }
   .diff .hunk { color: var(--hunk); background: var(--chip); }
   .spinner { color: var(--muted); padding: 24px 0; }
+  .done { color: var(--ok); font-weight: 500; margin-bottom: 16px; }
+  .decide {
+    position: sticky; bottom: 0; margin: 20px -16px -60px; padding: 12px 16px 16px;
+    background: var(--bg); border-top: 1px solid var(--line);
+  }
+  .decide textarea {
+    width: 100%; min-height: 64px; resize: vertical; font: inherit; font-size: 14px;
+    padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--surface); color: var(--text);
+  }
+  .decide .row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  .decide .hint { color: var(--muted); font-size: 13px; margin-right: auto; }
+  button.approve { background: var(--ok); border-color: var(--ok); color: #fff; }
+  button.reject { color: var(--accent); border-color: var(--accent); }
+  @media (prefers-color-scheme: dark) { button.approve { color: #0b1f12; } }
 
   @media (max-width: 520px) {
     .card { flex-wrap: wrap; }
@@ -213,8 +228,43 @@
       ${warn}
       ${r.qa ? `<h2>QA</h2><div class="panel"><pre>${esc(r.qa)}</pre></div>` : ""}
       <h2>Code changes</h2>
-      ${renderDiff(r.diff)}`;
+      ${renderDiff(r.diff)}
+      <div class="decide">
+        <textarea id="comment" placeholder="What do you think? Required to reject — the agents get your words as-is."></textarea>
+        <div class="row">
+          <span class="hint" id="hint"></span>
+          <button class="reject" id="reject" disabled>Reject — send back</button>
+          <button class="approve" id="approve">Approve &amp; merge</button>
+        </div>
+      </div>`;
+    const comment = document.getElementById("comment");
+    const reject = document.getElementById("reject");
+    comment.addEventListener("input", () => { reject.disabled = !comment.value.trim(); });
+    reject.addEventListener("click", () => decide("reject", comment.value));
+    document.getElementById("approve").addEventListener("click", () => decide("approve", comment.value));
     document.getElementById("close").addEventListener("click", closeReview);
+  }
+
+  async function decide(decision, comment) {
+    const ask = decision === "approve"
+      ? "Merge this pull request? This can't be undone from here."
+      : "Send this back to the agents with your comment?";
+    if (!confirm(ask)) return;
+    const hint = document.getElementById("hint");
+    document.querySelectorAll(".decide button, .decide textarea, #close").forEach(el => el.disabled = true);
+    hint.textContent = decision === "approve" ? "Merging…" : "Sending back…";
+    try {
+      const { message } = await post("/api/review/decide", { ...current, decision, comment });
+      current = null;
+      content.innerHTML = `<div class="done">✓ ${esc(message)}</div><div class="spinner">Refreshing…</div>`;
+      await load();
+      content.insertAdjacentHTML("afterbegin", `<div class="done">✓ ${esc(message)}</div>`);
+    } catch (e) {
+      hint.textContent = "";
+      document.querySelectorAll(".decide button, .decide textarea, #close").forEach(el => el.disabled = false);
+      document.getElementById("reject").disabled = !document.getElementById("comment").value.trim();
+      alert(e.message);
+    }
   }
 
   async function openReview(repo, number) {
