@@ -240,17 +240,26 @@
     const comment = document.getElementById("comment");
     const reject = document.getElementById("reject");
     comment.addEventListener("input", () => { reject.disabled = !comment.value.trim(); });
-    reject.addEventListener("click", () => decide("reject", comment.value));
-    document.getElementById("approve").addEventListener("click", () => decide("approve", comment.value));
+    armed(reject, "Click again to send back", () => decide("reject", comment.value));
+    armed(document.getElementById("approve"), "Click again to merge", () => decide("approve", comment.value));
     document.getElementById("close").addEventListener("click", closeReview);
   }
 
+  // Two clicks instead of confirm(): Claude's browser pane silently answers "Cancel"
+  // to every dialog, so a confirm() there blocks the button forever.
+  function armed(button, prompt, action) {
+    const label = button.textContent;
+    let timer = null;
+    button.addEventListener("click", () => {
+      if (timer) { clearTimeout(timer); timer = null; button.textContent = label; return action(); }
+      button.textContent = prompt;
+      timer = setTimeout(() => { timer = null; button.textContent = label; }, 4000);
+    });
+  }
+
   async function decide(decision, comment) {
-    const ask = decision === "approve"
-      ? "Merge this pull request? This can't be undone from here."
-      : "Send this back to the agents with your comment?";
-    if (!confirm(ask)) return;
     const hint = document.getElementById("hint");
+    hint.style.color = "";
     document.querySelectorAll(".decide button, .decide textarea, #close").forEach(el => el.disabled = true);
     hint.textContent = decision === "approve" ? "Merging…" : "Sending back…";
     try {
@@ -260,10 +269,10 @@
       await load();
       content.insertAdjacentHTML("afterbegin", `<div class="done">✓ ${esc(message)}</div>`);
     } catch (e) {
-      hint.textContent = "";
+      hint.textContent = e.message;  // no alert(): dialogs are blocked in the pane too
+      hint.style.color = "var(--accent)";
       document.querySelectorAll(".decide button, .decide textarea, #close").forEach(el => el.disabled = false);
       document.getElementById("reject").disabled = !document.getElementById("comment").value.trim();
-      alert(e.message);
     }
   }
 
