@@ -1,22 +1,24 @@
 #!/usr/bin/env bash
 # Let a domain repo run the Work Item agents.
-# Usage: bash scripts/enable-agents.sh owner/repo
+# Usage: bash scripts/enable-agents.sh owner/repo [hq-ref]
 #
-# Installs the stage-label workflow and the labels. The repo also needs the
-# CLAUDE_CODE_OAUTH_TOKEN secret — this script checks and tells you if it's missing.
+# Installs the small stub workflow (which calls HQ's runner at hq-ref, default main)
+# and the labels. Re-running it is safe. The repo also needs the CLAUDE_CODE_OAUTH_TOKEN
+# secret — this script checks and tells you if it's missing.
 set -euo pipefail
 
 REPO="${1:-}"
 if [ -z "$REPO" ]; then
-  echo "Usage: bash scripts/enable-agents.sh owner/repo" >&2
+  echo "Usage: bash scripts/enable-agents.sh owner/repo [hq-ref]" >&2
   exit 1
 fi
 
+REF="${2:-main}"
 HQ_REPO="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 PATH_IN_REPO=".github/workflows/work-item.yml"
 
-CONTENT="$(sed "s|__HQ_REPO__|${HQ_REPO}|g" "$HERE/orchestration/work-item.yml" | base64 -w0)"
+CONTENT="$(sed -e "s|__HQ_REPO__|${HQ_REPO}|g" -e "s|__REF__|${REF}|g" "$HERE/orchestration/work-item.yml" | base64 -w0)"
 
 SHA="$(gh api "repos/$REPO/contents/$PATH_IN_REPO" --jq .sha 2>/dev/null || true)"
 
