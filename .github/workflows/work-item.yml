@@ -1,8 +1,7 @@
-# Work Item runner. Copied into each domain repo as .github/workflows/work-item.yml
-# by scripts/enable-agents.sh, which fills in Logangosha/hq. Edit it here, not there.
-#
-# A stage: label lands on an Issue -> the agent for that stage runs -> it comments
-# and sets the next stage: label, which starts the next run.
+# Work Item stub. Installed into each domain repo as .github/workflows/work-item.yml
+# by scripts/enable-agents.sh, which fills in Logangosha/hq and f8-notify.
+# It only hands the event to HQ's runner, so it never needs updating:
+# change .github/workflows/work-item-runner.yml in HQ instead.
 name: Work Item
 
 on:
@@ -13,104 +12,17 @@ concurrency:
   group: work-item-${{ github.event.issue.number }}
   cancel-in-progress: false
 
+# The most the runner's jobs may use; each job asks for what it needs.
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  id-token: write
+
 jobs:
-  stage:
-    # Only stage: labels. stage:review is the user's turn, so no agent runs.
-    # waiting:* means the Work Item is parked.
-    if: >-
-      startsWith(github.event.label.name, 'stage:')
-      && github.event.label.name != 'stage:review'
-      && !contains(toJSON(github.event.issue.labels.*.name), 'waiting:')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      issues: write
-      pull-requests: write
-      id-token: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Fetch HQ's agents
-        run: |
-          git clone --depth 1 https://github.com/Logangosha/hq.git .hq
-          mkdir -p .claude/agents
-          # -n: this repo's own agent of the same name wins (F7.5).
-          cp -n .hq/.claude/agents/*.md .claude/agents/ || true
-
-      - name: Which agent
-        id: agent
-        run: |
-          case "${LABEL#stage:}" in
-            plan)  NAME=planner ;;
-            build) NAME=builder ;;
-            *)     NAME="${LABEL#stage:}" ;;
-          esac
-          test -f ".claude/agents/$NAME.md" || { echo "No agent for $LABEL"; exit 1; }
-          echo "name=$NAME" >> "$GITHUB_OUTPUT"
-          case "$NAME" in
-            qa) MAX_TURNS=120 ;;
-            *)  MAX_TURNS=80 ;;
-          esac
-          echo "max_turns=$MAX_TURNS" >> "$GITHUB_OUTPUT"
-        env:
-          LABEL: ${{ github.event.label.name }}
-
-      # Three strikes (F7.9). The agents are told to stop by themselves; this is the
-      # backstop in case one doesn't. A stage comment is headed "## 1. Requirements —
-      # requirements", so counting the agent's name in the headings counts its runs.
-      - name: Three strikes
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NUM: ${{ github.event.issue.number }}
-          NAME: ${{ steps.agent.outputs.name }}
-        run: |
-          RUNS=$(gh issue view "$NUM" --repo "$GITHUB_REPOSITORY" --json comments \
-                   --jq "[.comments[].body | select(startswith(\"## \") and contains(\"— $NAME\"))] | length")
-          echo "$NAME has run $RUNS time(s) on #$NUM"
-          if [ "$RUNS" -ge 3 ]; then
-            gh issue edit "$NUM" --repo "$GITHUB_REPOSITORY" --add-label waiting:user
-            gh issue comment "$NUM" --repo "$GITHUB_REPOSITORY" --body \
-              "🛑 Stopped: **$NAME** has run 3 times on this Work Item. Something upstream is unresolved — a person needs to look. Remove \`waiting:user\` to let it continue."
-            exit 1
-          fi
-
-      - uses: anthropics/claude-code-action@v1
-        id: run_agent
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          # Each stage is started by the previous stage's label change, which the
-          # claude bot makes. Without this the chain stops after stage 1.
-          allowed_bots: "claude"
-          # bypassPermissions: no one is here to approve prompts, and without it writes
-          # to .claude/ (skills, agents) are always refused. The runner is thrown away
-          # after the run; everything still reaches main only through a reviewed PR.
-          claude_args: '--permission-mode bypassPermissions --allowedTools "Bash,Read,Write,Edit,Glob,Grep" --max-turns ${{ steps.agent.outputs.max_turns }}'
-          prompt: |
-            Work Item #${{ github.event.issue.number }} in ${{ github.repository }} has
-            just been labelled `${{ github.event.label.name }}`, so you are the
-            **${{ steps.agent.outputs.name }}** agent for it.
-
-            1. Read `.hq/orchestration/lifecycle.md` — the rules of the system.
-            2. Read `.claude/agents/${{ steps.agent.outputs.name }}.md` and do exactly
-               what it says for this Issue. It is your whole job description.
-            3. Read the Issue and every comment on it first:
-               `gh issue view ${{ github.event.issue.number }} --comments`
-
-            Finish by posting your stage comment and setting the `stage:` label to the
-            next stage (or back, if you are bouncing it). Use `gh` for both. Nothing
-            else happens until that label changes.
-
-      # If the agent step above didn't complete (crash, timeout, hitting --max-turns),
-      # nothing else records that — without this the Issue would just sit silently.
-      - name: Report a failed agent step
-        if: failure() && steps.run_agent.outcome == 'failure'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NUM: ${{ github.event.issue.number }}
-          NAME: ${{ steps.agent.outputs.name }}
-          LABEL: ${{ github.event.label.name }}
-        run: |
-          gh issue comment "$NUM" --repo "$GITHUB_REPOSITORY" --body \
-            "🛑 The **$NAME** agent step failed to complete for \`$LABEL\` (crash, timeout, or hit its turn limit). The Work Item is unchanged — a person needs to look."
+  run:
+    uses: Logangosha/hq/.github/workflows/work-item-runner.yml@f8-notify
+    with:
+      hq_repo: Logangosha/hq
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
