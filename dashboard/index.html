@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HQ Dashboard</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --surface: #ffffff; --text: #1d1d1b; --muted: #6b6a66;
+    --line: #e4e2dc; --accent: #c2410c; --accent-soft: #fdeee6;
+    --ok: #15803d; --chip: #efede8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161614; --surface: #1f1f1c; --text: #ecebe6; --muted: #9c9a93;
+      --line: #33322e; --accent: #fb923c; --accent-soft: #3a2518;
+      --ok: #4ade80; --chip: #2a2926;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 28px 16px 60px; }
+  header { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+  #updated { color: var(--muted); font-size: 13px; margin-left: auto; }
+  button {
+    font: inherit; font-size: 14px; padding: 6px 12px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--text); cursor: pointer;
+  }
+  button:hover { border-color: var(--muted); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  h2 {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--muted); margin: 28px 0 10px; font-weight: 600;
+  }
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 8px; display: flex; gap: 12px; align-items: baseline;
+  }
+  .needs .card { border-left: 3px solid var(--accent); }
+  .ref { color: var(--muted); font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .title { flex: 1; min-width: 0; }
+  .title a { color: var(--text); text-decoration: none; font-weight: 500; }
+  .title a:hover { text-decoration: underline; }
+  .why { display: block; font-size: 13px; color: var(--accent); margin-top: 2px; }
+  .chip {
+    font-size: 12px; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+    background: var(--chip); color: var(--muted);
+  }
+  .needs .chip { background: var(--accent-soft); color: var(--accent); }
+  .repo { font-weight: 600; margin: 18px 0 8px; font-size: 14px; }
+  .empty { color: var(--muted); font-size: 14px; padding: 4px 0 8px; }
+  .all-clear { color: var(--ok); }
+  .error {
+    background: var(--accent-soft); color: var(--accent); border-radius: 10px;
+    padding: 12px 14px; white-space: pre-wrap; font-size: 14px;
+  }
+  @media (max-width: 520px) {
+    .card { flex-wrap: wrap; }
+    .chip { order: 3; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>HQ</h1>
+    <span id="updated">Loading…</span>
+    <button id="refresh" type="button">Refresh</button>
+  </header>
+  <div id="content"></div>
+</main>
+<script>
+  const content = document.getElementById("content");
+  const updated = document.getElementById("updated");
+  const refresh = document.getElementById("refresh");
+
+  const esc = s => String(s).replace(/[&<>"']/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+  function card(repo, it, showWhy) {
+    const why = !showWhy ? "" :
+      it.waiting.includes("waiting:user") ? "An agent stopped and needs your answer"
+      : "Ready for your review";
+    return `<div class="card">
+      <span class="ref">${esc(repo)}#${it.number}</span>
+      <span class="title"><a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.title)}</a>
+        ${why ? `<span class="why">${why}</span>` : ""}</span>
+      <span class="chip">${esc(it.stage.replace(/^\d+ /, ""))}</span>
+    </div>`;
+  }
+
+  function render(domains) {
+    const needs = domains.flatMap(d => d.items.filter(i => i.needs_you).map(i => card(d.repo, i, true)));
+    let html = `<h2>Needs you</h2><section class="needs">` +
+      (needs.length ? needs.join("") : `<div class="empty all-clear">Nothing needs you right now.</div>`) +
+      `</section><h2>In progress</h2>`;
+    for (const d of domains) {
+      const rest = d.items.filter(i => !i.needs_you);
+      html += `<div class="repo">${esc(d.full)}</div>` +
+        (rest.length ? rest.map(i => card(d.repo, i, false)).join("") : `<div class="empty">No Work Items in progress.</div>`);
+    }
+    content.innerHTML = html;
+  }
+
+  async function load() {
+    refresh.disabled = true;
+    updated.textContent = "Loading…";
+    try {
+      const res = await fetch("/api/items");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || res.statusText);
+      render(data);
+      updated.textContent = "Updated " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    } catch (e) {
+      content.innerHTML = `<div class="error">Couldn't load Work Items.\n${esc(e.message)}</div>`;
+      updated.textContent = "";
+    } finally {
+      refresh.disabled = false;
+    }
+  }
+
+  refresh.addEventListener("click", load);
+  load();
+</script>
+</body>
+</html>

@@ -86,7 +86,7 @@ disagree. An agent that forgets to @ the next one would stall silently with a co
       can find an item without its number
 - [x] F8.3 `/review <repo>#<n>`: run the PR on your computer, then approve (merge) or reject
       (back to Requirements) — no git by hand *(built; not yet tried on a real Work Item)*
-- [ ] F8.4 Review dashboard: a simple web page listing every Work Item that needs you, across
+- [x] F8.4 Review dashboard: a simple web page listing every Work Item that needs you, across
       all domains, with its stage and a link to the Issue
 - [ ] F8.5 Dashboard **Review** button: Claude runs the review checkout on your computer and
       brings up the app, and the page shows the PR's code changes
