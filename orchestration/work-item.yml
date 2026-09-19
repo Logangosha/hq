@@ -14,6 +14,19 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # F8.1: the user's turn -> assign them, so the GitHub app pings their phone.
+  # Assigned means "needs you"; the stage job below unassigns when agents take it back.
+  notify:
+    if: github.event.label.name == 'stage:review' || github.event.label.name == 'waiting:user'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NUM: ${{ github.event.issue.number }}
+        run: gh issue edit "$NUM" --repo "$GITHUB_REPOSITORY" --add-assignee "$GITHUB_REPOSITORY_OWNER"
+
   stage:
     # Only stage: labels. stage:review is the user's turn, so no agent runs.
     # waiting:* means the Work Item is parked.
@@ -29,6 +42,12 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Back to the agents, so no longer the user's turn
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NUM: ${{ github.event.issue.number }}
+        run: gh issue edit "$NUM" --repo "$GITHUB_REPOSITORY" --remove-assignee "$GITHUB_REPOSITORY_OWNER"
 
       - name: Fetch HQ's agents
         run: |
@@ -68,7 +87,9 @@ jobs:
                    --jq "[.comments[].body | select(startswith(\"## \") and contains(\"— $NAME\"))] | length")
           echo "$NAME has run $RUNS time(s) on #$NUM"
           if [ "$RUNS" -ge 3 ]; then
-            gh issue edit "$NUM" --repo "$GITHUB_REPOSITORY" --add-label waiting:user
+            # GITHUB_TOKEN label changes don't trigger workflows, so assign here too.
+            gh issue edit "$NUM" --repo "$GITHUB_REPOSITORY" --add-label waiting:user \
+              --add-assignee "$GITHUB_REPOSITORY_OWNER"
             gh issue comment "$NUM" --repo "$GITHUB_REPOSITORY" --body \
               "🛑 Stopped: **$NAME** has run 3 times on this Work Item. Something upstream is unresolved — a person needs to look. Remove \`waiting:user\` to let it continue."
             exit 1
