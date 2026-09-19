@@ -10,7 +10,8 @@ bash scripts/list-work-items.sh
 ```
 
 Output is grouped by domain: a `DOMAIN<TAB><owner>/<repo>` line, followed by that domain's
-open Work Items as `<repo><TAB><number><TAB><title><TAB><stage><TAB><url>` lines (none if
+open Work Items as `<repo><TAB><number><TAB><title><TAB><stage><TAB><url><TAB><waiting>` lines
+(`<waiting>` is any `waiting:` labels, usually empty) (none if
 the domain has no open Work Items).
 
 Render one combined tree, all domains together, in this shape:
