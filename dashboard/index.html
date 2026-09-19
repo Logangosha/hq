@@ -9,12 +9,15 @@
     --bg: #f6f5f2; --surface: #ffffff; --text: #1d1d1b; --muted: #6b6a66;
     --line: #e4e2dc; --accent: #c2410c; --accent-soft: #fdeee6;
     --ok: #15803d; --chip: #efede8;
+    --add-bg: #e7f6ec; --add: #116329; --del-bg: #fdecec; --del: #a4161a; --hunk: #6b6a66;
+    --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #161614; --surface: #1f1f1c; --text: #ecebe6; --muted: #9c9a93;
       --line: #33322e; --accent: #fb923c; --accent-soft: #3a2518;
       --ok: #4ade80; --chip: #2a2926;
+      --add-bg: #13301d; --add: #86efac; --del-bg: #3b1616; --del: #fca5a5; --hunk: #9c9a93;
     }
   }
   * { box-sizing: border-box; }
@@ -22,7 +25,7 @@
     margin: 0; background: var(--bg); color: var(--text);
     font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
   }
-  main { max-width: 760px; margin: 0 auto; padding: 28px 16px 60px; }
+  main { max-width: 960px; margin: 0 auto; padding: 28px 16px 60px; }
   header { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
   h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
   #updated { color: var(--muted); font-size: 13px; margin-left: auto; }
@@ -32,13 +35,14 @@
   }
   button:hover { border-color: var(--muted); }
   button:disabled { opacity: 0.5; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   h2 {
     font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em;
     color: var(--muted); margin: 28px 0 10px; font-weight: 600;
   }
   .card {
     background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
-    padding: 12px 14px; margin-bottom: 8px; display: flex; gap: 12px; align-items: baseline;
+    padding: 12px 14px; margin-bottom: 8px; display: flex; gap: 12px; align-items: center;
   }
   .needs .card { border-left: 3px solid var(--accent); }
   .ref { color: var(--muted); font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -54,10 +58,38 @@
   .repo { font-weight: 600; margin: 18px 0 8px; font-size: 14px; }
   .empty { color: var(--muted); font-size: 14px; padding: 4px 0 8px; }
   .all-clear { color: var(--ok); }
-  .error {
+  .error, .warn {
     background: var(--accent-soft); color: var(--accent); border-radius: 10px;
-    padding: 12px 14px; white-space: pre-wrap; font-size: 14px;
+    padding: 12px 14px; white-space: pre-wrap; font-size: 14px; margin-bottom: 12px;
   }
+
+  /* Review view */
+  .back { margin-bottom: 16px; }
+  .review-title { font-size: 20px; margin: 0 0 6px; }
+  .meta { color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 18px; }
+  .meta a { color: var(--accent); }
+  .panel {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 12px;
+  }
+  .panel pre { margin: 0; white-space: pre-wrap; font: 13px/1.5 var(--mono); }
+  .app-link { font-weight: 600; color: var(--accent); }
+  details.file {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    margin-bottom: 10px; overflow: hidden;
+  }
+  details.file summary {
+    padding: 8px 12px; cursor: pointer; font: 13px var(--mono);
+    border-bottom: 1px solid var(--line); display: flex; gap: 10px;
+  }
+  details.file summary .n { margin-left: auto; color: var(--muted); }
+  .diff { overflow-x: auto; font: 12.5px/1.5 var(--mono); }
+  .diff div { white-space: pre; padding: 0 12px; min-width: max-content; }
+  .diff .add { background: var(--add-bg); color: var(--add); }
+  .diff .del { background: var(--del-bg); color: var(--del); }
+  .diff .hunk { color: var(--hunk); background: var(--chip); }
+  .spinner { color: var(--muted); padding: 24px 0; }
+
   @media (max-width: 520px) {
     .card { flex-wrap: wrap; }
     .chip { order: 3; }
@@ -77,31 +109,48 @@
   const content = document.getElementById("content");
   const updated = document.getElementById("updated");
   const refresh = document.getElementById("refresh");
+  let domains = [];
+  let current = null;  // the Work Item being reviewed: {repo, number}
 
   const esc = s => String(s).replace(/[&<>"']/g, c =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
-  function card(repo, it, showWhy) {
+  async function post(path, body) {
+    const res = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-HQ": "1" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    return data;
+  }
+
+  // ---- List ----
+
+  function card(d, it, showWhy) {
     const why = !showWhy ? "" :
       it.waiting.includes("waiting:user") ? "An agent stopped and needs your answer"
       : "Ready for your review";
+    const canReview = it.stage.startsWith("6 ");
     return `<div class="card">
-      <span class="ref">${esc(repo)}#${it.number}</span>
+      <span class="ref">${esc(d.repo)}#${it.number}</span>
       <span class="title"><a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.title)}</a>
         ${why ? `<span class="why">${why}</span>` : ""}</span>
       <span class="chip">${esc(it.stage.replace(/^\d+ /, ""))}</span>
+      ${canReview ? `<button class="primary" data-review="${esc(d.full)}" data-number="${it.number}">Review</button>` : ""}
     </div>`;
   }
 
-  function render(domains) {
-    const needs = domains.flatMap(d => d.items.filter(i => i.needs_you).map(i => card(d.repo, i, true)));
+  function renderList() {
+    const needs = domains.flatMap(d => d.items.filter(i => i.needs_you).map(i => card(d, i, true)));
     let html = `<h2>Needs you</h2><section class="needs">` +
       (needs.length ? needs.join("") : `<div class="empty all-clear">Nothing needs you right now.</div>`) +
       `</section><h2>In progress</h2>`;
     for (const d of domains) {
       const rest = d.items.filter(i => !i.needs_you);
       html += `<div class="repo">${esc(d.full)}</div>` +
-        (rest.length ? rest.map(i => card(d.repo, i, false)).join("") : `<div class="empty">No Work Items in progress.</div>`);
+        (rest.length ? rest.map(i => card(d, i, false)).join("") : `<div class="empty">No Work Items in progress.</div>`);
     }
     content.innerHTML = html;
   }
@@ -113,16 +162,85 @@
       const res = await fetch("/api/items");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || res.statusText);
-      render(data);
+      domains = data;
+      if (!current) renderList();
       updated.textContent = "Updated " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     } catch (e) {
-      content.innerHTML = `<div class="error">Couldn't load Work Items.\n${esc(e.message)}</div>`;
+      if (!current) content.innerHTML = `<div class="error">Couldn't load Work Items.\n${esc(e.message)}</div>`;
       updated.textContent = "";
     } finally {
       refresh.disabled = false;
     }
   }
 
+  // ---- Review ----
+
+  function renderDiff(diff) {
+    const files = diff.split(/^(?=diff --git )/m).filter(f => f.trim());
+    if (!files.length) return `<div class="empty">No code changes.</div>`;
+    return files.map(f => {
+      const lines = f.split("\n");
+      const name = (lines[0].match(/ b\/(.+)$/) || [, lines[0]])[1];
+      let adds = 0, dels = 0;
+      const body = lines.slice(1)
+        .filter(l => !/^(index |--- |\+\+\+ |new file mode|deleted file mode|similarity|rename )/.test(l))
+        .map(l => {
+          let cls = "";
+          if (l.startsWith("@@")) cls = "hunk";
+          else if (l.startsWith("+")) { cls = "add"; adds++; }
+          else if (l.startsWith("-")) { cls = "del"; dels++; }
+          return `<div class="${cls}">${esc(l) || " "}</div>`;
+        }).join("");
+      return `<details class="file" open><summary><span>${esc(name)}</span>
+        <span class="n">+${adds} −${dels}</span></summary><div class="diff">${body}</div></details>`;
+    }).join("");
+  }
+
+  function renderReview(r) {
+    const warn = r.claude_files.length
+      ? `<div class="warn">⚠️ Changes how agents and Claude behave — look closely:\n${r.claude_files.map(esc).join("\n")}</div>` : "";
+    content.innerHTML = `
+      <button class="back" id="close">← Done reviewing</button>
+      <h1 class="review-title">${esc(r.title)}</h1>
+      <div class="meta">
+        <span>${esc(r.key)}</span>
+        <a href="${esc(r.pr_url)}" target="_blank" rel="noopener">Pull request #${esc(r.pr)}</a>
+        <span>Branch <code>${esc(r.branch)}</code> is checked out in <code>${esc(r.path)}</code></span>
+      </div>
+      <div class="panel">${r.app_url
+        ? `App: <a class="app-link" href="${esc(r.app_url)}" target="_blank" rel="noopener">${esc(r.app_url)}</a>`
+        : `No app to start for this repo. Ask Claude in the chat if you want to see it running.`}</div>
+      ${warn}
+      ${r.qa ? `<h2>QA</h2><div class="panel"><pre>${esc(r.qa)}</pre></div>` : ""}
+      <h2>Code changes</h2>
+      ${renderDiff(r.diff)}`;
+    document.getElementById("close").addEventListener("click", closeReview);
+  }
+
+  async function openReview(repo, number) {
+    current = { repo, number };
+    content.innerHTML = `<div class="spinner">Checking out the branch and starting the app…</div>`;
+    try {
+      renderReview(await post("/api/review", current));
+    } catch (e) {
+      content.innerHTML = `<button class="back" id="close">← Back</button><div class="error">${esc(e.message)}</div>`;
+      document.getElementById("close").addEventListener("click", closeReview);
+    }
+  }
+
+  async function closeReview() {
+    const r = current;
+    content.innerHTML = `<div class="spinner">Stopping the app and putting your copy back…</div>`;
+    try { await post("/api/review/close", r); } catch (e) { /* nothing was checked out */ }
+    current = null;
+    renderList();
+    load();
+  }
+
+  content.addEventListener("click", e => {
+    const b = e.target.closest("[data-review]");
+    if (b) openReview(b.dataset.review, Number(b.dataset.number));
+  });
   refresh.addEventListener("click", load);
   load();
 </script>
