@@ -12,6 +12,7 @@ import re
 import shutil
 import socket
 import subprocess
+import tempfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HQ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -163,7 +164,9 @@ def decide(full, number, decision, comment):
         if comment:
             run(["gh", "issue", "comment", num, "--repo", full,
                  "--body", f"## 6. Review — user ✅\n\n{comment}"])
-        run(["gh", "pr", "merge", pr, "--repo", full, "--squash", "--delete-branch"])
+        # Outside any repo, so gh only touches GitHub; the local copy is pulled below.
+        run(["gh", "pr", "merge", pr, "--repo", full, "--squash", "--delete-branch"],
+            cwd=tempfile.gettempdir())
         run(["git", "-C", r["path"], "pull", "--quiet"], check=False)
         return {"message": f"Approved — PR #{pr} merged."}
     run(["gh", "issue", "comment", num, "--repo", full,

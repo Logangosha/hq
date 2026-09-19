@@ -90,7 +90,7 @@ disagree. An agent that forgets to @ the next one would stall silently with a co
       all domains, with its stage and a link to the Issue
 - [x] F8.5 Dashboard **Review** button: Claude runs the review checkout on your computer and
       brings up the app, and the page shows the PR's code changes
-- [ ] F8.6 Dashboard decision: a comment box plus **Approve** (merge and close) and
+- [x] F8.6 Dashboard decision: a comment box plus **Approve** (merge and close) and
       **Reject** (back to Requirements with your comment). Claude does the GitHub steps.
 - [ ] F8.7 "How's X going?" — a one-line status for each item on the dashboard
 - [ ] ✅ User check: take one Work Item from notification → dashboard → review → decision
