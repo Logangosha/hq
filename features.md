@@ -6,6 +6,14 @@ The flow we're building toward: **you say it** (F5) → **it becomes an Issue** 
 **GitHub runs it** (F7) → **you're alerted and review** (F8). You appear only at the
 first and last step.
 
+From your phone or computer:
+1. `new-work-item` — say what you want and in which repo. It becomes an Issue.
+2. The agents run the chain on GitHub and stop at `stage:review`.
+3. You get a notification.
+4. Open the review dashboard (or `work-items`) and pick the item.
+5. Click **Review**. Claude checks out the branch locally and shows you the changes and the app.
+6. Leave a comment, then **Approve** (merge and close) or **Reject** (back to the agents with your comment).
+
 ---
 
 ## Done so far ✅
@@ -73,14 +81,20 @@ disagree. An agent that forgets to @ the next one would stall silently with a co
 ## F8: You're alerted, and you review
 *Goal: know when something needs you, without going looking.*
 
-- [ ] F8.1 Reaching `stage:review` notifies you (assign the Issue, so the phone app pings)
-- [ ] F8.2 GitHub Project board with a column per stage
-- [ ] F8.3 Auto-add Issues from all domain repos
-- [ ] F8.4 "Needs my decision" view — `stage:review` and `waiting:user` across every repo
-- [ ] F8.5 "How's X going?" summaries from HQ
-- [ ] F8.6 `/review <repo>#<n>`: run the PR on your computer, then approve (merge) or reject
-      (back to Requirements) — no git by hand
-- [ ] ✅ User check: open the board on your phone. Is it clear what needs you?
+- [ ] F8.1 Reaching `stage:review` notifies you (assign the Issue, so the phone app pings) *(built; test pending)*
+- [ ] F8.2 `work-items` flags what needs you — `stage:review` and `waiting:user` — so you
+      can find an item without its number
+- [x] F8.3 `/review <repo>#<n>`: run the PR on your computer, then approve (merge) or reject
+      (back to Requirements) — no git by hand *(built; not yet tried on a real Work Item)*
+- [ ] F8.4 Review dashboard: a simple web page listing every Work Item that needs you, across
+      all domains, with its stage and a link to the Issue
+- [ ] F8.5 Dashboard **Review** button: Claude runs the review checkout on your computer and
+      brings up the app, and the page shows the PR's code changes
+- [ ] F8.6 Dashboard decision: a comment box plus **Approve** (merge and close) and
+      **Reject** (back to Requirements with your comment). Claude does the GitHub steps.
+- [ ] F8.7 "How's X going?" — a one-line status for each item on the dashboard
+- [ ] ✅ User check: take one Work Item from notification → dashboard → review → decision
+      without touching git. Was it clean?
 
 ## F9: Big goals become smaller Work Items
 *Goal: a big request becomes a set of connected Work Items.*

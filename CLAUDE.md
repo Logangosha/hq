@@ -47,7 +47,7 @@ Brief, not clipped. Full sentences are fine; padding is not.
 | List my domains | `domains` skill |
 | All my repos (domain? local?) | `repos` skill |
 | Looking at finished work, approve or reject | `review` skill |
-| What runs the agents on GitHub | `orchestration/work-item.yml`, installed by `scripts/enable-agents.sh` |
+| What runs the agents on GitHub | `.github/workflows/work-item-runner.yml`; each domain gets the stub `orchestration/work-item.yml` via `scripts/enable-agents.sh` |
 | Reusable agents (one per lifecycle stage) | `.claude/agents/` |
 ## What HQ is NOT
 - Not a place for personal files. Those belong in their own domain repos.
