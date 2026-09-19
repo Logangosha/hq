@@ -7,6 +7,7 @@ Usage: python dashboard/server.py        then open http://localhost:8765
 """
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -57,6 +58,12 @@ def work_items():
     return domains
 
 
+def native_path(path):
+    # Git Bash prints /c/Users/...; Windows Python and git need C:/Users/...
+    m = re.match(r"^/([a-zA-Z])/(.*)$", path)
+    return f"{m[1].upper()}:/{m[2]}" if os.name == "nt" and m else path
+
+
 def port_open(port):
     with socket.socket() as s:
         s.settimeout(0.5)
@@ -98,6 +105,7 @@ def open_review(full, number):
     if res.returncode != 0:
         raise UserError(res.stderr.strip() or "Checkout failed.")
     kv = dict(line.split("=", 1) for line in res.stdout.splitlines() if "=" in line)
+    kv["path"] = native_path(kv["path"])
 
     key = f"{repo}#{number}"
     if key in reviews:
