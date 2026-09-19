@@ -1,5 +1,5 @@
 # Work Item stub. Installed into each domain repo as .github/workflows/work-item.yml
-# by scripts/enable-agents.sh, which fills in Logangosha/hq and f8-notify.
+# by scripts/enable-agents.sh, which fills in Logangosha/hq and main.
 # It only hands the event to HQ's runner, so it never needs updating:
 # change .github/workflows/work-item-runner.yml in HQ instead.
 name: Work Item
@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   run:
-    uses: Logangosha/hq/.github/workflows/work-item-runner.yml@f8-notify
+    uses: Logangosha/hq/.github/workflows/work-item-runner.yml@main
     with:
       hq_repo: Logangosha/hq
     secrets:
