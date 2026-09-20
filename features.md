@@ -76,6 +76,9 @@ disagree. An agent that forgets to @ the next one would stall silently with a co
       *(deferred — test issues #15, #19 in the sandbox)*
 - [x] F7.9 Stop and wait when the user is needed (`waiting:*` skips the run), or when a
       stage is reached 3 times (workflow counts that agent's stage comments)
+- [ ] F7.10 Let the agents look things up: allow `WebSearch` and `WebFetch` in the runner
+      (today only Bash `curl` reaches the network, so they work from memory). Fixes the
+      mismatch where `builder.md` claims WebFetch but the runner doesn't allow it
 - [ ] ✅ User check: create an Issue from your phone and watch it move
 
 ## F8: You're alerted, and you review
@@ -107,7 +110,10 @@ disagree. An agent that forgets to @ the next one would stall silently with a co
 - [ ] F9.2 Add a "break it down" step to Plan
 - [ ] F9.3 When a child finishes, start work that was waiting on it
 - [ ] F9.4 A parent is done only when all its children are done
-- [ ] F9.5 Test with a small 3-part sandbox project
+- [ ] F9.5 Cross-repo Work Items: the run's token is scoped to its own repo, so an agent
+      can't open an Issue elsewhere. Decide how (GitHub App token vs. a secret per repo)
+      and weigh it — it widens what a wrong agent can reach
+- [ ] F9.6 Test with a small 3-part sandbox project
 - [ ] ✅ User check: are the parts and their order clear?
 
 ## F10: More workflows
