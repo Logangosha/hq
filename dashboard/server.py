@@ -177,6 +177,38 @@ def decide(full, number, decision, comment):
     return {"message": "Sent back to the agents with your comment."}
 
 
+def stopped(full, number):
+    """What a stopped Work Item is waiting for: its goal and the agent's last word."""
+    data = json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
+                           "--json", "title,body,comments,labels"]).stdout)
+    stage = [l["name"] for l in data["labels"] if l["name"].startswith("stage:")]
+    return {"title": data["title"], "goal": data["body"],
+            "last": data["comments"][-1]["body"] if data["comments"] else "",
+            "stage": stage[0] if stage else "stage:requirements",
+            "url": f"https://github.com/{full}/issues/{number}"}
+
+
+def resume(full, number, comment):
+    """Answer a stopped Work Item and start it moving again."""
+    comment = comment.strip()
+    if not comment:
+        raise UserError("Write your answer first — it's what unblocks the agents.")
+    info = stopped(full, number)
+    run(["gh", "issue", "comment", str(number), "--repo", full,
+         "--body", f"## Answer — user\n\n{comment}"])
+    waiting = [l for l in json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
+                                          "--json", "labels"]).stdout)["labels"]
+               if l["name"].startswith("waiting:")]
+    args = ["gh", "issue", "edit", str(number), "--repo", full,
+            "--remove-label", info["stage"]]
+    for l in waiting:
+        args += ["--remove-label", l["name"]]
+    run(args, check=False)  # the stage label may not be there to remove
+    # Adding it back is what starts the agent: the workflow fires on a label being added.
+    run(["gh", "issue", "edit", str(number), "--repo", full, "--add-label", info["stage"]])
+    return {"message": f"Answer posted — restarted at {info['stage'].split(':')[1]}."}
+
+
 class UserError(Exception):
     pass
 
@@ -217,6 +249,10 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == "/api/review/close":
                 close_review(full, number)
                 self.send(200, {"ok": True})
+            elif self.path == "/api/stopped":
+                self.send(200, stopped(full, number))
+            elif self.path == "/api/resume":
+                self.send(200, resume(full, number, body.get("comment", "")))
             elif self.path == "/api/review/decide":
                 self.send(200, decide(full, number, body.get("decision"), body.get("comment", "")))
             else:

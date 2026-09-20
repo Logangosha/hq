@@ -92,6 +92,8 @@ disagree. An agent that forgets to @ the next one would stall silently with a co
       brings up the app, and the page shows the PR's code changes
 - [x] F8.6 Dashboard decision: a comment box plus **Approve** (merge and close) and
       **Reject** (back to Requirements with your comment). Claude does the GitHub steps.
+- [x] F8.8 A stopped Work Item (agent gave up, waiting on you) gets an **Answer** button:
+      your answer goes on the Issue and the stage label is re-applied, which restarts it
 - [ ] F8.7 "How's X going?" — a one-line status for each item on the dashboard
 - [ ] ✅ User check: take one Work Item from notification → dashboard → review → decision
       without touching git. Was it clean?

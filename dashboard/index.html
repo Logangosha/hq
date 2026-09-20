@@ -154,6 +154,7 @@
         ${why ? `<span class="why">${why}</span>` : ""}</span>
       <span class="chip">${esc(it.stage.replace(/^\d+ /, ""))}</span>
       ${canReview ? `<button class="primary" data-review="${esc(d.full)}" data-number="${it.number}">Review</button>` : ""}
+      ${!canReview && it.needs_you ? `<button class="primary" data-answer="${esc(d.full)}" data-number="${it.number}">Answer</button>` : ""}
     </div>`;
   }
 
@@ -257,22 +258,67 @@
     });
   }
 
-  async function decide(decision, comment) {
+  const decide = (decision, comment) =>
+    send("/api/review/decide", { decision, comment },
+         decision === "approve" ? "Merging…" : "Sending back…");
+
+  // Every decision ends the same way: lock the panel, send, then back to the list.
+  async function send(path, extra, working = "Working…") {
     const hint = document.getElementById("hint");
+    const panel = () => document.querySelectorAll(".decide button, .decide textarea, #close");
     hint.style.color = "";
-    document.querySelectorAll(".decide button, .decide textarea, #close").forEach(el => el.disabled = true);
-    hint.textContent = decision === "approve" ? "Merging…" : "Sending back…";
+    hint.textContent = working;
+    panel().forEach(el => el.disabled = true);
     try {
-      const { message } = await post("/api/review/decide", { ...current, decision, comment });
+      const { message } = await post(path, { ...current, ...extra });
       current = null;
-      content.innerHTML = `<div class="done">✓ ${esc(message)}</div><div class="spinner">Refreshing…</div>`;
+      content.innerHTML = `<div class="spinner">Refreshing…</div>`;
       await load();
       content.insertAdjacentHTML("afterbegin", `<div class="done">✓ ${esc(message)}</div>`);
     } catch (e) {
       hint.textContent = e.message;  // no alert(): dialogs are blocked in the pane too
       hint.style.color = "var(--accent)";
-      document.querySelectorAll(".decide button, .decide textarea, #close").forEach(el => el.disabled = false);
-      document.getElementById("reject").disabled = !document.getElementById("comment").value.trim();
+      panel().forEach(el => el.disabled = false);
+      const comment = document.getElementById("comment").value.trim();
+      for (const id of ["reject", "resume"]) {
+        const b = document.getElementById(id);
+        if (b) b.disabled = !comment;
+      }
+    }
+  }
+
+  // ---- Stopped: answer and restart ----
+
+  async function openStopped(repo, number) {
+    current = { repo, number };
+    content.innerHTML = `<div class="spinner">Reading the Work Item…</div>`;
+    try {
+      const s = await post("/api/stopped", current);
+      content.innerHTML = `
+        <button class="back" id="close">← Back</button>
+        <h1 class="review-title">${esc(s.title)}</h1>
+        <div class="meta">
+          <span>${esc(repo.split("/").pop())}#${number}</span>
+          <a href="${esc(s.url)}" target="_blank" rel="noopener">Open the Issue</a>
+          <span>An agent stopped here and needs your answer.</span>
+        </div>
+        <h2>Goal</h2><div class="panel"><pre>${esc(s.goal)}</pre></div>
+        <h2>Where it stopped</h2><div class="panel"><pre>${esc(s.last)}</pre></div>
+        <div class="decide">
+          <textarea id="comment" placeholder="Your answer — what should the agents do?"></textarea>
+          <div class="row">
+            <span class="hint" id="hint"></span>
+            <button class="approve" id="resume" disabled>Send answer &amp; restart</button>
+          </div>
+        </div>`;
+      const comment = document.getElementById("comment");
+      const resume = document.getElementById("resume");
+      comment.addEventListener("input", () => { resume.disabled = !comment.value.trim(); });
+      armed(resume, "Click again to restart", () => send("/api/resume", { comment: comment.value }));
+      document.getElementById("close").addEventListener("click", closeReview);
+    } catch (e) {
+      content.innerHTML = `<button class="back" id="close">← Back</button><div class="error">${esc(e.message)}</div>`;
+      document.getElementById("close").addEventListener("click", closeReview);
     }
   }
 
@@ -298,7 +344,9 @@
 
   content.addEventListener("click", e => {
     const b = e.target.closest("[data-review]");
-    if (b) openReview(b.dataset.review, Number(b.dataset.number));
+    if (b) return openReview(b.dataset.review, Number(b.dataset.number));
+    const a = e.target.closest("[data-answer]");
+    if (a) openStopped(a.dataset.answer, Number(a.dataset.number));
   });
   refresh.addEventListener("click", load);
   load();
