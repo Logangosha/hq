@@ -94,6 +94,8 @@ disagree. An agent that forgets to @ the next one would stall silently with a co
       **Reject** (back to Requirements with your comment). Claude does the GitHub steps.
 - [x] F8.8 A stopped Work Item (agent gave up, waiting on you) gets an **Answer** button:
       your answer goes on the Issue and the stage label is re-applied, which restarts it
+- [ ] F8.9 The dashboard refreshes itself (~30s), so work moving on GitHub shows up without
+      clicking. It holds still while you're mid-review or mid-answer
 - [ ] F8.7 "How's X going?" — a one-line status for each item on the dashboard
 - [ ] ✅ User check: take one Work Item from notification → dashboard → review → decision
       without touching git. Was it clean?
