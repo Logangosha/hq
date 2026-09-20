@@ -209,6 +209,19 @@ def resume(full, number, comment):
     return {"message": f"Answer posted — restarted at {info['stage'].split(':')[1]}."}
 
 
+def drop(full, number, reason):
+    """Throw a Work Item away: PR closed, branch gone, Issue closed as not planned."""
+    close_review(full, number)  # in case it was checked out
+    res = run([BASH, "scripts/drop-work-item.sh", full.split("/")[-1], str(number),
+               reason.strip()], check=False)
+    if res.returncode == 2:
+        raise UserError("That Work Item doesn't exist any more.")
+    if res.returncode != 0:
+        raise UserError(res.stderr.strip() or "Couldn't drop it.")
+    pr = [l.split("=")[1] for l in res.stdout.splitlines() if l.startswith("closed_pr=")]
+    return {"message": "Dropped." + (f" PR #{pr[0]} closed and its branch deleted." if pr else "")}
+
+
 class UserError(Exception):
     pass
 
@@ -249,6 +262,8 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == "/api/review/close":
                 close_review(full, number)
                 self.send(200, {"ok": True})
+            elif self.path == "/api/drop":
+                self.send(200, drop(full, number, body.get("comment", "")))
             elif self.path == "/api/stopped":
                 self.send(200, stopped(full, number))
             elif self.path == "/api/resume":

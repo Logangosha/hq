@@ -234,6 +234,7 @@
         <textarea id="comment" placeholder="What do you think? Required to reject — the agents get your words as-is."></textarea>
         <div class="row">
           <span class="hint" id="hint"></span>
+          <button id="drop">Drop it</button>
           <button class="reject" id="reject" disabled>Reject — send back</button>
           <button class="approve" id="approve">Approve &amp; merge</button>
         </div>
@@ -242,6 +243,8 @@
     const reject = document.getElementById("reject");
     comment.addEventListener("input", () => { reject.disabled = !comment.value.trim(); });
     armed(reject, "Click again to send back", () => decide("reject", comment.value));
+    armed(document.getElementById("drop"), "Click again to drop it",
+          () => send("/api/drop", { comment: comment.value }, "Dropping…"));
     armed(document.getElementById("approve"), "Click again to merge", () => decide("approve", comment.value));
     document.getElementById("close").addEventListener("click", closeReview);
   }
@@ -308,6 +311,7 @@
           <textarea id="comment" placeholder="Your answer — what should the agents do?"></textarea>
           <div class="row">
             <span class="hint" id="hint"></span>
+            <button class="reject" id="drop">Drop it</button>
             <button class="approve" id="resume" disabled>Send answer &amp; restart</button>
           </div>
         </div>`;
@@ -315,6 +319,8 @@
       const resume = document.getElementById("resume");
       comment.addEventListener("input", () => { resume.disabled = !comment.value.trim(); });
       armed(resume, "Click again to restart", () => send("/api/resume", { comment: comment.value }));
+      armed(document.getElementById("drop"), "Click again to drop it",
+            () => send("/api/drop", { comment: comment.value }, "Dropping…"));
       document.getElementById("close").addEventListener("click", closeReview);
     } catch (e) {
       content.innerHTML = `<button class="back" id="close">← Back</button><div class="error">${esc(e.message)}</div>`;
