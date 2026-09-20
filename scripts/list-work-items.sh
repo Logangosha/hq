@@ -26,12 +26,17 @@ bash scripts/list-domains.sh | while IFS=$'\t' read -r REPO _DESC; do
   printf 'DOMAIN\t%s/%s\n' "$OWNER" "$REPO"
   gh issue list --repo "$OWNER/$REPO" --state open --limit 1000 \
     --json number,title,url,labels \
-    --jq '.[] | [.number, .title, (.labels[].name | select(startswith("stage:"))), .url,
-             ([.labels[].name | select(startswith("waiting:"))] | join(","))] | @tsv' |
+    --jq '.[] | [.number, .title, ([.labels[].name | select(startswith("stage:"))][0] // "-"), .url,
+             (([.labels[].name | select(startswith("waiting:"))] | join(",")) // "" | if . == "" then "-" else . end)] | @tsv' |
   while IFS=$'\t' read -r NUMBER TITLE LABEL URL WAITING; do
-    [ -z "$LABEL" ] && continue
+    # "-" stands in for an empty field: the shell would otherwise swallow it.
+    [ "$LABEL" = "-" ] && LABEL=""
+    [ "$WAITING" = "-" ] && WAITING=""
     STAGE="$(stage_name "$LABEL")"
-    [ -z "$STAGE" ] && continue
+    # An agent that stops can leave no stage: label at all. Those still need a person,
+    # so they must not vanish from the list.
+    [ -z "$STAGE" ] && [ -z "$WAITING" ] && continue
+    [ -z "$STAGE" ] && STAGE="0 Stopped"
     printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$REPO" "$NUMBER" "$TITLE" "$STAGE" "$URL" "$WAITING"
   done
 done
