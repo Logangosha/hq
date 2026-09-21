@@ -7,8 +7,19 @@
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
-OWNER="$(cd "$HERE" && gh repo view --json owner --jq .owner.login)" || exit 1
+source "$HERE/scripts/lib/gh-refusal.sh"
 
-gh repo list "$OWNER" --topic hq-domain --no-archived --limit 1000 --json name,description \
-  --jq '.[] | "\(.name)\t\(.description // "")"' | sort
+OWNER="$(cd "$HERE" && gh_or_refusal gh repo view --json owner --jq .owner.login)"
+STATUS=$?
+[ "$STATUS" -eq 2 ] && { printf '%s\n' "$OWNER"; exit 2; }
+[ "$STATUS" -ne 0 ] && exit 1
+
+REPOS="$(gh_or_refusal gh repo list "$OWNER" --topic hq-domain --no-archived --limit 1000 \
+  --json name,description --jq '.[] | "\(.name)\t\(.description // "")"')"
+STATUS=$?
+[ "$STATUS" -eq 2 ] && { printf '%s\n' "$REPOS"; exit 2; }
+[ "$STATUS" -ne 0 ] && exit 1
+
+[ -z "$REPOS" ] && exit 0
+printf '%s\n' "$REPOS" | sort
 exit 0

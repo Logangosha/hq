@@ -43,6 +43,24 @@ def _save(cache):
             os.remove(tmp)
 
 
+class GhRefusal(Exception):
+    """gh refused the request outright: rate limit, bad/expired token, or no network."""
+    def __init__(self, kind, detail=""):
+        super().__init__(f"{kind} {detail}".strip())
+        self.kind = kind
+        self.detail = detail
+
+
+def classify(stderr):
+    """(kind, detail) for a failed `gh` invocation's stderr: rate_limit, auth, or offline."""
+    err = (stderr or "").lower()
+    if "rate limit" in err:
+        return "rate_limit", ""
+    if "bad credentials" in err or "http 401" in err or "gh auth login" in err:
+        return "auth", ""
+    return "offline", ""
+
+
 def _parse(raw):
     """gh api ... -i output -> (status, headers, body_text)."""
     head, _, body = raw.partition("\n\n")
@@ -60,6 +78,7 @@ def fetch(url, run):
     """Return (body_json, link_header) for a GitHub REST GET, using the shared cache.
 
     `run` is server.py's subprocess runner: run(args, check=False) -> CompletedProcess.
+    Raises GhRefusal, not RuntimeError, for a rate limit, bad/expired token, or no network.
     """
     cache = _load()
     entry = cache.get(url)
@@ -71,6 +90,8 @@ def fetch(url, run):
     if entry and entry.get("etag"):
         args += ["-H", f"If-None-Match: {entry['etag']}"]
     res = run(args, check=False)
+    if res.returncode != 0 and not res.stdout.startswith("HTTP/"):
+        raise GhRefusal(*classify(res.stderr))  # gh never got an HTTP response at all
     status, headers, body = _parse(res.stdout)
 
     if status == 304 and entry:
@@ -78,6 +99,11 @@ def fetch(url, run):
         cache[url] = entry
         _save(cache)
         return json.loads(entry["body"]), entry.get("link")
+
+    if status == 401:
+        raise GhRefusal("auth")
+    if status in (403, 429) and headers.get("x-ratelimit-remaining") == "0":
+        raise GhRefusal("rate_limit", headers.get("x-ratelimit-reset", ""))
 
     if status != 200:
         raise RuntimeError(f"GitHub API error for {url}: {status} {body[:200]}")

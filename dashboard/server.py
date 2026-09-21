@@ -6,6 +6,7 @@ buttons can use HQ's scripts and your local copies of the repos.
 
 Usage: python dashboard/server.py        then open http://localhost:8765
 """
+import datetime
 import json
 import os
 import re
@@ -55,7 +56,47 @@ def run(args, cwd=HQ, check=True):
                           encoding="utf-8", check=check)
 
 
-OWNER = run(["gh", "repo", "view", "--json", "owner", "--jq", ".owner.login"]).stdout.strip()
+REFUSAL_MESSAGES = {
+    "rate_limit": "GitHub's rate limit was hit.",
+    "auth": "GitHub's token is invalid or expired.",
+    "offline": "Can't reach GitHub — check your network.",
+}
+
+
+class RefusalError(Exception):
+    """gh refused a request: rate limit, bad/expired token, or no network."""
+    def __init__(self, kind, message):
+        super().__init__(message)
+        self.kind = kind
+        self.message = message
+
+
+def _refusal(kind, detail=""):
+    message = REFUSAL_MESSAGES.get(kind, "GitHub refused the request.")
+    if kind == "rate_limit" and detail:
+        try:
+            reset = datetime.datetime.fromtimestamp(int(detail)).strftime("%I:%M %p").lstrip("0")
+            message += f" Try again after {reset}."
+        except ValueError:
+            pass
+    elif kind == "auth":
+        message += " Run `gh auth login` with a fresh token."
+    return RefusalError(kind, message)
+
+
+_owner = None
+
+
+def owner():
+    """OWNER, fetched once and cached. A refusal here (bad token, offline) surfaces through
+    work_items() like one from ghcache, instead of crashing the server at import time."""
+    global _owner
+    if _owner is None:
+        res = run(["gh", "repo", "view", "--json", "owner", "--jq", ".owner.login"], check=False)
+        if res.returncode != 0:
+            raise _refusal(*ghcache.classify(res.stderr))
+        _owner = res.stdout.strip()
+    return _owner
 
 
 def work_items():
@@ -63,31 +104,34 @@ def work_items():
     JSON: [{repo, full, items: [...]}]. Uses ghcache so an unchanged domain costs nothing
     and a changed one costs one call, regardless of how many other domains exist."""
     domains = []
-    repos = ghcache.fetch_all(f"users/{OWNER}/repos?per_page=100", run)
-    for repo in repos:
-        if repo["archived"] or "hq-domain" not in (repo.get("topics") or []):
-            continue
-        full = f"{OWNER}/{repo['name']}"
-        known.add(full)
-        items = []
-        issues = ghcache.fetch_all(f"repos/{full}/issues?state=open&per_page=100", run)
-        for issue in issues:
-            if "pull_request" in issue:
+    try:
+        repos = ghcache.fetch_all(f"users/{owner()}/repos?per_page=100", run)
+        for repo in repos:
+            if repo["archived"] or "hq-domain" not in (repo.get("topics") or []):
                 continue
-            labels = [l["name"] for l in issue["labels"]]
-            stage_label = next((l for l in labels if l.startswith("stage:")), None)
-            waiting = [l for l in labels if l.startswith("waiting:")]
-            stage = STAGE_NAMES.get(stage_label, "")
-            if not stage and not waiting:
-                continue  # no stage and nothing to do -> not a Work Item view needs
-            if not stage:
-                stage = "0 Stopped"
-            items.append({
-                "number": issue["number"], "title": issue["title"], "stage": stage,
-                "url": issue["html_url"], "waiting": waiting,
-                "needs_you": stage.startswith("6 ") or "waiting:user" in waiting,
-            })
-        domains.append({"full": full, "repo": repo["name"], "items": items})
+            full = f"{owner()}/{repo['name']}"
+            known.add(full)
+            items = []
+            issues = ghcache.fetch_all(f"repos/{full}/issues?state=open&per_page=100", run)
+            for issue in issues:
+                if "pull_request" in issue:
+                    continue
+                labels = [l["name"] for l in issue["labels"]]
+                stage_label = next((l for l in labels if l.startswith("stage:")), None)
+                waiting = [l for l in labels if l.startswith("waiting:")]
+                stage = STAGE_NAMES.get(stage_label, "")
+                if not stage and not waiting:
+                    continue  # no stage and nothing to do -> not a Work Item view needs
+                if not stage:
+                    stage = "0 Stopped"
+                items.append({
+                    "number": issue["number"], "title": issue["title"], "stage": stage,
+                    "url": issue["html_url"], "waiting": waiting,
+                    "needs_you": stage.startswith("6 ") or "waiting:user" in waiting,
+                })
+            domains.append({"full": full, "repo": repo["name"], "items": items})
+    except ghcache.GhRefusal as e:
+        raise _refusal(e.kind, e.detail)
     return sorted(domains, key=lambda d: d["repo"])
 
 
@@ -270,6 +314,8 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/api/items":
             try:
                 self.send(200, work_items())
+            except RefusalError as e:
+                self.send(200, {"refusal": {"kind": e.kind, "message": e.message}})
             except (subprocess.CalledProcessError, RuntimeError) as e:
                 self.send(500, {"error": (getattr(e, "stderr", None) or str(e)).strip()})
         else:

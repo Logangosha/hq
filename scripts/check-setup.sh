@@ -38,7 +38,13 @@ ME="$(gh api user --jq .login)"
 [ "$OWNER" = "$ME" ] && ok "owner: $OWNER" \
   || bad "this HQ belongs to $OWNER, but gh is logged in as $ME" "copy HQ into your own account (README → How to use)"
 
-DOMAINS="$(bash "$HERE/scripts/list-domains.sh" | cut -f1)"
+DOMAINS_RAW="$(bash "$HERE/scripts/list-domains.sh")"
+if [ "${DOMAINS_RAW%%$'\t'*}" = "REFUSAL" ]; then
+  KIND="$(printf '%s' "$DOMAINS_RAW" | cut -f2)"
+  bad "GitHub refused the request ($KIND)" "check your token, rate limit, or network, then run this again"
+  echo; exit 1
+fi
+DOMAINS="$(printf '%s\n' "$DOMAINS_RAW" | cut -f1)"
 if [ -z "$DOMAINS" ]; then
   bad "no domains yet (no repo of yours has the Work Item workflow)" "/add-domain <repo>"
 fi
