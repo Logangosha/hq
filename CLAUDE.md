@@ -49,6 +49,7 @@ Brief, not clipped. Full sentences are fine; padding is not.
 | Looking at finished work, approve or reject | `review` skill |
 | Throwing a Work Item away | `scripts/drop-work-item.sh` |
 | What runs the agents on GitHub | `.github/workflows/work-item-runner.yml`; each domain gets the stub `orchestration/work-item.yml` via `scripts/enable-agents.sh` |
+| What the runner's steps actually do | `scripts/runner/` — the workflow only calls these. **Put runner logic here, never in the workflow:** GitHub refuses a GitHub App's push to anything under `.github/workflows/`, so an agent can never change that file |
 | Review dashboard (local page: what needs me) | `dashboard/`, run with `python dashboard/server.py` |
 | Reusable agents (one per lifecycle stage) | `.claude/agents/` |
 ## What HQ is NOT
