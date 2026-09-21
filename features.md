@@ -14,6 +14,9 @@ From your phone or computer:
 5. Click **Review**. Claude checks out the branch locally and shows you the changes and the app.
 6. Leave a comment, then **Approve** (merge and close) or **Reject** (back to the agents with your comment).
 
+Each section lists what's **done** (one line each, IDs kept), then what's **next**, in the
+order it should happen.
+
 ---
 
 ## Done so far ✅
@@ -23,35 +26,22 @@ From your phone or computer:
 - **F3 Test run by hand** — one sandbox Work Item taken through every stage to a merge.
 - **F4 Reusable agents** — one agent per stage in `.claude/agents/`; generic ones live in HQ.
 
-## F4 (deferred): workflows that write themselves
-
-- [ ] F4.8 After a few similar Work Items, Claude reads the recorded `Decisions` and offers
-      a short overlay (about 15 lines) for the user to approve
-- [ ] F4.9 Store approved overlays in `orchestration/workflows/` and use them automatically
-- [ ] ✅ User check: read a proposed workflow. Is it 5 lines you agree with?
-
-> Needs several similar Work Items to generalise from. Revisit once there is a real backlog.
-
 ## F5: HQ creates work from plain English
 *Goal: the user says what they want, and HQ creates the Issue in the right place.*
 
-- [x] F5.1 Write `scripts/create-work-item.sh`: takes a repo, title and goal, creates the
-      Issue with the goal as its body, at `stage:requirements`
-- [x] F5.2 Write the routing rules (request → domain; no workflow is chosen up front)
-- [x] F5.3 `new-work-item` skill: the front door. Takes *"I want X done in Y"*, applies
-      `routing.md`, runs the script, replies with one line and the link
-- [x] F5.4 Test: a plain request becomes an Issue in `hq-test-sandbox`
-- [x] F5.5 Test with 2 more requests (the user always names the repo — no unnamed test)
+Done: **F5.1** `create-work-item.sh` · **F5.2** routing rules (`registry/routing.md`) ·
+**F5.3** `new-work-item` skill · **F5.4–F5.5** three plain requests became Issues
+*(the user always names the repo, so there's no unnamed-repo test)*.
+
 - [ ] ✅ User check: did each request land in the right repo, with a goal you recognise?
 
 ## F6: Setup for a new user
 *Goal: anyone can copy HQ onto a fresh computer and get a Work Item running. Nothing personal is hardcoded.*
 
-- [x] F6.1 Make `hq` a template repo, so copying is one `gh repo create --template` command
-- [x] F6.2 `scripts/check-setup.sh` — reports what's set up and what's missing
-- [x] F6.3 `setup-hq` skill: owner, domains, repos *(asks first)*, workflow, app, token,
-      then a test Work Item
-- [x] F6.4 README "How to use" section
+Done: **F6.1** HQ is a template repo · **F6.2** `check-setup.sh` · **F6.3** `setup-hq`
+skill (owner, domains, repos, workflow, app, token, test Work Item) · **F6.4** README
+"How to use".
+
 - [ ] F6.5 Test it from a fresh copy of HQ, on a different account
 - [ ] ✅ User check: run the setup yourself. Was it easy?
 
@@ -62,53 +52,52 @@ From your phone or computer:
 truth for where the work is, so using it as the trigger means state and trigger can never
 disagree. An agent that forgets to @ the next one would stall silently with a correct label.
 
-- [x] F7.1 Decide how a domain repo reaches HQ's agents at run time → **HQ is public;
-      each domain repo's Action fetches HQ's agents when it runs.** No token, one place to edit.
-- [x] F7.2 Install the Claude GitHub App *(user does this, with guidance)*
-- [x] F7.3 Add `CLAUDE_CODE_OAUTH_TOKEN` as a repo secret *(user does this, per repo)*
-- [x] F7.4 `orchestration/work-item.yml` fires on a `stage:` label change and runs that
-      stage's agent; `scripts/enable-agents.sh` installs it in a domain repo
-- [x] F7.5 A repo's own `.claude/agents/` overrides HQ's for that repo; HQ's is the fallback
-- [x] F7.6 Test: set `stage:requirements`, and the requirements agent writes them
-- [x] F7.7 Each stage sets the next label, so the chain runs itself (sandbox #13 ran
-      requirements → review unattended; needs `allowed_bots: "claude"`)
-- [ ] F7.8 A bounce works: an agent sets the label *backwards* and the right agent picks it up
-      *(deferred — test issues #15, #19 in the sandbox)*
-- [x] F7.9 Stop and wait when the user is needed (`waiting:*` skips the run), or when a
-      stage is reached 3 times (workflow counts that agent's stage comments)
+Done: **F7.1** HQ is public, so a domain's Action fetches HQ's agents at run time (no
+token) · **F7.2** Claude GitHub App installed · **F7.3** `CLAUDE_CODE_OAUTH_TOKEN` per
+repo · **F7.4** `work-item.yml` fires on a `stage:` label and runs that stage's agent
+(`enable-agents.sh` installs it) · **F7.5** a repo's own `.claude/agents/` wins, HQ's is
+the fallback · **F7.6** requirements agent ran from a label · **F7.7** the chain runs
+itself (sandbox #13, requirements → review unattended; needs `allowed_bots: "claude"`) ·
+**F7.9** stop and wait when the user is needed (`waiting:*`), or when a stage is reached
+3 times.
+
 - [ ] F7.10 Let the agents look things up: allow `WebSearch` and `WebFetch` in the runner
       (today only Bash `curl` reaches the network, so they work from memory). Fixes the
       mismatch where `builder.md` claims WebFetch but the runner doesn't allow it
+- [ ] F7.8 A bounce works: an agent sets the label *backwards* and the right agent picks it
+      up *(deferred — test issues #15, #19 in the sandbox)*
 - [ ] ✅ User check: create an Issue from your phone and watch it move
 
 ## F8: You're alerted, and you review
 *Goal: know when something needs you, without going looking.*
 
-- [x] F8.1 Reaching `stage:review` notifies you (assign the Issue, so the phone app pings) *(email arrives; phone push not received)*
+Done: **F8.1** reaching `stage:review` assigns the Issue and notifies you *(email arrives;
+phone push not received)* · **F8.3** `/review <repo>#<n>` in chat *(built, never used — the
+dashboard replaced it. Keep for chat-only use, or retire it)* · **F8.4** review dashboard
+listing every Work Item that needs you, across all domains · **F8.5** **Review** button:
+checkout, the app, and the PR's code changes · **F8.6** **Approve** / **Reject** with a
+comment *(Reject proven on hq#21, Approve by merging PR #20)* · **F8.8** **Answer** button
+restarts a stopped Work Item · **F8.10** **Drop it** (`drop-work-item.sh`, `--erase`) ·
+**F8.11** HQ Work Items are reviewed in a separate copy under `.hq-reviews/`, so a review
+can't move the work you're doing in HQ *(proven on hq#23)*.
+
+- [ ] F8.9 The dashboard refreshes itself: every 30s normally, every 5s while an agent is
+      working on something. Holds still while you're mid-review or mid-answer
+      *(in flight — hq#26)*
 - [ ] F8.2 `work-items` flags what needs you — `stage:review` and `waiting:user` — so you
       can find an item without its number
-- [x] F8.3 `/review <repo>#<n>`: run the PR on your computer, then approve (merge) or reject
-      (back to Requirements) — no git by hand *(built, never used: the dashboard replaced it
-      in practice. Keep for chat-only use, or retire it)*
-- [x] F8.4 Review dashboard: a simple web page listing every Work Item that needs you, across
-      all domains, with its stage and a link to the Issue
-- [x] F8.5 Dashboard **Review** button: Claude runs the review checkout on your computer and
-      brings up the app, and the page shows the PR's code changes
-- [x] F8.6 Dashboard decision: a comment box plus **Approve** (merge and close) and
-      **Reject** (back to Requirements with your comment). Claude does the GitHub steps.
-      *(Reject proven on hq#21; Approve proven by merging PR #20)*
-- [x] F8.8 A stopped Work Item (agent gave up, waiting on you) gets an **Answer** button:
-      your answer goes on the Issue and the stage label is re-applied, which restarts it
-- [x] F8.10 **Drop it**: a Work Item you no longer want — PR closed, branch deleted,
-      Issue closed as not planned (`scripts/drop-work-item.sh`, `--erase` to delete it outright)
-- [x] F8.11 Review `hq` Work Items in a separate copy of the repo — `review-checkout.sh`
-      skips HQ's own folder and clones to `.hq-reviews/<repo>` instead, so a review can't
-      move the work you're doing in HQ onto another branch *(proven on hq#23)*
-- [ ] F8.9 The dashboard refreshes itself (~30s), so work moving on GitHub shows up without
-      clicking. It holds still while you're mid-review or mid-answer
 - [ ] F8.7 "How's X going?" — a one-line status for each item on the dashboard
 - [ ] ✅ User check: take one Work Item from notification → dashboard → review → decision
       without touching git. Was it clean?
+
+## F4 (deferred): workflows that write themselves
+
+Needs several similar Work Items to generalise from. Revisit once there's a real backlog.
+
+- [ ] F4.8 After a few similar Work Items, Claude reads the recorded `Decisions` and offers
+      a short overlay (about 15 lines) for the user to approve
+- [ ] F4.9 Store approved overlays in `orchestration/workflows/` and use them automatically
+- [ ] ✅ User check: read a proposed workflow. Is it 5 lines you agree with?
 
 ## F9: Big goals become smaller Work Items
 *Goal: a big request becomes a set of connected Work Items.*
