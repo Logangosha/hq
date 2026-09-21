@@ -179,6 +179,9 @@ def open_review(full, number):
         raise UserError("There's no open pull request for this Work Item yet.")
     if res.returncode == 3:
         raise UserError("Your local copy has unsaved edits, so it wasn't touched:\n" + res.stderr)
+    if res.returncode == 4:
+        raise UserError("Your local copy has commits the PR branch doesn't, so it wasn't "
+                        "touched:\n" + res.stderr)
     if res.returncode != 0:
         raise UserError(res.stderr.strip() or "Checkout failed.")
     kv = dict(line.split("=", 1) for line in res.stdout.splitlines() if "=" in line)
