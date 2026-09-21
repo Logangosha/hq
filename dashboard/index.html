@@ -110,6 +110,9 @@
   button.reject { color: var(--accent); border-color: var(--accent); }
   @media (prefers-color-scheme: dark) { button.approve { color: #0b1f12; } }
 
+  #budget { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  #budget.low { color: var(--warn, #b45309); font-weight: 600; }
+
   @media (max-width: 520px) {
     .card { flex-wrap: wrap; }
     .chip { order: 3; }
@@ -121,6 +124,7 @@
   <header>
     <h1>HQ</h1>
     <span id="updated">Loading…</span>
+    <span id="budget" title="GitHub calls used this hour"></span>
     <button id="refresh" type="button">Refresh</button>
   </header>
   <div id="content"></div>
@@ -128,6 +132,17 @@
 <script>
   const content = document.getElementById("content");
   const updated = document.getElementById("updated");
+  const budget = document.getElementById("budget");
+
+  // GitHub's own count, which rides along on the response we already made.
+  function showBudget(header) {
+    if (!header) return;
+    const [remaining, limit, reset] = header.split(",").map(Number);
+    const used = limit - remaining;
+    const mins = Math.max(0, Math.round((reset * 1000 - Date.now()) / 60000));
+    budget.textContent = `${used.toLocaleString()}/${limit.toLocaleString()} calls · resets in ${mins}m`;
+    budget.classList.toggle("low", remaining < limit * 0.1);
+  }
   const refresh = document.getElementById("refresh");
   let domains = [];
   let current = null;  // the Work Item being reviewed: {repo, number}
@@ -228,6 +243,7 @@
     updated.textContent = "Loading…";
     try {
       const res = await fetch("/api/items");
+      showBudget(res.headers.get("X-HQ-Rate"));
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || res.statusText);
       if (data.refusal) {

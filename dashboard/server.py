@@ -299,9 +299,11 @@ class UserError(Exception):
 
 
 class Handler(BaseHTTPRequestHandler):
-    def send(self, code, body, kind="application/json"):
+    def send(self, code, body, kind="application/json", extra=None):
         data = (body if isinstance(body, str) else json.dumps(body)).encode("utf-8")
         self.send_response(code)
+        for k, v in (extra or {}).items():
+            self.send_header(k, v)
         self.send_header("Content-Type", kind)
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
@@ -313,7 +315,11 @@ class Handler(BaseHTTPRequestHandler):
             self.send(200, PAGE_HTML, "text/html; charset=utf-8")
         elif self.path == "/api/items":
             try:
-                self.send(200, work_items())
+                # The budget rides along as a header: GitHub reports it on every
+                # response we already make, so showing it costs no extra call.
+                r = ghcache.rate()
+                extra = {"X-HQ-Rate": f"{r['remaining']},{r['limit']},{r['reset']}"} if r else None
+                self.send(200, work_items(), extra=extra)
             except RefusalError as e:
                 self.send(200, {"refusal": {"kind": e.kind, "message": e.message}})
             except (subprocess.CalledProcessError, RuntimeError) as e:
