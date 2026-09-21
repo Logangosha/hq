@@ -15,12 +15,23 @@ import subprocess
 import tempfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import ghcache
+
 HQ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PAGE = os.path.join(HQ, "dashboard", "index.html")
 PORT = int(os.environ.get("PORT", "8765"))
 # Read once: reviewing HQ itself checks out other branches under this server.
 with open(PAGE, encoding="utf-8") as fh:
     PAGE_HTML = fh.read()
+
+STAGE_NAMES = {
+    "stage:requirements": "1 Requirements",
+    "stage:verification": "2 Verification",
+    "stage:plan": "3 Plan",
+    "stage:build": "4 Build",
+    "stage:qa": "5 QA",
+    "stage:review": "6 Human review",
+}
 
 
 def find_bash():
@@ -44,23 +55,40 @@ def run(args, cwd=HQ, check=True):
                           encoding="utf-8", check=check)
 
 
+OWNER = run(["gh", "repo", "view", "--json", "owner", "--jq", ".owner.login"]).stdout.strip()
+
+
 def work_items():
-    """scripts/list-work-items.sh, as JSON: [{repo, full, items: [...]}]."""
+    """Every domain (repos of OWNER's tagged `hq-domain`) with its open Work Items, as
+    JSON: [{repo, full, items: [...]}]. Uses ghcache so an unchanged domain costs nothing
+    and a changed one costs one call, regardless of how many other domains exist."""
     domains = []
-    for line in run([BASH, "scripts/list-work-items.sh"]).stdout.splitlines():
-        f = line.split("\t")
-        if f[0] == "DOMAIN":
-            domains.append({"full": f[1], "repo": f[1].split("/")[-1], "items": []})
-            known.add(f[1])
-        elif len(f) >= 5 and domains:
-            waiting = [w for w in (f[5] if len(f) > 5 else "").split(",") if w]
-            stage = f[3]
-            domains[-1]["items"].append({
-                "number": int(f[1]), "title": f[2], "stage": stage, "url": f[4],
-                "waiting": waiting,
+    repos = ghcache.fetch_all(f"users/{OWNER}/repos?per_page=100", run)
+    for repo in repos:
+        if repo["archived"] or "hq-domain" not in (repo.get("topics") or []):
+            continue
+        full = f"{OWNER}/{repo['name']}"
+        known.add(full)
+        items = []
+        issues = ghcache.fetch_all(f"repos/{full}/issues?state=open&per_page=100", run)
+        for issue in issues:
+            if "pull_request" in issue:
+                continue
+            labels = [l["name"] for l in issue["labels"]]
+            stage_label = next((l for l in labels if l.startswith("stage:")), None)
+            waiting = [l for l in labels if l.startswith("waiting:")]
+            stage = STAGE_NAMES.get(stage_label, "")
+            if not stage and not waiting:
+                continue  # no stage and nothing to do -> not a Work Item view needs
+            if not stage:
+                stage = "0 Stopped"
+            items.append({
+                "number": issue["number"], "title": issue["title"], "stage": stage,
+                "url": issue["html_url"], "waiting": waiting,
                 "needs_you": stage.startswith("6 ") or "waiting:user" in waiting,
             })
-    return domains
+        domains.append({"full": full, "repo": repo["name"], "items": items})
+    return sorted(domains, key=lambda d: d["repo"])
 
 
 def native_path(path):
@@ -242,8 +270,8 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/api/items":
             try:
                 self.send(200, work_items())
-            except subprocess.CalledProcessError as e:
-                self.send(500, {"error": (e.stderr or str(e)).strip()})
+            except (subprocess.CalledProcessError, RuntimeError) as e:
+                self.send(500, {"error": (getattr(e, "stderr", None) or str(e)).strip()})
         else:
             self.send(404, "Not found", "text/plain")
 
