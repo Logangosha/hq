@@ -1,6 +1,7 @@
 """HQ review dashboard: a local page listing every open Work Item, with the ones that
 need you on top (F8.4). Review opens one: its branch is checked out on this computer,
-its app started, and its code changes shown (F8.5). Runs here, not on GitHub, so the
+its app started, and its code changes shown (F8.5); then you approve or reject it with
+a comment (F8.6). Runs here, not on GitHub, so the
 buttons can use HQ's scripts and your local copies of the repos.
 
 Usage: python dashboard/server.py        then open http://localhost:8765
@@ -11,11 +12,15 @@ import re
 import shutil
 import socket
 import subprocess
+import tempfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HQ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PAGE = os.path.join(HQ, "dashboard", "index.html")
 PORT = int(os.environ.get("PORT", "8765"))
+# Read once: reviewing HQ itself checks out other branches under this server.
+with open(PAGE, encoding="utf-8") as fh:
+    PAGE_HTML = fh.read()
 
 
 def find_bash():
@@ -111,7 +116,7 @@ def open_review(full, number):
     if key in reviews:
         stop_app(reviews[key]["app"])
     app_url, proc = start_app(kv["path"])
-    reviews[key] = {"default": kv["default"], "path": kv["path"], "app": proc}
+    reviews[key] = {"default": kv["default"], "path": kv["path"], "app": proc, "pr": kv["pr"]}
 
     pr = kv["pr"]
     info = json.loads(run(["gh", "pr", "view", pr, "--repo", full,
@@ -134,10 +139,87 @@ def close_review(full, number):
     key = f"{full.split('/')[-1]}#{number}"
     r = reviews.pop(key, None)
     if not r:
-        return
+        return None
     stop_app(r["app"])
     run(["git", "-C", r["path"], "checkout", r["default"]], check=False)
     run(["git", "-C", r["path"], "pull", "--quiet"], check=False)
+    return r
+
+
+def decide(full, number, decision, comment):
+    """F8.6, the review skill's step 4: approve merges, reject goes back to Requirements."""
+    key = f"{full.split('/')[-1]}#{number}"
+    if key not in reviews:
+        raise UserError("Open this Work Item with Review first.")
+    comment = comment.strip()
+    if decision == "reject" and not comment:
+        raise UserError("Say what's wrong, so the agents know what to change.")
+    if decision not in ("approve", "reject"):
+        raise UserError("Unknown decision.")
+    pr = reviews[key]["pr"]
+    # Back on the default branch first, so the merge can delete the PR branch.
+    r = close_review(full, number)
+    num = str(number)
+    if decision == "approve":
+        if comment:
+            run(["gh", "issue", "comment", num, "--repo", full,
+                 "--body", f"## 6. Review — user ✅\n\n{comment}"])
+        # Outside any repo, so gh only touches GitHub; the local copy is pulled below.
+        run(["gh", "pr", "merge", pr, "--repo", full, "--squash", "--delete-branch"],
+            cwd=tempfile.gettempdir())
+        run(["git", "-C", r["path"], "pull", "--quiet"], check=False)
+        return {"message": f"Approved — PR #{pr} merged."}
+    run(["gh", "issue", "comment", num, "--repo", full,
+         "--body", f"## 6. Review — user ❌\n\n{comment}"])
+    # The rebuild reuses the open PR. The label change starts the requirements agent.
+    run(["gh", "issue", "edit", num, "--repo", full,
+         "--remove-label", "stage:review", "--add-label", "stage:requirements"])
+    return {"message": "Sent back to the agents with your comment."}
+
+
+def stopped(full, number):
+    """What a stopped Work Item is waiting for: its goal and the agent's last word."""
+    data = json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
+                           "--json", "title,body,comments,labels"]).stdout)
+    stage = [l["name"] for l in data["labels"] if l["name"].startswith("stage:")]
+    return {"title": data["title"], "goal": data["body"],
+            "last": data["comments"][-1]["body"] if data["comments"] else "",
+            "stage": stage[0] if stage else "stage:requirements",
+            "url": f"https://github.com/{full}/issues/{number}"}
+
+
+def resume(full, number, comment):
+    """Answer a stopped Work Item and start it moving again."""
+    comment = comment.strip()
+    if not comment:
+        raise UserError("Write your answer first — it's what unblocks the agents.")
+    info = stopped(full, number)
+    run(["gh", "issue", "comment", str(number), "--repo", full,
+         "--body", f"## Answer — user\n\n{comment}"])
+    waiting = [l for l in json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
+                                          "--json", "labels"]).stdout)["labels"]
+               if l["name"].startswith("waiting:")]
+    args = ["gh", "issue", "edit", str(number), "--repo", full,
+            "--remove-label", info["stage"]]
+    for l in waiting:
+        args += ["--remove-label", l["name"]]
+    run(args, check=False)  # the stage label may not be there to remove
+    # Adding it back is what starts the agent: the workflow fires on a label being added.
+    run(["gh", "issue", "edit", str(number), "--repo", full, "--add-label", info["stage"]])
+    return {"message": f"Answer posted — restarted at {info['stage'].split(':')[1]}."}
+
+
+def drop(full, number, reason):
+    """Throw a Work Item away: PR closed, branch gone, Issue closed as not planned."""
+    close_review(full, number)  # in case it was checked out
+    res = run([BASH, "scripts/drop-work-item.sh", full.split("/")[-1], str(number),
+               reason.strip()], check=False)
+    if res.returncode == 2:
+        raise UserError("That Work Item doesn't exist any more.")
+    if res.returncode != 0:
+        raise UserError(res.stderr.strip() or "Couldn't drop it.")
+    pr = [l.split("=")[1] for l in res.stdout.splitlines() if l.startswith("closed_pr=")]
+    return {"message": "Dropped." + (f" PR #{pr[0]} closed and its branch deleted." if pr else "")}
 
 
 class UserError(Exception):
@@ -156,8 +238,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path in ("/", "/index.html"):
-            with open(PAGE, encoding="utf-8") as fh:
-                self.send(200, fh.read(), "text/html; charset=utf-8")
+            self.send(200, PAGE_HTML, "text/html; charset=utf-8")
         elif self.path == "/api/items":
             try:
                 self.send(200, work_items())
@@ -181,6 +262,14 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == "/api/review/close":
                 close_review(full, number)
                 self.send(200, {"ok": True})
+            elif self.path == "/api/drop":
+                self.send(200, drop(full, number, body.get("comment", "")))
+            elif self.path == "/api/stopped":
+                self.send(200, stopped(full, number))
+            elif self.path == "/api/resume":
+                self.send(200, resume(full, number, body.get("comment", "")))
+            elif self.path == "/api/review/decide":
+                self.send(200, decide(full, number, body.get("decision"), body.get("comment", "")))
             else:
                 self.send(404, {"error": "Not found"})
         except UserError as e:

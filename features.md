@@ -76,6 +76,9 @@ disagree. An agent that forgets to @ the next one would stall silently with a co
       *(deferred — test issues #15, #19 in the sandbox)*
 - [x] F7.9 Stop and wait when the user is needed (`waiting:*` skips the run), or when a
       stage is reached 3 times (workflow counts that agent's stage comments)
+- [ ] F7.10 Let the agents look things up: allow `WebSearch` and `WebFetch` in the runner
+      (today only Bash `curl` reaches the network, so they work from memory). Fixes the
+      mismatch where `builder.md` claims WebFetch but the runner doesn't allow it
 - [ ] ✅ User check: create an Issue from your phone and watch it move
 
 ## F8: You're alerted, and you review
@@ -85,13 +88,24 @@ disagree. An agent that forgets to @ the next one would stall silently with a co
 - [ ] F8.2 `work-items` flags what needs you — `stage:review` and `waiting:user` — so you
       can find an item without its number
 - [x] F8.3 `/review <repo>#<n>`: run the PR on your computer, then approve (merge) or reject
-      (back to Requirements) — no git by hand *(built; not yet tried on a real Work Item)*
+      (back to Requirements) — no git by hand *(built, never used: the dashboard replaced it
+      in practice. Keep for chat-only use, or retire it)*
 - [x] F8.4 Review dashboard: a simple web page listing every Work Item that needs you, across
       all domains, with its stage and a link to the Issue
 - [x] F8.5 Dashboard **Review** button: Claude runs the review checkout on your computer and
       brings up the app, and the page shows the PR's code changes
-- [ ] F8.6 Dashboard decision: a comment box plus **Approve** (merge and close) and
+- [x] F8.6 Dashboard decision: a comment box plus **Approve** (merge and close) and
       **Reject** (back to Requirements with your comment). Claude does the GitHub steps.
+      *(Reject proven on hq#21; Approve proven by merging PR #20)*
+- [x] F8.8 A stopped Work Item (agent gave up, waiting on you) gets an **Answer** button:
+      your answer goes on the Issue and the stage label is re-applied, which restarts it
+- [x] F8.10 **Drop it**: a Work Item you no longer want — PR closed, branch deleted,
+      Issue closed as not planned (`scripts/drop-work-item.sh`, `--erase` to delete it outright)
+- [ ] F8.11 Review `hq` Work Items in a separate copy of the repo. Today the dashboard
+      checks out branches in the same folder Claude works in, which has twice moved
+      unrelated work onto `main`
+- [ ] F8.9 The dashboard refreshes itself (~30s), so work moving on GitHub shows up without
+      clicking. It holds still while you're mid-review or mid-answer
 - [ ] F8.7 "How's X going?" — a one-line status for each item on the dashboard
 - [ ] ✅ User check: take one Work Item from notification → dashboard → review → decision
       without touching git. Was it clean?
@@ -103,7 +117,10 @@ disagree. An agent that forgets to @ the next one would stall silently with a co
 - [ ] F9.2 Add a "break it down" step to Plan
 - [ ] F9.3 When a child finishes, start work that was waiting on it
 - [ ] F9.4 A parent is done only when all its children are done
-- [ ] F9.5 Test with a small 3-part sandbox project
+- [ ] F9.5 Cross-repo Work Items: the run's token is scoped to its own repo, so an agent
+      can't open an Issue elsewhere. Decide how (GitHub App token vs. a secret per repo)
+      and weigh it — it widens what a wrong agent can reach
+- [ ] F9.6 Test with a small 3-part sandbox project
 - [ ] ✅ User check: are the parts and their order clear?
 
 ## F10: More workflows
