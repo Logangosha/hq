@@ -46,7 +46,8 @@ fi
 for D in $DOMAINS; do
   R="$OWNER/$D"
   echo; echo "Domain: $R"
-  ok "workflow installed"
+  gh api "repos/$R/contents/.github/workflows/work-item.yml" --silent 2>/dev/null \
+    && ok "workflow installed" || bad "workflow file missing" "/add-domain $D"
   gh label list --repo "$R" --search stage:requirements --json name --jq '.[].name' | grep -qx stage:requirements \
     && ok "labels" || bad "labels missing" "/add-domain $D"
   gh secret list --repo "$R" 2>/dev/null | grep -q CLAUDE_CODE_OAUTH_TOKEN \
