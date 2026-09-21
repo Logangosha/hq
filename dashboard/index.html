@@ -205,7 +205,7 @@
   function scheduleRefresh() {
     clearTimeout(timer);
     if (paused) return;  // the tab is hidden or idle: resuming re-arms this
-    timer = setTimeout(load, nextDelay());
+    timer = setTimeout(() => load(true), nextDelay());
   }
 
   // R3/R4: replaces "Updated <time>" so the last-loaded data is never shown as current.
@@ -238,9 +238,11 @@
   ["click", "keydown", "scroll", "pointermove"].forEach(evt =>
     document.addEventListener(evt, onActivity, { passive: true }));
 
-  async function load() {
-    refresh.disabled = true;
-    updated.textContent = "Loading…";
+  async function load(auto = false) {
+    if (!auto) {
+      refresh.disabled = true;
+      updated.textContent = "Loading…";
+    }
     try {
       const res = await fetch("/api/items");
       showBudget(res.headers.get("X-HQ-Rate"));
@@ -252,11 +254,11 @@
       } else {
         domains = data;
         if (!current) renderList();
-        updated.textContent = "Updated " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+        updated.textContent = "Updated " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
       }
     } catch (e) {
       if (!current) content.innerHTML = `<div class="error">Couldn't load Work Items.\n${esc(e.message)}</div>`;
-      updated.textContent = "";
+      updated.textContent = auto ? "Update failed" : "";
     } finally {
       paused = null;  // a completed fetch, however it turned out, is fresh enough to resume on
       refresh.disabled = false;
@@ -429,7 +431,7 @@
     const a = e.target.closest("[data-answer]");
     if (a) openStopped(a.dataset.answer, Number(a.dataset.number));
   });
-  refresh.addEventListener("click", load);
+  refresh.addEventListener("click", () => load());
   resetIdleTimer();
   load();
 </script>
