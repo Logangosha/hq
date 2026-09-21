@@ -24,7 +24,9 @@ bash scripts/review-checkout.sh <repo> <n>
 | 2 | No open PR yet — the builder hasn't opened one |
 | 3 | The folder has unsaved edits (list them). Don't touch them; ask the user to save or discard them first |
 
-Keep the printed `pr`, `default`, `path` and `launch` for the steps below.
+Keep the printed `pr`, `default`, `path` and `launch` for the steps below. `path` is
+never HQ's own folder — HQ Work Items get a review copy under `.hq-reviews/` beside HQ,
+so a review can't move the work you're doing here onto another branch.
 
 ## 3. Show it
 

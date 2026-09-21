@@ -2,8 +2,10 @@
 # Put a local copy of a domain repo on a Work Item's PR branch, ready to look at.
 # Usage: bash scripts/review-checkout.sh <repo> <issue-number>
 #
-# Clones the repo next to HQ if there's no local copy. Refuses if the copy has unsaved
-# edits (files git ignores don't count). Prints key=value lines:
+# Never uses HQ's own folder — that's where Claude works, and checking a PR branch out
+# there has twice moved unrelated work onto main (F8.11). HQ Work Items get a separate
+# review copy under .hq-reviews/ instead. Refuses if the copy has unsaved edits (files
+# git ignores don't count). Prints key=value lines:
 #   pr, pr_url, branch, default (branch to return to), path, launch (.claude/launch.json or -)
 # Exit: 1 usage/gh error, 2 no open PR for the Issue, 3 unsaved edits.
 set -euo pipefail
@@ -31,11 +33,22 @@ fi
 read -r BRANCH PR_URL < <(gh pr view "$PR" --repo "$REPO" --json headRefName,url --jq '"\(.headRefName) \(.url)"')
 DEFAULT="$(gh repo view "$REPO" --json defaultBranchRef --jq .defaultBranchRef.name)"
 
-# Local copy: the first one found, else clone next to HQ
-DIR="$(bash "$HERE/scripts/find-clones.sh" "$REPO_NAME" | head -1 | cut -f2)"
+# Local copy: the first one found that isn't HQ's own folder (you work there), else a
+# review copy of its own.
+DIR=""
+while IFS=$'	' read -r _ D; do
+  [ "$D" = "$HERE" ] && continue
+  DIR="$D"; break
+done < <(bash "$HERE/scripts/find-clones.sh" "$REPO_NAME")
+
 if [ -z "$DIR" ]; then
-  DIR="$(cd "$HERE/.." && pwd)/$REPO_NAME"
-  gh repo clone "$REPO" "$DIR" -- --quiet
+  DIR="${HQ_REVIEW_ROOT:-$(cd "$HERE/.." && pwd)/.hq-reviews}/$REPO_NAME"
+  if [ -d "$DIR/.git" ]; then
+    git -C "$DIR" fetch --quiet origin
+  else
+    mkdir -p "$(dirname "$DIR")"
+    gh repo clone "$REPO" "$DIR" -- --quiet
+  fi
 fi
 
 if [ -n "$(git -C "$DIR" status --porcelain)" ]; then
