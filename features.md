@@ -101,9 +101,9 @@ disagree. An agent that forgets to @ the next one would stall silently with a co
       your answer goes on the Issue and the stage label is re-applied, which restarts it
 - [x] F8.10 **Drop it**: a Work Item you no longer want — PR closed, branch deleted,
       Issue closed as not planned (`scripts/drop-work-item.sh`, `--erase` to delete it outright)
-- [ ] F8.11 Review `hq` Work Items in a separate copy of the repo. Today the dashboard
-      checks out branches in the same folder Claude works in, which has twice moved
-      unrelated work onto `main`
+- [x] F8.11 Review `hq` Work Items in a separate copy of the repo — `review-checkout.sh`
+      skips HQ's own folder and clones to `.hq-reviews/<repo>` instead, so a review can't
+      move the work you're doing in HQ onto another branch *(proven on hq#23)*
 - [ ] F8.9 The dashboard refreshes itself (~30s), so work moving on GitHub shows up without
       clicking. It holds still while you're mid-review or mid-answer
 - [ ] F8.7 "How's X going?" — a one-line status for each item on the dashboard
