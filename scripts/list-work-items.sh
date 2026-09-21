@@ -8,7 +8,12 @@
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
-OWNER="$(cd "$HERE" && gh repo view --json owner --jq .owner.login)" || exit 1
+source "$HERE/scripts/lib/gh-refusal.sh"
+
+OWNER="$(cd "$HERE" && gh_or_refusal gh repo view --json owner --jq .owner.login)"
+STATUS=$?
+[ "$STATUS" -eq 2 ] && { printf '%s\n' "$OWNER"; exit 2; }
+[ "$STATUS" -ne 0 ] && exit 1
 
 stage_name() {
   case "$1" in
@@ -22,12 +27,23 @@ stage_name() {
   esac
 }
 
-bash scripts/list-domains.sh | while IFS=$'\t' read -r REPO _DESC; do
+DOMAINS="$(bash scripts/list-domains.sh)"
+STATUS=$?
+[ "$STATUS" -eq 2 ] && { printf '%s\n' "$DOMAINS"; exit 2; }
+[ "$STATUS" -ne 0 ] && exit 1
+
+printf '%s\n' "$DOMAINS" | while IFS=$'\t' read -r REPO _DESC; do
+  [ -z "$REPO" ] && continue
   printf 'DOMAIN\t%s/%s\n' "$OWNER" "$REPO"
-  gh issue list --repo "$OWNER/$REPO" --state open --limit 1000 \
+  ISSUES="$(gh_or_refusal gh issue list --repo "$OWNER/$REPO" --state open --limit 1000 \
     --json number,title,url,labels \
     --jq '.[] | [.number, .title, ([.labels[].name | select(startswith("stage:"))][0] // "-"), .url,
-             (([.labels[].name | select(startswith("waiting:"))] | join(",")) // "" | if . == "" then "-" else . end)] | @tsv' |
+             (([.labels[].name | select(startswith("waiting:"))] | join(",")) // "" | if . == "" then "-" else . end)] | @tsv')"
+  ISTATUS=$?
+  [ "$ISTATUS" -eq 2 ] && { printf '%s\n' "$ISSUES"; exit 2; }
+  [ "$ISTATUS" -ne 0 ] && exit 1
+  [ -z "$ISSUES" ] && continue
+  printf '%s\n' "$ISSUES" |
   while IFS=$'\t' read -r NUMBER TITLE LABEL URL WAITING; do
     # "-" stands in for an empty field: the shell would otherwise swallow it.
     [ "$LABEL" = "-" ] && LABEL=""
@@ -40,4 +56,7 @@ bash scripts/list-domains.sh | while IFS=$'\t' read -r REPO _DESC; do
     printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$REPO" "$NUMBER" "$TITLE" "$STAGE" "$URL" "$WAITING"
   done
 done
+STATUS=$?
+[ "$STATUS" -eq 2 ] && exit 2
+[ "$STATUS" -ne 0 ] && exit 1
 exit 0

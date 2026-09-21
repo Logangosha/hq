@@ -62,6 +62,11 @@
     background: var(--accent-soft); color: var(--accent); border-radius: 10px;
     padding: 12px 14px; white-space: pre-wrap; font-size: 14px; margin-bottom: 12px;
   }
+  .refusal {
+    background: var(--surface); border: 1px dashed var(--accent); color: var(--text);
+    border-radius: 10px; padding: 12px 14px; font-size: 14px; margin-bottom: 12px;
+  }
+  .refusal::before { content: "⚠ GitHub isn't answering — "; color: var(--accent); font-weight: 600; }
 
   /* Review view */
   .back { margin-bottom: 16px; }
@@ -127,6 +132,9 @@
   let domains = [];
   let current = null;  // the Work Item being reviewed: {repo, number}
   let timer = null;
+  let idleTimer = null;
+  let paused = null;  // null, "hidden" (tab not visible), or "idle" (no activity)
+  const IDLE_MS = 5 * 60 * 1000;
 
   const esc = s => String(s).replace(/[&<>"']/g, c =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -181,8 +189,39 @@
 
   function scheduleRefresh() {
     clearTimeout(timer);
+    if (paused) return;  // the tab is hidden or idle: resuming re-arms this
     timer = setTimeout(load, nextDelay());
   }
+
+  // R3/R4: replaces "Updated <time>" so the last-loaded data is never shown as current.
+  function setPaused(reason) {
+    paused = reason;
+    clearTimeout(timer);
+    updated.textContent = reason === "hidden" ? "Paused — tab hidden" : "Paused — idle";
+  }
+
+  function resetIdleTimer() {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      if (!document.hidden && !paused) setPaused("idle");
+    }, IDLE_MS);
+  }
+
+  function onActivity() {
+    resetIdleTimer();
+    if (paused === "idle") load();  // R6: resume immediately, don't wait for the timer
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      setPaused("hidden");
+    } else {
+      resetIdleTimer();
+      load();  // R5: resume immediately, don't wait for the timer
+    }
+  });
+  ["click", "keydown", "scroll", "pointermove"].forEach(evt =>
+    document.addEventListener(evt, onActivity, { passive: true }));
 
   async function load() {
     refresh.disabled = true;
@@ -191,13 +230,19 @@
       const res = await fetch("/api/items");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || res.statusText);
-      domains = data;
-      if (!current) renderList();
-      updated.textContent = "Updated " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      if (data.refusal) {
+        if (!current) content.innerHTML = `<div class="refusal">${esc(data.refusal.message)}</div>`;
+        updated.textContent = "";
+      } else {
+        domains = data;
+        if (!current) renderList();
+        updated.textContent = "Updated " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      }
     } catch (e) {
       if (!current) content.innerHTML = `<div class="error">Couldn't load Work Items.\n${esc(e.message)}</div>`;
       updated.textContent = "";
     } finally {
+      paused = null;  // a completed fetch, however it turned out, is fresh enough to resume on
       refresh.disabled = false;
       scheduleRefresh();
     }
@@ -369,6 +414,7 @@
     if (a) openStopped(a.dataset.answer, Number(a.dataset.number));
   });
   refresh.addEventListener("click", load);
+  resetIdleTimer();
   load();
 </script>
 </body>
