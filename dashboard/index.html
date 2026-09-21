@@ -168,17 +168,22 @@
   // ---- List ----
 
   function card(d, it, showWhy) {
-    const why = !showWhy ? "" :
-      it.waiting.includes("waiting:user") ? "An agent stopped and needs your answer"
-      : "Ready for your review";
     const canReview = it.stage.startsWith("6 ");
+    const canAnswer = it.waiting.includes("waiting:user");
+    const canRestart = it.stalled && !canAnswer;
+    const why = !showWhy ? "" :
+      canAnswer ? "An agent stopped and needs your answer"
+      : canReview ? "Ready for your review"
+      : canRestart ? it.stall_reason
+      : "";
     return `<div class="card">
       <span class="ref">${esc(d.repo)}#${it.number}</span>
       <span class="title"><a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.title)}</a>
-        ${why ? `<span class="why">${why}</span>` : ""}</span>
+        ${why ? `<span class="why">${esc(why)}</span>` : ""}</span>
       <span class="chip">${esc(it.stage.replace(/^\d+ /, ""))}</span>
       ${canReview ? `<button class="primary" data-review="${esc(d.full)}" data-number="${it.number}">Review</button>` : ""}
-      ${!canReview && it.needs_you ? `<button class="primary" data-answer="${esc(d.full)}" data-number="${it.number}">Answer</button>` : ""}
+      ${canAnswer ? `<button class="primary" data-answer="${esc(d.full)}" data-number="${it.number}">Answer</button>` : ""}
+      ${canRestart ? `<button data-restart="${esc(d.full)}" data-number="${it.number}">Restart</button>` : ""}
     </div>`;
   }
 
@@ -425,11 +430,24 @@
     load();
   }
 
+  async function restart(button, repo, number) {
+    button.disabled = true;
+    try {
+      await post("/api/restart", { repo, number });
+      await load();
+    } catch (e) {
+      button.disabled = false;
+      button.title = e.message;
+    }
+  }
+
   content.addEventListener("click", e => {
     const b = e.target.closest("[data-review]");
     if (b) return openReview(b.dataset.review, Number(b.dataset.number));
     const a = e.target.closest("[data-answer]");
-    if (a) openStopped(a.dataset.answer, Number(a.dataset.number));
+    if (a) return openStopped(a.dataset.answer, Number(a.dataset.number));
+    const r = e.target.closest("[data-restart]");
+    if (r) restart(r, r.dataset.restart, Number(r.dataset.number));
   });
   refresh.addEventListener("click", () => load());
   resetIdleTimer();

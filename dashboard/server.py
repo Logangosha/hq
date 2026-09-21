@@ -6,7 +6,6 @@ buttons can use HQ's scripts and your local copies of the repos.
 
 Usage: python dashboard/server.py        then open http://localhost:8765
 """
-import datetime
 import json
 import os
 import re
@@ -14,6 +13,7 @@ import shutil
 import socket
 import subprocess
 import tempfile
+from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import ghcache
@@ -75,7 +75,7 @@ def _refusal(kind, detail=""):
     message = REFUSAL_MESSAGES.get(kind, "GitHub refused the request.")
     if kind == "rate_limit" and detail:
         try:
-            reset = datetime.datetime.fromtimestamp(int(detail)).strftime("%I:%M %p").lstrip("0")
+            reset = datetime.fromtimestamp(int(detail)).strftime("%I:%M %p").lstrip("0")
             message += f" Try again after {reset}."
         except ValueError:
             pass
@@ -99,10 +99,97 @@ def owner():
     return _owner
 
 
+# Stage display name (from STAGE_NAMES above) -> its stage: label / agent name (from
+# scripts/runner/which-agent.sh). Stage 6 (human review) is deliberately absent: it's the
+# user's turn, so a finished run there is normal, not a stall.
+STAGE_LABEL = {
+    "1 Requirements": "stage:requirements", "2 Verification": "stage:verification",
+    "3 Plan": "stage:plan", "4 Build": "stage:build", "5 QA": "stage:qa",
+}
+STAGE_AGENT = {
+    "1 Requirements": "requirements", "2 Verification": "verification",
+    "3 Plan": "planner", "4 Build": "builder", "5 QA": "qa",
+}
+
+
+def _shift(iso, seconds):
+    """iso, moved earlier by `seconds` — a small clock-skew margin."""
+    return (datetime.strptime(iso, "%Y-%m-%dT%H:%M:%SZ") - timedelta(seconds=seconds)) \
+        .strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def stage_label_time(full, number, label, created_at):
+    """When `label` most recently landed on the issue, or its creation time if it was
+    only ever set there (no later "labeled" event, e.g. a label set at creation)."""
+    events = json.loads(run(["gh", "api", f"repos/{full}/issues/{number}/events", "--paginate",
+                             "--jq", f'[.[] | select(.event=="labeled" and .label.name=="{label}") '
+                                     '| .created_at]'], check=False).stdout or "[]")
+    return events[-1] if events else created_at
+
+
+def domain_runs(full):
+    """The Work Item runner's recent runs for this domain, most recent first."""
+    data = json.loads(run(["gh", "run", "list", "--repo", full, "--workflow=work-item.yml",
+                           "--json", "status,createdAt,event", "-L", "30"],
+                          check=False).stdout or "[]")
+    return [r for r in data if r["event"] == "issues"]
+
+
+def stall_info(full, item, comments, runs):
+    """Whether this Work Item's current stage looks stuck: its Actions run finished,
+    but nothing on the Issue changed since (F7.10). Posts the first comment for a
+    stall and stays quiet after that; parks the item on a 3rd stall in a row on the
+    same stage, with no successful stage comment in between.
+
+    Returns (stalled, reason, just_parked) — just_parked is True only on the call that
+    adds waiting:user, so work_items() can reflect it in this same response's `waiting`
+    list instead of waiting for a second poll."""
+    stage, number = item["stage"], item["number"]
+    since = stage_label_time(full, number, STAGE_LABEL[stage], item["created_at"])
+    cutoff = _shift(since, 5)
+    after = [c for c in comments if c["created_at"] >= cutoff]
+    if any(c["body"].startswith("## ") for c in after):
+        return False, None, False  # a real stage comment landed — not a stall
+    if not any(r["status"] == "completed" and r["createdAt"] >= cutoff for r in runs):
+        return False, None, False  # still running, or hasn't run yet since this stage started
+
+    title = stage.split(" ", 1)[1]
+    reason = (f"🛑 Stalled: **{title}** — the last Actions run for this stage finished "
+              "with no new comment or label change. A person needs to look, or Restart.")
+    if after and after[-1]["body"] == reason:
+        return True, reason, False  # already recorded this stall episode
+
+    run(["gh", "issue", "comment", str(number), "--repo", full, "--body", reason])
+
+    agent = STAGE_AGENT[stage]
+    heading = [i for i, c in enumerate(comments)
+               if c["body"].startswith("## ") and f"— {agent}" in c["body"]]
+    tail = comments[heading[-1] + 1:] if heading else comments
+    strikes = 1 + sum(1 for c in tail if c["body"].startswith(f"🛑 Stalled: **{title}**"))
+    parked = strikes >= 3
+    if parked:
+        run(["gh", "issue", "edit", str(number), "--repo", full,
+             "--add-label", "waiting:user", "--add-assignee", full.split("/")[0]])
+    return True, reason, parked
+
+
+def domain_comments(full):
+    """Every issue comment in the domain, grouped by issue number. One cached,
+    ETag-conditional call (like the rest of work_items()) instead of one per issue."""
+    by_number = {}
+    for c in ghcache.fetch_all(f"repos/{full}/issues/comments?per_page=100", run):
+        number = int(c["issue_url"].rsplit("/", 1)[-1])
+        by_number.setdefault(number, []).append(c)
+    for comments in by_number.values():
+        comments.sort(key=lambda c: c["created_at"])
+    return by_number
+
+
 def work_items():
     """Every domain (repos of OWNER's tagged `hq-domain`) with its open Work Items, as
     JSON: [{repo, full, items: [...]}]. Uses ghcache so an unchanged domain costs nothing
-    and a changed one costs one call, regardless of how many other domains exist."""
+    and a changed one costs one call, regardless of how many other domains exist. Each
+    item still on an agent's stage is also checked for a stall (F7.10)."""
     domains = []
     try:
         repos = ghcache.fetch_all(f"users/{owner()}/repos?per_page=100", run)
@@ -127,8 +214,21 @@ def work_items():
                 items.append({
                     "number": issue["number"], "title": issue["title"], "stage": stage,
                     "url": issue["html_url"], "waiting": waiting,
+                    "created_at": issue["created_at"], "stalled": False, "stall_reason": None,
                     "needs_you": stage.startswith("6 ") or "waiting:user" in waiting,
                 })
+            # waiting:* (either kind) means the runner won't touch it either — not a stall.
+            checkable = [it for it in items if it["stage"] in STAGE_LABEL and not it["waiting"]]
+            if checkable:
+                comments_by_number = domain_comments(full)
+                runs = domain_runs(full)
+                for it in checkable:
+                    comments = comments_by_number.get(it["number"], [])
+                    stalled, reason, parked = stall_info(full, it, comments, runs)
+                    if stalled:
+                        it["stalled"], it["stall_reason"], it["needs_you"] = True, reason, True
+                        if parked:
+                            it["waiting"].append("waiting:user")
             domains.append({"full": full, "repo": repo["name"], "items": items})
     except ghcache.GhRefusal as e:
         raise _refusal(e.kind, e.detail)
@@ -284,6 +384,20 @@ def resume(full, number, comment):
     return {"message": f"Answer posted — restarted at {info['stage'].split(':')[1]}."}
 
 
+def restart(full, number):
+    """Retry a stalled Work Item at the same stage — same idiom as resume(): remove
+    then re-add the stage: label, which is what starts the agent."""
+    labels = [l["name"] for l in json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
+                                                  "--json", "labels"]).stdout)["labels"]
+              if l["name"].startswith("stage:")]
+    if not labels:
+        raise UserError("No stage to restart — open the Issue to see what's going on.")
+    stage = labels[0]
+    run(["gh", "issue", "edit", str(number), "--repo", full, "--remove-label", stage])
+    run(["gh", "issue", "edit", str(number), "--repo", full, "--add-label", stage])
+    return {"message": f"Restarted at {stage.split(':')[1]}."}
+
+
 def drop(full, number, reason):
     """Throw a Work Item away: PR closed, branch gone, Issue closed as not planned."""
     close_review(full, number)  # in case it was checked out
@@ -351,6 +465,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200, stopped(full, number))
             elif self.path == "/api/resume":
                 self.send(200, resume(full, number, body.get("comment", "")))
+            elif self.path == "/api/restart":
+                self.send(200, restart(full, number))
             elif self.path == "/api/review/decide":
                 self.send(200, decide(full, number, body.get("decision"), body.get("comment", "")))
             else:
