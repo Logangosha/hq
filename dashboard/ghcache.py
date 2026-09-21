@@ -74,6 +74,23 @@ def _parse(raw):
     return status, headers, body.strip()
 
 
+def _remember_rate(cache, headers):
+    """Keep the budget GitHub reports on every response, so showing it costs no call."""
+    if "x-ratelimit-limit" not in headers:
+        return
+    cache["_rate"] = {
+        "limit": int(headers["x-ratelimit-limit"]),
+        "remaining": int(headers.get("x-ratelimit-remaining", 0)),
+        "reset": int(headers.get("x-ratelimit-reset", 0)),
+        "at": time.time(),
+    }
+
+
+def rate():
+    """The last budget GitHub reported, or None. Shared by every dashboard process."""
+    return _load().get("_rate")
+
+
 def fetch(url, run):
     """Return (body_json, link_header) for a GitHub REST GET, using the shared cache.
 
@@ -93,6 +110,7 @@ def fetch(url, run):
     if res.returncode != 0 and not res.stdout.startswith("HTTP/"):
         raise GhRefusal(*classify(res.stderr))  # gh never got an HTTP response at all
     status, headers, body = _parse(res.stdout)
+    _remember_rate(cache, headers)
 
     if status == 304 and entry:
         entry["fetched_at"] = now
@@ -100,6 +118,8 @@ def fetch(url, run):
         _save(cache)
         return json.loads(entry["body"]), entry.get("link")
 
+    if status in (401, 403, 429):
+        _save(cache)  # keep the budget this response reported before giving up
     if status == 401:
         raise GhRefusal("auth")
     if status in (403, 429) and headers.get("x-ratelimit-remaining") == "0":
