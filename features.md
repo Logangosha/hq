@@ -88,17 +88,22 @@ disagree. An agent that forgets to @ the next one would stall silently with a co
 - [ ] F8.2 `work-items` flags what needs you — `stage:review` and `waiting:user` — so you
       can find an item without its number
 - [x] F8.3 `/review <repo>#<n>`: run the PR on your computer, then approve (merge) or reject
-      (back to Requirements) — no git by hand *(built; not yet tried on a real Work Item)*
+      (back to Requirements) — no git by hand *(built, never used: the dashboard replaced it
+      in practice. Keep for chat-only use, or retire it)*
 - [x] F8.4 Review dashboard: a simple web page listing every Work Item that needs you, across
       all domains, with its stage and a link to the Issue
 - [x] F8.5 Dashboard **Review** button: Claude runs the review checkout on your computer and
       brings up the app, and the page shows the PR's code changes
 - [x] F8.6 Dashboard decision: a comment box plus **Approve** (merge and close) and
       **Reject** (back to Requirements with your comment). Claude does the GitHub steps.
+      *(Reject proven on hq#21; Approve proven by merging PR #20)*
 - [x] F8.8 A stopped Work Item (agent gave up, waiting on you) gets an **Answer** button:
       your answer goes on the Issue and the stage label is re-applied, which restarts it
 - [x] F8.10 **Drop it**: a Work Item you no longer want — PR closed, branch deleted,
       Issue closed as not planned (`scripts/drop-work-item.sh`, `--erase` to delete it outright)
+- [ ] F8.11 Review `hq` Work Items in a separate copy of the repo. Today the dashboard
+      checks out branches in the same folder Claude works in, which has twice moved
+      unrelated work onto `main`
 - [ ] F8.9 The dashboard refreshes itself (~30s), so work moving on GitHub shows up without
       clicking. It holds still while you're mid-review or mid-answer
 - [ ] F8.7 "How's X going?" — a one-line status for each item on the dashboard
