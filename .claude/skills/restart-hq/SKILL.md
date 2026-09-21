@@ -1,14 +1,14 @@
 ---
-name: stophq
-description: Stop the review dashboard. Use when the user says "stop the dashboard", "stop hq", or "/stophq".
+name: restart-hq
+description: Restart the review dashboard so it picks up the working copy's current state. Use when the user says "restart the dashboard", "restart hq", or "/restart-hq".
 ---
 
-# /stophq
+# /restart-hq
 
 Run from the HQ root:
 
 ```bash
-python dashboard/ctl.py stop
+python dashboard/ctl.py restart
 ```
 
 Relay its one line of output verbatim. Never ask the user for a port or process id —

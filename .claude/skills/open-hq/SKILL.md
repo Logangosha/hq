@@ -1,9 +1,9 @@
 ---
-name: openhq
-description: Open the review dashboard in the browser, starting it first if it isn't running. Use when the user says "open the dashboard", "open hq", or "/openhq".
+name: open-hq
+description: Open the review dashboard in the browser, starting it first if it isn't running. Use when the user says "open the dashboard", "open hq", or "/open-hq".
 ---
 
-# /openhq
+# /open-hq
 
 Run from the HQ root:
 

@@ -1,9 +1,9 @@
 ---
-name: starthq
-description: Start the review dashboard. Use when the user says "start the dashboard", "start hq", or "/starthq".
+name: start-hq
+description: Start the review dashboard. Use when the user says "start the dashboard", "start hq", or "/start-hq".
 ---
 
-# /starthq
+# /start-hq
 
 Run from the HQ root:
 
