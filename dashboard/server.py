@@ -134,12 +134,8 @@ STAGE_AGENT = {
     "1 Requirements": "requirements", "2 Verification": "verification",
     "3 Plan": "planner", "4 Build": "builder", "5 QA": "qa",
 }
-
-
-def _shift(iso, seconds):
-    """iso, moved earlier by `seconds` — a small clock-skew margin."""
-    return (datetime.strptime(iso, "%Y-%m-%dT%H:%M:%SZ") - timedelta(seconds=seconds)) \
-        .strftime("%Y-%m-%dT%H:%M:%SZ")
+# Stages restart() may target — the same five agent stages, so the two lists can't drift.
+RESTART_STAGES = {l.split(":", 1)[1] for l in STAGE_LABEL.values()}
 
 
 def stage_label_time(full, number, label, created_at):
@@ -151,45 +147,26 @@ def stage_label_time(full, number, label, created_at):
     return events[-1] if events else created_at
 
 
-def domain_runs(full):
-    """The Work Item runner's recent runs for this domain, most recent first."""
-    data = json.loads(run(["gh", "run", "list", "--repo", full, "--workflow=work-item.yml",
-                           "--json", "status,createdAt,event", "-L", "30"],
-                          check=False).stdout or "[]")
-    return [r for r in data if r["event"] == "issues"]
-
-
-def stall_info(full, item, comments, runs):
-    """Whether this Work Item's current stage looks stuck: either its Actions run
-    finished with nothing changed on the Issue (crashed), or 15+ minutes have passed
-    since the stage label landed with no completed run and no new comment (silent, e.g.
-    queued/stuck/never started) (F7.10). Posts the first comment for a stall and stays
-    quiet after that; parks the item on a 3rd stall in a row on the same stage — crash
-    or silence, in any mix — with no successful stage comment in between.
+def stall_info(full, item, comments):
+    """Whether this Work Item's current stage looks stuck: 15+ minutes have passed since
+    the stage label landed on the Issue (F7.10) — the only test, regardless of comments
+    or Actions run history. Posts the first comment for a stall and stays quiet after
+    that; parks the item on a 3rd stall in a row on the same stage, with no successful
+    stage comment in between.
 
     Returns (stalled, reason, just_parked) — just_parked is True only on the call that
     adds waiting:user, so work_items() can reflect it in this same response's `waiting`
     list instead of waiting for a second poll."""
     stage, number = item["stage"], item["number"]
     since = stage_label_time(full, number, STAGE_LABEL[stage], item["created_at"])
-    cutoff = _shift(since, 5)
-    after = [c for c in comments if c["created_at"] >= cutoff]
-    if any(c["body"].startswith("## ") for c in after):
-        return False, None, False  # a real stage comment landed — not a stall
-
-    crashed = any(r["status"] == "completed" and r["createdAt"] >= cutoff for r in runs)
-    if not crashed:
-        elapsed = datetime.utcnow() - datetime.strptime(since, "%Y-%m-%dT%H:%M:%SZ")
-        if elapsed < timedelta(seconds=900):
-            return False, None, False  # stage started under 15 min ago, no crash yet — give it time
+    elapsed = datetime.utcnow() - datetime.strptime(since, "%Y-%m-%dT%H:%M:%SZ")
+    if elapsed < timedelta(seconds=900):
+        return False, None, False  # stage started under 15 min ago — give it time
 
     title = stage.split(" ", 1)[1]
-    if crashed:
-        reason = (f"🛑 Stalled: **{title}** — the last Actions run for this stage finished "
-                  "with no new comment or label change. A person needs to look, or Restart.")
-    else:
-        reason = (f"🛑 Stalled: **{title}** — no Actions run has finished for this stage in "
-                  "15+ minutes (queued, stuck, or never started). A person needs to look, or Restart.")
+    reason = (f"🛑 Stalled: **{title}** — 15+ minutes have passed since this stage started "
+              "with no new comment or label change. A person needs to look, or Restart.")
+    after = [c for c in comments if c["created_at"] >= since]
     if after and after[-1]["body"] == reason:
         return True, reason, False  # already recorded this stall episode
 
@@ -255,10 +232,9 @@ def work_items():
             checkable = [it for it in items if it["stage"] in STAGE_LABEL and not it["waiting"]]
             if checkable:
                 comments_by_number = domain_comments(full)
-                runs = domain_runs(full)
                 for it in checkable:
                     comments = comments_by_number.get(it["number"], [])
-                    stalled, reason, parked = stall_info(full, it, comments, runs)
+                    stalled, reason, parked = stall_info(full, it, comments)
                     if stalled:
                         it["stalled"], it["stall_reason"], it["needs_you"] = True, reason, True
                         if parked:
@@ -479,18 +455,25 @@ def resume(full, number, comment):
     return {"message": f"Answer posted — restarted at {info['stage'].split(':')[1]}."}
 
 
-def restart(full, number):
-    """Retry a stalled Work Item at the same stage — same idiom as resume(): remove
-    then re-add the stage: label, which is what starts the agent."""
+def restart(full, number, reason, target=None):
+    """Retry a stalled Work Item, at its current stage or an earlier one — same idiom as
+    resume(): remove then re-add the stage: label, which is what starts the agent."""
+    reason = reason.strip()
+    if not reason:
+        raise UserError("Say why you're restarting it, so the agents know what to change.")
+    if target is not None and target not in RESTART_STAGES:
+        raise UserError(f"'{target}' isn't a stage you can restart at.")
     labels = [l["name"] for l in json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
                                                   "--json", "labels"]).stdout)["labels"]
               if l["name"].startswith("stage:")]
     if not labels:
         raise UserError("No stage to restart — open the Issue to see what's going on.")
     stage = labels[0]
+    run(["gh", "issue", "comment", str(number), "--repo", full, "--body", reason])
+    new_stage = f"stage:{target}" if target else stage
     run(["gh", "issue", "edit", str(number), "--repo", full, "--remove-label", stage])
-    run(["gh", "issue", "edit", str(number), "--repo", full, "--add-label", stage])
-    return {"message": f"Restarted at {stage.split(':')[1]}."}
+    run(["gh", "issue", "edit", str(number), "--repo", full, "--add-label", new_stage])
+    return {"message": f"Restarted at {new_stage.split(':')[1]}."}
 
 
 def drop(full, number, reason):
@@ -596,7 +579,7 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == "/api/resume":
                 self.send(200, resume(full, number, body.get("comment", "")))
             elif self.path == "/api/restart":
-                self.send(200, restart(full, number))
+                self.send(200, restart(full, number, body.get("reason", ""), body.get("stage")))
             elif self.path == "/api/review/decide":
                 self.send(200, decide(full, number, body.get("decision"), body.get("comment", "")))
             else:

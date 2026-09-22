@@ -104,6 +104,10 @@
     padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line);
     background: var(--surface); color: var(--text);
   }
+  .decide select {
+    font: inherit; font-size: 14px; padding: 6px 10px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--text);
+  }
   .decide .row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
   .decide .hint { color: var(--muted); font-size: 13px; margin-right: auto; }
   button.approve { background: var(--ok); border-color: var(--ok); color: #fff; }
@@ -396,7 +400,7 @@
   async function send(path, extra, working = "Working…") {
     clearInterval(pingTimer);
     const hint = document.getElementById("hint");
-    const panel = () => document.querySelectorAll(".decide button, .decide textarea, #close");
+    const panel = () => document.querySelectorAll(".decide button, .decide textarea, .decide select, #close");
     hint.style.color = "";
     hint.textContent = working;
     panel().forEach(el => el.disabled = true);
@@ -410,7 +414,7 @@
       hint.textContent = e.message;  // no alert(): dialogs are blocked in the pane too
       hint.style.color = "var(--accent)";
       panel().forEach(el => el.disabled = false);
-      const comment = document.getElementById("comment").value.trim();
+      const comment = (document.getElementById("comment")?.value || "").trim();
       for (const id of ["reject", "resume"]) {
         const b = document.getElementById(id);
         if (b) b.disabled = !comment;
@@ -477,15 +481,42 @@
     load();
   }
 
-  async function restart(button, repo, number) {
-    button.disabled = true;
-    try {
-      await post("/api/restart", { repo, number });
-      await load();
-    } catch (e) {
-      button.disabled = false;
-      button.title = e.message;
-    }
+  // Reads the item straight from the already-loaded list — same data the card renders
+  // from, so opening the panel costs no extra call.
+  async function openRestart(repo, number) {
+    current = { repo, number };
+    const d = domains.find(d => d.full === repo);
+    const it = d && d.items.find(i => i.number === number);
+    content.innerHTML = `
+      <button class="back" id="close">← Back</button>
+      <h1 class="review-title">${esc(it ? it.title : `${repo}#${number}`)}</h1>
+      <div class="meta">
+        <span>${esc(repo.split("/").pop())}#${number}</span>
+        ${it ? `<a href="${esc(it.url)}" target="_blank" rel="noopener">Open the Issue</a>` : ""}
+        <span>${esc((it && it.stall_reason) || "")}</span>
+      </div>
+      <div class="decide">
+        <textarea id="reason" placeholder="Why are you restarting it?"></textarea>
+        <div class="row">
+          <select id="target">
+            <option value="">Same stage${it ? ` (${esc(it.stage.replace(/^\d+ /, ""))})` : ""}</option>
+            <option value="requirements">1 Requirements</option>
+            <option value="verification">2 Verification</option>
+            <option value="plan">3 Plan</option>
+            <option value="build">4 Build</option>
+            <option value="qa">5 QA</option>
+          </select>
+          <span class="hint" id="hint"></span>
+          <button class="approve" id="go" disabled>Restart</button>
+        </div>
+      </div>`;
+    const reason = document.getElementById("reason");
+    const target = document.getElementById("target");
+    const go = document.getElementById("go");
+    reason.addEventListener("input", () => { go.disabled = !reason.value.trim(); });
+    armed(go, "Click again to restart",
+          () => send("/api/restart", { reason: reason.value, stage: target.value || null }));
+    document.getElementById("close").addEventListener("click", closeReview);
   }
 
   content.addEventListener("click", e => {
@@ -494,7 +525,7 @@
     const a = e.target.closest("[data-answer]");
     if (a) return openStopped(a.dataset.answer, Number(a.dataset.number));
     const r = e.target.closest("[data-restart]");
-    if (r) restart(r, r.dataset.restart, Number(r.dataset.number));
+    if (r) return openRestart(r.dataset.restart, Number(r.dataset.number));
   });
   refresh.addEventListener("click", () => load());
   resetIdleTimer();
