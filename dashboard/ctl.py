@@ -1,18 +1,23 @@
 """Start, stop, or restart the review dashboard (dashboard/server.py) without the user
 hunting for its port or process id themselves.
 
-Usage: python dashboard/ctl.py <start|stop|restart>
+Usage: python dashboard/ctl.py <start|stop|restart> [branch]
 """
 import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 import webbrowser
 
 HQ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SERVER = os.path.join(HQ, "dashboard", "server.py")
 PORT = int(os.environ.get("PORT", "8765"))
+# Outside the repo: server.py reads its content once at startup (see its hq_version()
+# docstring), so this is the only record of which branch a running process is actually
+# serving. Keeping it out of HQ's own working copy means it never shows up in dirty().
+SERVED_BRANCH_FILE = os.path.join(tempfile.gettempdir(), f"hq-dashboard-branch-{PORT}")
 
 # ctl.py has no console of its own once detached; without this, Windows pops a fresh
 # console window for every git call this makes.
@@ -66,6 +71,51 @@ def find_pid(port):
     return None
 
 
+def dirty():
+    """True if the HQ working copy has uncommitted changes."""
+    out = subprocess.run(["git", "status", "--porcelain"], cwd=HQ,
+                          capture_output=True, text=True).stdout
+    return bool(out.strip())
+
+
+def current_branch():
+    return subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=HQ,
+                           capture_output=True, text=True).stdout.strip()
+
+
+def served_branch():
+    """Branch the currently-running server process was launched against, or None if
+    unknown (never launched by ctl.py, or the marker's gone)."""
+    try:
+        with open(SERVED_BRANCH_FILE, encoding="utf-8") as fh:
+            return fh.read().strip()
+    except FileNotFoundError:
+        return None
+
+
+def _record_served_branch(branch):
+    with open(SERVED_BRANCH_FILE, "w", encoding="utf-8") as fh:
+        fh.write(branch)
+
+
+def ensure_branch(branch):
+    """Make `branch` the one checked out in the HQ working copy.
+
+    Returns a one-line reason and touches nothing if that isn't possible right now,
+    else None.
+    """
+    if dirty():
+        return "Uncommitted changes in the HQ working copy — commit or stash them first."
+    if current_branch() == branch:
+        return None
+    result = subprocess.run(["git", "checkout", branch], cwd=HQ,
+                             capture_output=True, text=True)
+    if result.returncode != 0:
+        return result.stderr.strip().splitlines()[-1] if result.stderr.strip() else \
+            f"Couldn't check out {branch}."
+    return None
+
+
 def stop():
     pid = find_pid(PORT)
     if pid is None:
@@ -99,7 +149,7 @@ def update():
     return True, sha
 
 
-def start():
+def _launch():
     if find_pid(PORT) is not None:
         print(f"Already running on port {PORT}.")
     else:
@@ -114,6 +164,7 @@ def start():
             if find_pid(PORT) is not None:
                 break
             time.sleep(0.25)
+        _record_served_branch(current_branch())
         if ok:
             print(f"Started the dashboard on port {PORT} (now at {detail}).")
         else:
@@ -121,19 +172,47 @@ def start():
     webbrowser.open(f"http://localhost:{PORT}")
 
 
-def restart():
+def _stop_and_wait():
     if find_pid(PORT) is not None:
         stop()
         for _ in range(20):
             if find_pid(PORT) is None:
                 break
             time.sleep(0.25)
-    start()
+
+
+def start(branch=None):
+    target = branch or "main"
+    reason = ensure_branch(target)
+    if reason:
+        print(reason)
+        return
+    if find_pid(PORT) is not None and served_branch() != target:
+        # The running server was launched against a different branch than the one
+        # ensure_branch just checked out (explicitly named, or left over from an
+        # earlier explicit start). server.py reads its content once at startup, so
+        # checking the branch out on disk alone never reaches what's served — only a
+        # relaunch does.
+        _stop_and_wait()
+    _launch()
+
+
+def restart(branch=None):
+    reason = ensure_branch(branch or "main")
+    if reason:
+        print(reason)
+        return
+    _stop_and_wait()
+    _launch()
 
 
 if __name__ == "__main__":
     action = sys.argv[1] if len(sys.argv) > 1 else ""
     if action not in ("start", "stop", "restart"):
-        print("Usage: python dashboard/ctl.py <start|stop|restart>", file=sys.stderr)
+        print("Usage: python dashboard/ctl.py <start|stop|restart> [branch]", file=sys.stderr)
         sys.exit(1)
-    {"start": start, "stop": stop, "restart": restart}[action]()
+    branch_arg = sys.argv[2] if len(sys.argv) > 2 else None
+    if action == "stop":
+        stop()
+    else:
+        {"start": start, "restart": restart}[action](branch_arg)
