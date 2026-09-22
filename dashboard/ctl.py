@@ -148,11 +148,26 @@ def _launch():
     webbrowser.open(f"http://localhost:{PORT}")
 
 
+def _stop_and_wait():
+    if find_pid(PORT) is not None:
+        stop()
+        for _ in range(20):
+            if find_pid(PORT) is None:
+                break
+            time.sleep(0.25)
+
+
 def start(branch=None):
     reason = ensure_branch(branch or "main")
     if reason:
         print(reason)
         return
+    if branch is not None:
+        # A branch was explicitly named: it must actually be served, even if the
+        # dashboard is already running something else. Without this, ensure_branch
+        # checks the branch out on disk but _launch() no-ops on an already-running
+        # server, so the switch never reaches what's served.
+        _stop_and_wait()
     _launch()
 
 
@@ -161,12 +176,7 @@ def restart(branch=None):
     if reason:
         print(reason)
         return
-    if find_pid(PORT) is not None:
-        stop()
-        for _ in range(20):
-            if find_pid(PORT) is None:
-                break
-            time.sleep(0.25)
+    _stop_and_wait()
     _launch()
 
 
