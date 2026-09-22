@@ -141,10 +141,12 @@ def domain_runs(full):
 
 
 def stall_info(full, item, comments, runs):
-    """Whether this Work Item's current stage looks stuck: its Actions run finished,
-    but nothing on the Issue changed since (F7.10). Posts the first comment for a
-    stall and stays quiet after that; parks the item on a 3rd stall in a row on the
-    same stage, with no successful stage comment in between.
+    """Whether this Work Item's current stage looks stuck: either its Actions run
+    finished with nothing changed on the Issue (crashed), or 15+ minutes have passed
+    since the stage label landed with no completed run and no new comment (silent, e.g.
+    queued/stuck/never started) (F7.10). Posts the first comment for a stall and stays
+    quiet after that; parks the item on a 3rd stall in a row on the same stage — crash
+    or silence, in any mix — with no successful stage comment in between.
 
     Returns (stalled, reason, just_parked) — just_parked is True only on the call that
     adds waiting:user, so work_items() can reflect it in this same response's `waiting`
@@ -155,12 +157,20 @@ def stall_info(full, item, comments, runs):
     after = [c for c in comments if c["created_at"] >= cutoff]
     if any(c["body"].startswith("## ") for c in after):
         return False, None, False  # a real stage comment landed — not a stall
-    if not any(r["status"] == "completed" and r["createdAt"] >= cutoff for r in runs):
-        return False, None, False  # still running, or hasn't run yet since this stage started
+
+    crashed = any(r["status"] == "completed" and r["createdAt"] >= cutoff for r in runs)
+    if not crashed:
+        elapsed = datetime.utcnow() - datetime.strptime(since, "%Y-%m-%dT%H:%M:%SZ")
+        if elapsed < timedelta(seconds=900):
+            return False, None, False  # stage started under 15 min ago, no crash yet — give it time
 
     title = stage.split(" ", 1)[1]
-    reason = (f"🛑 Stalled: **{title}** — the last Actions run for this stage finished "
-              "with no new comment or label change. A person needs to look, or Restart.")
+    if crashed:
+        reason = (f"🛑 Stalled: **{title}** — the last Actions run for this stage finished "
+                  "with no new comment or label change. A person needs to look, or Restart.")
+    else:
+        reason = (f"🛑 Stalled: **{title}** — no Actions run has finished for this stage in "
+                  "15+ minutes (queued, stuck, or never started). A person needs to look, or Restart.")
     if after and after[-1]["body"] == reason:
         return True, reason, False  # already recorded this stall episode
 
