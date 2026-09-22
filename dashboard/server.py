@@ -14,9 +14,12 @@ import socket
 import subprocess
 import sys
 import tempfile
+from datetime import datetime, timedelta
 from html import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
+
+import ghcache
 
 HQ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PAGE = os.path.join(HQ, "dashboard", "index.html")
@@ -26,6 +29,15 @@ APP_IDLE_TIMEOUT = 300
 # Read once: reviewing HQ itself checks out other branches under this server.
 with open(PAGE, encoding="utf-8") as fh:
     PAGE_HTML = fh.read()
+
+STAGE_NAMES = {
+    "stage:requirements": "1 Requirements",
+    "stage:verification": "2 Verification",
+    "stage:plan": "3 Plan",
+    "stage:build": "4 Build",
+    "stage:qa": "5 QA",
+    "stage:review": "6 Human review",
+}
 
 
 def find_bash():
@@ -46,28 +58,203 @@ reviews = {}
 known = set()  # owner/repo of every domain, from the last listing
 
 
+# The server runs detached, so it has no console of its own: without this, Windows gives
+# every child console app (gh, git, bash) a brand-new window, which flashes on every poll.
+NO_WINDOW = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
+
+
 def run(args, cwd=HQ, check=True):
     return subprocess.run(args, cwd=cwd, capture_output=True, text=True,
-                          encoding="utf-8", check=check)
+                          encoding="utf-8", check=check, **NO_WINDOW)
+
+
+REFUSAL_MESSAGES = {
+    "rate_limit": "GitHub's rate limit was hit.",
+    "auth": "GitHub's token is invalid or expired.",
+    "offline": "Can't reach GitHub — check your network.",
+}
+
+
+class RefusalError(Exception):
+    """gh refused a request: rate limit, bad/expired token, or no network."""
+    def __init__(self, kind, message):
+        super().__init__(message)
+        self.kind = kind
+        self.message = message
+
+
+def _refusal(kind, detail=""):
+    message = REFUSAL_MESSAGES.get(kind, "GitHub refused the request.")
+    if kind == "rate_limit" and detail:
+        try:
+            reset = datetime.fromtimestamp(int(detail)).strftime("%I:%M %p").lstrip("0")
+            message += f" Try again after {reset}."
+        except ValueError:
+            pass
+    elif kind == "auth":
+        message += " Run `gh auth login` with a fresh token."
+    return RefusalError(kind, message)
+
+
+_owner = None
+
+
+def owner():
+    """OWNER, fetched once and cached. A refusal here (bad token, offline) surfaces through
+    work_items() like one from ghcache, instead of crashing the server at import time."""
+    global _owner
+    if _owner is None:
+        res = run(["gh", "repo", "view", "--json", "owner", "--jq", ".owner.login"], check=False)
+        if res.returncode != 0:
+            raise _refusal(*ghcache.classify(res.stderr))
+        _owner = res.stdout.strip()
+    return _owner
+
+
+# Stage display name (from STAGE_NAMES above) -> its stage: label / agent name (from
+# scripts/runner/which-agent.sh). Stage 6 (human review) is deliberately absent: it's the
+# user's turn, so a finished run there is normal, not a stall.
+STAGE_LABEL = {
+    "1 Requirements": "stage:requirements", "2 Verification": "stage:verification",
+    "3 Plan": "stage:plan", "4 Build": "stage:build", "5 QA": "stage:qa",
+}
+STAGE_AGENT = {
+    "1 Requirements": "requirements", "2 Verification": "verification",
+    "3 Plan": "planner", "4 Build": "builder", "5 QA": "qa",
+}
+
+
+def _shift(iso, seconds):
+    """iso, moved earlier by `seconds` — a small clock-skew margin."""
+    return (datetime.strptime(iso, "%Y-%m-%dT%H:%M:%SZ") - timedelta(seconds=seconds)) \
+        .strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def stage_label_time(full, number, label, created_at):
+    """When `label` most recently landed on the issue, or its creation time if it was
+    only ever set there (no later "labeled" event, e.g. a label set at creation)."""
+    events = json.loads(run(["gh", "api", f"repos/{full}/issues/{number}/events", "--paginate",
+                             "--jq", f'[.[] | select(.event=="labeled" and .label.name=="{label}") '
+                                     '| .created_at]'], check=False).stdout or "[]")
+    return events[-1] if events else created_at
+
+
+def domain_runs(full):
+    """The Work Item runner's recent runs for this domain, most recent first."""
+    data = json.loads(run(["gh", "run", "list", "--repo", full, "--workflow=work-item.yml",
+                           "--json", "status,createdAt,event", "-L", "30"],
+                          check=False).stdout or "[]")
+    return [r for r in data if r["event"] == "issues"]
+
+
+def stall_info(full, item, comments, runs):
+    """Whether this Work Item's current stage looks stuck: either its Actions run
+    finished with nothing changed on the Issue (crashed), or 15+ minutes have passed
+    since the stage label landed with no completed run and no new comment (silent, e.g.
+    queued/stuck/never started) (F7.10). Posts the first comment for a stall and stays
+    quiet after that; parks the item on a 3rd stall in a row on the same stage — crash
+    or silence, in any mix — with no successful stage comment in between.
+
+    Returns (stalled, reason, just_parked) — just_parked is True only on the call that
+    adds waiting:user, so work_items() can reflect it in this same response's `waiting`
+    list instead of waiting for a second poll."""
+    stage, number = item["stage"], item["number"]
+    since = stage_label_time(full, number, STAGE_LABEL[stage], item["created_at"])
+    cutoff = _shift(since, 5)
+    after = [c for c in comments if c["created_at"] >= cutoff]
+    if any(c["body"].startswith("## ") for c in after):
+        return False, None, False  # a real stage comment landed — not a stall
+
+    crashed = any(r["status"] == "completed" and r["createdAt"] >= cutoff for r in runs)
+    if not crashed:
+        elapsed = datetime.utcnow() - datetime.strptime(since, "%Y-%m-%dT%H:%M:%SZ")
+        if elapsed < timedelta(seconds=900):
+            return False, None, False  # stage started under 15 min ago, no crash yet — give it time
+
+    title = stage.split(" ", 1)[1]
+    if crashed:
+        reason = (f"🛑 Stalled: **{title}** — the last Actions run for this stage finished "
+                  "with no new comment or label change. A person needs to look, or Restart.")
+    else:
+        reason = (f"🛑 Stalled: **{title}** — no Actions run has finished for this stage in "
+                  "15+ minutes (queued, stuck, or never started). A person needs to look, or Restart.")
+    if after and after[-1]["body"] == reason:
+        return True, reason, False  # already recorded this stall episode
+
+    run(["gh", "issue", "comment", str(number), "--repo", full, "--body", reason])
+
+    agent = STAGE_AGENT[stage]
+    heading = [i for i, c in enumerate(comments)
+               if c["body"].startswith("## ") and f"— {agent}" in c["body"]]
+    tail = comments[heading[-1] + 1:] if heading else comments
+    strikes = 1 + sum(1 for c in tail if c["body"].startswith(f"🛑 Stalled: **{title}**"))
+    parked = strikes >= 3
+    if parked:
+        run(["gh", "issue", "edit", str(number), "--repo", full,
+             "--add-label", "waiting:user", "--add-assignee", full.split("/")[0]])
+    return True, reason, parked
+
+
+def domain_comments(full):
+    """Every issue comment in the domain, grouped by issue number. One cached,
+    ETag-conditional call (like the rest of work_items()) instead of one per issue."""
+    by_number = {}
+    for c in ghcache.fetch_all(f"repos/{full}/issues/comments?per_page=100", run):
+        number = int(c["issue_url"].rsplit("/", 1)[-1])
+        by_number.setdefault(number, []).append(c)
+    for comments in by_number.values():
+        comments.sort(key=lambda c: c["created_at"])
+    return by_number
 
 
 def work_items():
-    """scripts/list-work-items.sh, as JSON: [{repo, full, items: [...]}]."""
+    """Every domain (repos of OWNER's tagged `hq-domain`) with its open Work Items, as
+    JSON: [{repo, full, items: [...]}]. Uses ghcache so an unchanged domain costs nothing
+    and a changed one costs one call, regardless of how many other domains exist. Each
+    item still on an agent's stage is also checked for a stall (F7.10)."""
     domains = []
-    for line in run([BASH, "scripts/list-work-items.sh"]).stdout.splitlines():
-        f = line.split("\t")
-        if f[0] == "DOMAIN":
-            domains.append({"full": f[1], "repo": f[1].split("/")[-1], "items": []})
-            known.add(f[1])
-        elif len(f) >= 5 and domains:
-            waiting = [w for w in (f[5] if len(f) > 5 else "").split(",") if w]
-            stage = f[3]
-            domains[-1]["items"].append({
-                "number": int(f[1]), "title": f[2], "stage": stage, "url": f[4],
-                "waiting": waiting,
-                "needs_you": stage.startswith("6 ") or "waiting:user" in waiting,
-            })
-    return domains
+    try:
+        repos = ghcache.fetch_all(f"users/{owner()}/repos?per_page=100", run)
+        for repo in repos:
+            if repo["archived"] or "hq-domain" not in (repo.get("topics") or []):
+                continue
+            full = f"{owner()}/{repo['name']}"
+            known.add(full)
+            items = []
+            issues = ghcache.fetch_all(f"repos/{full}/issues?state=open&per_page=100", run)
+            for issue in issues:
+                if "pull_request" in issue:
+                    continue
+                labels = [l["name"] for l in issue["labels"]]
+                stage_label = next((l for l in labels if l.startswith("stage:")), None)
+                waiting = [l for l in labels if l.startswith("waiting:")]
+                stage = STAGE_NAMES.get(stage_label, "")
+                if not stage and not waiting:
+                    continue  # no stage and nothing to do -> not a Work Item view needs
+                if not stage:
+                    stage = "0 Stopped"
+                items.append({
+                    "number": issue["number"], "title": issue["title"], "stage": stage,
+                    "url": issue["html_url"], "waiting": waiting,
+                    "created_at": issue["created_at"], "stalled": False, "stall_reason": None,
+                    "needs_you": stage.startswith("6 ") or "waiting:user" in waiting,
+                })
+            # waiting:* (either kind) means the runner won't touch it either — not a stall.
+            checkable = [it for it in items if it["stage"] in STAGE_LABEL and not it["waiting"]]
+            if checkable:
+                comments_by_number = domain_comments(full)
+                runs = domain_runs(full)
+                for it in checkable:
+                    comments = comments_by_number.get(it["number"], [])
+                    stalled, reason, parked = stall_info(full, it, comments, runs)
+                    if stalled:
+                        it["stalled"], it["stall_reason"], it["needs_you"] = True, reason, True
+                        if parked:
+                            it["waiting"].append("waiting:user")
+            domains.append({"full": full, "repo": repo["name"], "items": items})
+    except ghcache.GhRefusal as e:
+        raise _refusal(e.kind, e.detail)
+    return sorted(domains, key=lambda d: d["repo"])
 
 
 def native_path(path):
@@ -119,12 +306,12 @@ def start_instance(key):
     exe = shutil.which(config["runtimeExecutable"]) or config["runtimeExecutable"]
     env = dict(os.environ, PORT=str(port))
     proc = subprocess.Popen([exe, *config.get("runtimeArgs", [])], cwd=r["path"], env=env,
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **NO_WINDOW)
     heartbeat = os.path.join(tempfile.gettempdir(), f"hq-review-{key.replace('#', '-')}.heartbeat")
     with open(heartbeat, "w", encoding="utf-8"):
         pass
-    detach = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" \
-        else {"start_new_session": True}
+    detach = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW} \
+        if os.name == "nt" else {"start_new_session": True}
     watchdog = subprocess.Popen(
         [sys.executable, os.path.join(HQ, "scripts", "app-watchdog.py"),
          str(proc.pid), heartbeat, str(APP_IDLE_TIMEOUT)],
@@ -174,6 +361,9 @@ def checkout_review(full, number):
         raise UserError("There's no open pull request for this Work Item yet.")
     if res.returncode == 3:
         raise UserError("Your local copy has unsaved edits, so it wasn't touched:\n" + res.stderr)
+    if res.returncode == 4:
+        raise UserError("Your local copy has commits the PR branch doesn't, so it wasn't "
+                        "touched:\n" + res.stderr)
     if res.returncode != 0:
         raise UserError(res.stderr.strip() or "Checkout failed.")
     kv = dict(line.split("=", 1) for line in res.stdout.splitlines() if "=" in line)
@@ -277,6 +467,20 @@ def resume(full, number, comment):
     return {"message": f"Answer posted — restarted at {info['stage'].split(':')[1]}."}
 
 
+def restart(full, number):
+    """Retry a stalled Work Item at the same stage — same idiom as resume(): remove
+    then re-add the stage: label, which is what starts the agent."""
+    labels = [l["name"] for l in json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
+                                                  "--json", "labels"]).stdout)["labels"]
+              if l["name"].startswith("stage:")]
+    if not labels:
+        raise UserError("No stage to restart — open the Issue to see what's going on.")
+    stage = labels[0]
+    run(["gh", "issue", "edit", str(number), "--repo", full, "--remove-label", stage])
+    run(["gh", "issue", "edit", str(number), "--repo", full, "--add-label", stage])
+    return {"message": f"Restarted at {stage.split(':')[1]}."}
+
+
 def drop(full, number, reason):
     """Throw a Work Item away: PR closed, branch gone, Issue closed as not planned."""
     close_review(full, number)  # in case it was checked out
@@ -295,9 +499,11 @@ class UserError(Exception):
 
 
 class Handler(BaseHTTPRequestHandler):
-    def send(self, code, body, kind="application/json"):
+    def send(self, code, body, kind="application/json", extra=None):
         data = (body if isinstance(body, str) else json.dumps(body)).encode("utf-8")
         self.send_response(code)
+        for k, v in (extra or {}).items():
+            self.send_header(k, v)
         self.send_header("Content-Type", kind)
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
@@ -310,9 +516,15 @@ class Handler(BaseHTTPRequestHandler):
             self.send(200, PAGE_HTML, "text/html; charset=utf-8")
         elif parsed.path == "/api/items":
             try:
-                self.send(200, work_items())
-            except subprocess.CalledProcessError as e:
-                self.send(500, {"error": (e.stderr or str(e)).strip()})
+                # The budget rides along as a header: GitHub reports it on every
+                # response we already make, so showing it costs no extra call.
+                r = ghcache.rate()
+                extra = {"X-HQ-Rate": f"{r['remaining']},{r['limit']},{r['reset']}"} if r else None
+                self.send(200, work_items(), extra=extra)
+            except RefusalError as e:
+                self.send(200, {"refusal": {"kind": e.kind, "message": e.message}})
+            except (subprocess.CalledProcessError, RuntimeError) as e:
+                self.send(500, {"error": (getattr(e, "stderr", None) or str(e)).strip()})
         elif parsed.path == "/api/branch":
             # This process's own checkout — never cached, so a review instance
             # (its own process, its own HQ constant) reports its own branch (R5).
@@ -371,6 +583,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200, stopped(full, number))
             elif self.path == "/api/resume":
                 self.send(200, resume(full, number, body.get("comment", "")))
+            elif self.path == "/api/restart":
+                self.send(200, restart(full, number))
             elif self.path == "/api/review/decide":
                 self.send(200, decide(full, number, body.get("decision"), body.get("comment", "")))
             else:

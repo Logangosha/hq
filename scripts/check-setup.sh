@@ -38,7 +38,13 @@ ME="$(gh api user --jq .login)"
 [ "$OWNER" = "$ME" ] && ok "owner: $OWNER" \
   || bad "this HQ belongs to $OWNER, but gh is logged in as $ME" "copy HQ into your own account (README → How to use)"
 
-DOMAINS="$(bash "$HERE/scripts/list-domains.sh" | cut -f1)"
+DOMAINS_RAW="$(bash "$HERE/scripts/list-domains.sh")"
+if [ "${DOMAINS_RAW%%$'\t'*}" = "REFUSAL" ]; then
+  KIND="$(printf '%s' "$DOMAINS_RAW" | cut -f2)"
+  bad "GitHub refused the request ($KIND)" "check your token, rate limit, or network, then run this again"
+  echo; exit 1
+fi
+DOMAINS="$(printf '%s\n' "$DOMAINS_RAW" | cut -f1)"
 if [ -z "$DOMAINS" ]; then
   bad "no domains yet (no repo of yours has the Work Item workflow)" "/add-domain <repo>"
 fi
@@ -46,7 +52,8 @@ fi
 for D in $DOMAINS; do
   R="$OWNER/$D"
   echo; echo "Domain: $R"
-  ok "workflow installed"
+  gh api "repos/$R/contents/.github/workflows/work-item.yml" --silent 2>/dev/null \
+    && ok "workflow installed" || bad "workflow file missing" "/add-domain $D"
   gh label list --repo "$R" --search stage:requirements --json name --jq '.[].name' | grep -qx stage:requirements \
     && ok "labels" || bad "labels missing" "/add-domain $D"
   gh secret list --repo "$R" 2>/dev/null | grep -q CLAUDE_CODE_OAUTH_TOKEN \
