@@ -414,12 +414,14 @@ def decide(full, number, decision, comment):
         run(["gh", "pr", "merge", pr, "--repo", full, "--squash", "--delete-branch"],
             cwd=tempfile.gettempdir())
         run(["git", "-C", r["path"], "pull", "--quiet"], check=False)
+        ghcache.invalidate(f"repos/{full}/issues?state=open&per_page=100")
         return {"message": f"Approved — PR #{pr} merged."}
     run(["gh", "issue", "comment", num, "--repo", full,
          "--body", f"## 6. Review — user ❌\n\n{comment}"])
     # The rebuild reuses the open PR. The label change starts the requirements agent.
     run(["gh", "issue", "edit", num, "--repo", full,
          "--remove-label", "stage:review", "--add-label", "stage:requirements"])
+    ghcache.invalidate(f"repos/{full}/issues?state=open&per_page=100")
     return {"message": "Sent back to the agents with your comment."}
 
 
@@ -452,6 +454,7 @@ def resume(full, number, comment):
     run(args, check=False)  # the stage label may not be there to remove
     # Adding it back is what starts the agent: the workflow fires on a label being added.
     run(["gh", "issue", "edit", str(number), "--repo", full, "--add-label", info["stage"]])
+    ghcache.invalidate(f"repos/{full}/issues?state=open&per_page=100")
     return {"message": f"Answer posted — restarted at {info['stage'].split(':')[1]}."}
 
 
@@ -486,6 +489,7 @@ def drop(full, number, reason):
     if res.returncode != 0:
         raise UserError(res.stderr.strip() or "Couldn't drop it.")
     pr = [l.split("=")[1] for l in res.stdout.splitlines() if l.startswith("closed_pr=")]
+    ghcache.invalidate(f"repos/{full}/issues?state=open&per_page=100")
     return {"message": "Dropped." + (f" PR #{pr[0]} closed and its branch deleted." if pr else "")}
 
 

@@ -477,8 +477,7 @@
     content.innerHTML = `<div class="spinner">Stopping the app and putting your copy back…</div>`;
     try { await post("/api/review/close", r); } catch (e) { /* nothing was checked out */ }
     current = null;
-    renderList();
-    load();
+    await load();
   }
 
   // Reads the item straight from the already-loaded list — same data the card renders
