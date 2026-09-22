@@ -91,6 +91,13 @@ def rate():
     return _load().get("_rate")
 
 
+def invalidate(url):
+    """Drop url's cached entry so the next fetch() can't serve a pre-mutation body."""
+    cache = _load()
+    if cache.pop(url, None) is not None:
+        _save(cache)
+
+
 def fetch(url, run):
     """Return (body_json, link_header) for a GitHub REST GET, using the shared cache.
 
