@@ -51,9 +51,14 @@ reviews = {}  # "<repo>#<n>" -> {"default", "path", "app": Popen or None}
 known = set()  # owner/repo of every domain, from the last listing
 
 
+# The server runs detached, so it has no console of its own: without this, Windows gives
+# every child console app (gh, git, bash) a brand-new window, which flashes on every poll.
+NO_WINDOW = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
+
+
 def run(args, cwd=HQ, check=True):
     return subprocess.run(args, cwd=cwd, capture_output=True, text=True,
-                          encoding="utf-8", check=check)
+                          encoding="utf-8", check=check, **NO_WINDOW)
 
 
 REFUSAL_MESSAGES = {
@@ -260,7 +265,8 @@ def start_app(path):
         return url, None  # already running (reviewing HQ itself lands here)
     exe = shutil.which(config["runtimeExecutable"]) or config["runtimeExecutable"]
     proc = subprocess.Popen([exe, *config.get("runtimeArgs", [])], cwd=path,
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                            **NO_WINDOW)
     return url, proc
 
 
