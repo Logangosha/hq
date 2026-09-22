@@ -184,6 +184,53 @@ def stall_info(full, item, comments):
     return True, reason, parked
 
 
+BLOCKER_RE = re.compile(r"Blocked by `([^`]+)`")
+
+
+def parse_blocker(comments):
+    """The `owner/repo#N` a blocked Work Item names in its creation comment, or None."""
+    for c in comments:
+        m = BLOCKER_RE.search(c["body"])
+        if m:
+            return m.group(1)
+    return None
+
+
+def reconcile_blocker(full, it):
+    """Release a blocked Work Item once its blocker closes (R4-R6): merged starts
+    Requirements; closed without merging surfaces the drop for the user instead of
+    releasing on its own. Runs from the same poll as stall_info, so a PR merged
+    straight on GitHub is picked up too, not only one merged through the dashboard."""
+    ref = it["blocked_by"]
+    if not ref or "waiting:user" in it["waiting"]:
+        return  # nothing recorded, or already surfaced and parked for the user
+    bfull, bnum = ref.rsplit("#", 1)
+    res = run(["gh", "issue", "view", bnum, "--repo", bfull, "--json", "state,stateReason"],
+              check=False)
+    if res.returncode != 0:
+        return  # blocker issue gone or inaccessible — leave it parked, don't guess
+    info = json.loads(res.stdout)
+    if info["state"] != "CLOSED":
+        return
+    number = str(it["number"])
+    if info["stateReason"] == "COMPLETED":
+        run(["gh", "issue", "comment", number, "--repo", full,
+             "--body", f"Blocker `{ref}` merged. Starting Requirements."])
+        # Two calls, remove then add (same idiom as resume()): the labeled event that
+        # starts the requirements agent must not still show waiting:work, or the
+        # runner's waiting: guard skips it.
+        run(["gh", "issue", "edit", number, "--repo", full, "--remove-label", "waiting:work"])
+        run(["gh", "issue", "edit", number, "--repo", full, "--add-label", "stage:requirements"])
+        it["stage"], it["waiting"] = "1 Requirements", []
+    else:
+        run(["gh", "issue", "comment", number, "--repo", full,
+             "--body", f"🛑 Blocker `{ref}` was closed without merging. A person needs to "
+                       "decide: release this Work Item (Answer) or drop it too."])
+        run(["gh", "issue", "edit", number, "--repo", full, "--add-label", "waiting:user"])
+        it["waiting"].append("waiting:user")
+        it["needs_you"] = True
+
+
 def domain_comments(full):
     """Every issue comment in the domain, grouped by issue number. One cached,
     ETag-conditional call (like the rest of work_items()) instead of one per issue."""
@@ -221,16 +268,17 @@ def work_items():
                 if not stage and not waiting:
                     continue  # no stage and nothing to do -> not a Work Item view needs
                 if not stage:
-                    stage = "0 Stopped"
+                    stage = "0 Blocked" if "waiting:work" in waiting else "0 Stopped"
                 items.append({
                     "number": issue["number"], "title": issue["title"], "stage": stage,
-                    "url": issue["html_url"], "waiting": waiting,
+                    "url": issue["html_url"], "waiting": waiting, "blocked_by": None,
                     "created_at": issue["created_at"], "stalled": False, "stall_reason": None,
                     "needs_you": stage.startswith("6 ") or "waiting:user" in waiting,
                 })
             # waiting:* (either kind) means the runner won't touch it either — not a stall.
             checkable = [it for it in items if it["stage"] in STAGE_LABEL and not it["waiting"]]
-            if checkable:
+            blocked = [it for it in items if it["stage"] == "0 Blocked"]
+            if checkable or blocked:
                 comments_by_number = domain_comments(full)
                 for it in checkable:
                     comments = comments_by_number.get(it["number"], [])
@@ -239,6 +287,9 @@ def work_items():
                         it["stalled"], it["stall_reason"], it["needs_you"] = True, reason, True
                         if parked:
                             it["waiting"].append("waiting:user")
+                for it in blocked:
+                    it["blocked_by"] = parse_blocker(comments_by_number.get(it["number"], []))
+                    reconcile_blocker(full, it)
             domains.append({"full": full, "repo": repo["name"], "items": items})
     except ghcache.GhRefusal as e:
         raise _refusal(e.kind, e.detail)

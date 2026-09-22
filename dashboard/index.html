@@ -50,6 +50,7 @@
   .title a { color: var(--text); text-decoration: none; font-weight: 500; }
   .title a:hover { text-decoration: underline; }
   .why { display: block; font-size: 13px; color: var(--accent); margin-top: 2px; }
+  .blocked-by { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }
   .chip {
     font-size: 12px; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
     background: var(--chip); color: var(--muted);
@@ -190,7 +191,8 @@
     return `<div class="card">
       <span class="ref">${esc(d.repo)}#${it.number}</span>
       <span class="title"><a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.title)}</a>
-        ${why ? `<span class="why">${esc(why)}</span>` : ""}</span>
+        ${why ? `<span class="why">${esc(why)}</span>` : ""}
+        ${it.blocked_by ? `<span class="blocked-by">Waiting on ${esc(it.blocked_by)}</span>` : ""}</span>
       <span class="chip">${esc(it.stage.replace(/^\d+ /, ""))}</span>
       ${canReview ? `<button class="primary" data-review="${esc(d.full)}" data-number="${it.number}">Review</button>` : ""}
       ${canAnswer ? `<button class="primary" data-answer="${esc(d.full)}" data-number="${it.number}">Answer</button>` : ""}
