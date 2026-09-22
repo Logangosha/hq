@@ -1,8 +1,8 @@
 """HQ review dashboard: a local page listing every open Work Item, with the ones that
-need you on top (F8.4). Review opens one: its branch is checked out on this computer,
-its app started, and its code changes shown (F8.5); then you approve or reject it with
-a comment (F8.6). Runs here, not on GitHub, so the
-buttons can use HQ's scripts and your local copies of the repos.
+need you on top (F8.4). Review opens one: its branch is checked out on this computer
+and its code changes shown, with Start/Stop/Restart/Open for its app if it has one
+(F8.5); then you approve or reject it with a comment (F8.6). Runs here, not on GitHub,
+so the buttons can use HQ's scripts and your local copies of the repos.
 
 Usage: python dashboard/server.py        then open http://localhost:8765
 """
@@ -12,15 +12,20 @@ import re
 import shutil
 import socket
 import subprocess
+import sys
 import tempfile
 from datetime import datetime, timedelta
+from html import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlparse
 
 import ghcache
 
 HQ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PAGE = os.path.join(HQ, "dashboard", "index.html")
 PORT = int(os.environ.get("PORT", "8765"))
+# Backstop only (R8): long enough that a 60s ping from an open tab never trips it.
+APP_IDLE_TIMEOUT = 300
 # Read once: reviewing HQ itself checks out other branches under this server.
 with open(PAGE, encoding="utf-8") as fh:
     PAGE_HTML = fh.read()
@@ -47,7 +52,9 @@ def find_bash():
 
 
 BASH = find_bash()
-reviews = {}  # "<repo>#<n>" -> {"default", "path", "app": Popen or None}
+# "<repo>#<n>" -> {"default", "path", "pr", "app", "port", "url", "heartbeat", "watchdog"}
+# app/port/url/heartbeat/watchdog are None until Start.
+reviews = {}
 known = set()  # owner/repo of every domain, from the last listing
 
 
@@ -274,22 +281,15 @@ def port_open(port):
         return s.connect_ex(("127.0.0.1", port)) == 0
 
 
-def start_app(path):
-    """Start the repo's app from its .claude/launch.json. Returns (url, process)."""
-    launch = os.path.join(path, ".claude", "launch.json")
-    if not os.path.exists(launch):
-        return None, None
-    with open(launch, encoding="utf-8") as fh:
-        config = json.load(fh)["configurations"][0]
-    port = config.get("port")
-    url = config.get("url") or (f"http://localhost:{port}" if port else None)
-    if port and port_open(port):
-        return url, None  # already running (reviewing HQ itself lands here)
-    exe = shutil.which(config["runtimeExecutable"]) or config["runtimeExecutable"]
-    proc = subprocess.Popen([exe, *config.get("runtimeArgs", [])], cwd=path,
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                            **NO_WINDOW)
-    return url, proc
+def pick_port(preferred):
+    """preferred if it's free and no tracked instance already claims it, else a free
+    OS-assigned port (R2)."""
+    claimed = {r["port"] for r in reviews.values() if r.get("port")}
+    if preferred and not port_open(preferred) and preferred not in claimed:
+        return preferred
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
 
 
 def stop_app(proc):
@@ -300,7 +300,73 @@ def stop_app(proc):
             proc.terminate()
 
 
-def open_review(full, number):
+def start_instance(key):
+    """Start the reviewed checkout's app from its .claude/launch.json (R2), with a
+    detached watchdog as the dead-session backstop (R8). Returns {url, port}."""
+    r = reviews.get(key)
+    if not r:
+        raise UserError("Open this Work Item with Review first.")
+    if r.get("app"):
+        stop_instance(key)
+    launch = os.path.join(r["path"], ".claude", "launch.json")
+    if not os.path.exists(launch):
+        raise UserError("This repo has no app to start.")
+    with open(launch, encoding="utf-8") as fh:
+        config = json.load(fh)["configurations"][0]
+    port = pick_port(config.get("port"))
+    url = config.get("url") or f"http://localhost:{port}"
+    exe = shutil.which(config["runtimeExecutable"]) or config["runtimeExecutable"]
+    env = dict(os.environ, PORT=str(port))
+    proc = subprocess.Popen([exe, *config.get("runtimeArgs", [])], cwd=r["path"], env=env,
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **NO_WINDOW)
+    heartbeat = os.path.join(tempfile.gettempdir(), f"hq-review-{key.replace('#', '-')}.heartbeat")
+    with open(heartbeat, "w", encoding="utf-8"):
+        pass
+    detach = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW} \
+        if os.name == "nt" else {"start_new_session": True}
+    watchdog = subprocess.Popen(
+        [sys.executable, os.path.join(HQ, "scripts", "app-watchdog.py"),
+         str(proc.pid), heartbeat, str(APP_IDLE_TIMEOUT)],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **detach)
+    r.update(app=proc, port=port, url=url, heartbeat=heartbeat, watchdog=watchdog)
+    return {"url": url, "port": port}
+
+
+def stop_instance(key):
+    """Stop the app and free its port immediately (R7)."""
+    r = reviews.get(key)
+    if not r or not r.get("app"):
+        return
+    stop_app(r["app"])
+    if r.get("heartbeat"):
+        try:
+            os.remove(r["heartbeat"])
+        except OSError:
+            pass
+    r.update(app=None, port=None, url=None, heartbeat=None, watchdog=None)
+
+
+def restart_instance(key):
+    """Pick up new commits on the branch under review, then start fresh (R6)."""
+    r = reviews.get(key)
+    if not r:
+        raise UserError("Open this Work Item with Review first.")
+    run(["git", "-C", r["path"], "pull", "--quiet"], check=False)
+    stop_instance(key)
+    return start_instance(key)
+
+
+def ping_instance(key):
+    """Keep a running instance's heartbeat fresh so the R8 backstop doesn't fire."""
+    r = reviews.get(key)
+    if r and r.get("heartbeat"):
+        try:
+            os.utime(r["heartbeat"], None)
+        except OSError:
+            pass
+
+
+def checkout_review(full, number):
     repo = full.split("/")[-1]
     res = run([BASH, "scripts/review-checkout.sh", repo, str(number)], check=False)
     if res.returncode == 2:
@@ -317,9 +383,9 @@ def open_review(full, number):
 
     key = f"{repo}#{number}"
     if key in reviews:
-        stop_app(reviews[key]["app"])
-    app_url, proc = start_app(kv["path"])
-    reviews[key] = {"default": kv["default"], "path": kv["path"], "app": proc, "pr": kv["pr"]}
+        stop_instance(key)
+    reviews[key] = {"default": kv["default"], "path": kv["path"], "pr": kv["pr"],
+                    "app": None, "port": None, "url": None, "heartbeat": None, "watchdog": None}
 
     pr = kv["pr"]
     info = json.loads(run(["gh", "pr", "view", pr, "--repo", full,
@@ -331,7 +397,8 @@ def open_review(full, number):
     files = [f["path"] for f in info["files"]]
     return {
         "key": key, "pr": pr, "pr_url": kv["pr_url"], "branch": kv["branch"],
-        "path": kv["path"], "title": info["title"], "app_url": app_url,
+        "path": kv["path"], "title": info["title"],
+        "has_app": os.path.exists(os.path.join(kv["path"], ".claude", "launch.json")),
         "qa": qa[-1] if qa else None, "diff": diff,
         "claude_files": [f for f in files if f.startswith(".claude/")],
     }
@@ -340,10 +407,10 @@ def open_review(full, number):
 def close_review(full, number):
     """Stop the app and put the local copy back on its default branch."""
     key = f"{full.split('/')[-1]}#{number}"
-    r = reviews.pop(key, None)
-    if not r:
+    if key not in reviews:
         return None
-    stop_app(r["app"])
+    stop_instance(key)
+    r = reviews.pop(key)
     run(["git", "-C", r["path"], "checkout", r["default"]], check=False)
     run(["git", "-C", r["path"], "pull", "--quiet"], check=False)
     return r
@@ -456,9 +523,10 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
-        if self.path in ("/", "/index.html"):
+        parsed = urlparse(self.path)
+        if parsed.path in ("/", "/index.html"):
             self.send(200, PAGE_HTML, "text/html; charset=utf-8")
-        elif self.path == "/api/items":
+        elif parsed.path == "/api/items":
             try:
                 # The budget rides along as a header: GitHub reports it on every
                 # response we already make, so showing it costs no extra call.
@@ -469,6 +537,29 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200, {"refusal": {"kind": e.kind, "message": e.message}})
             except (subprocess.CalledProcessError, RuntimeError) as e:
                 self.send(500, {"error": (getattr(e, "stderr", None) or str(e)).strip()})
+        elif parsed.path == "/api/branch":
+            # This process's own checkout — never cached, so a review instance
+            # (its own process, its own HQ constant) reports its own branch (R5).
+            try:
+                branch = run(["git", "-C", HQ, "rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
+                self.send(200, {"branch": branch})
+            except subprocess.CalledProcessError as e:
+                self.send(500, {"error": (e.stderr or str(e)).strip()})
+        elif parsed.path == "/review-window":
+            qs = parse_qs(parsed.query)
+            full = (qs.get("repo") or [""])[0]
+            number = (qs.get("number") or [""])[0]
+            key = f"{full.split('/')[-1]}#{number}"
+            r = reviews.get(key)
+            if not r or not r.get("url"):
+                return self.send(404, "Not found", "text/plain")
+            html = (
+                "<!doctype html><html><head><meta charset=\"utf-8\">"
+                f"<title>{escape(key)}</title>"
+                "<style>html,body{margin:0;height:100%}iframe{border:0;width:100%;height:100%}</style>"
+                f"</head><body><iframe src=\"{escape(r['url'])}\"></iframe></body></html>"
+            )
+            self.send(200, html, "text/html; charset=utf-8")
         else:
             self.send(404, "Not found", "text/plain")
 
@@ -482,10 +573,21 @@ class Handler(BaseHTTPRequestHandler):
             full, number = body["repo"], int(body["number"])
             if full not in known and full not in {d["full"] for d in work_items()}:
                 raise UserError(f"{full} isn't one of your domains.")
+            key = f"{full.split('/')[-1]}#{number}"
             if self.path == "/api/review":
-                self.send(200, open_review(full, number))
+                self.send(200, checkout_review(full, number))
             elif self.path == "/api/review/close":
                 close_review(full, number)
+                self.send(200, {"ok": True})
+            elif self.path == "/api/review/app/start":
+                self.send(200, start_instance(key))
+            elif self.path == "/api/review/app/stop":
+                stop_instance(key)
+                self.send(200, {"ok": True})
+            elif self.path == "/api/review/app/restart":
+                self.send(200, restart_instance(key))
+            elif self.path == "/api/review/app/ping":
+                ping_instance(key)
                 self.send(200, {"ok": True})
             elif self.path == "/api/drop":
                 self.send(200, drop(full, number, body.get("comment", "")))

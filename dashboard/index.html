@@ -123,6 +123,7 @@
 <main>
   <header>
     <h1>HQ</h1>
+    <span id="branch" class="chip"></span>
     <span id="updated">Loading…</span>
     <span id="budget" title="GitHub calls used this hour"></span>
     <span id="version" title="Code currently being served">{{HQ_VERSION}}</span>
@@ -148,12 +149,17 @@
   let domains = [];
   let current = null;  // the Work Item being reviewed: {repo, number}
   let timer = null;
+  let pingTimer = null;  // keeps the running app instance's heartbeat fresh
   let idleTimer = null;
   let paused = null;  // null, "hidden" (tab not visible), or "idle" (no activity)
   const IDLE_MS = 5 * 60 * 1000;
 
   const esc = s => String(s).replace(/[&<>"']/g, c =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+  fetch("/api/branch").then(r => r.json()).then(d => {
+    if (d.branch) document.getElementById("branch").textContent = d.branch;
+  }).catch(() => {});
 
   async function post(path, body) {
     const res = await fetch(path, {
@@ -295,6 +301,45 @@
     }).join("");
   }
 
+  function appPanel(r) {
+    if (!r.has_app) return `No app to start for this repo. Ask Claude in the chat if you want to see it running.`;
+    return `App:
+      <button id="app-start">Start</button>
+      <button id="app-stop" disabled>Stop</button>
+      <button id="app-restart" disabled>Restart</button>
+      <button id="app-open" disabled>Open</button>
+      <span class="chip" id="app-status">Stopped</span>`;
+  }
+
+  function wireAppPanel() {
+    const start = document.getElementById("app-start");
+    const stop = document.getElementById("app-stop");
+    const restart = document.getElementById("app-restart");
+    const open = document.getElementById("app-open");
+    const status = document.getElementById("app-status");
+
+    function setRunning(running) {
+      start.disabled = running;
+      stop.disabled = !running;
+      restart.disabled = !running;
+      open.disabled = !running;
+      status.textContent = running ? "Running" : "Stopped";
+      clearInterval(pingTimer);
+      if (running) pingTimer = setInterval(() => post("/api/review/app/ping", current).catch(() => {}), 60000);
+    }
+    async function run(path, busyText, doneRunning) {
+      status.textContent = busyText;
+      [start, stop, restart, open].forEach(b => b.disabled = true);
+      try { await post(path, current); setRunning(doneRunning); }
+      catch (e) { status.textContent = e.message; setRunning(!doneRunning); }
+    }
+    start.addEventListener("click", () => run("/api/review/app/start", "Starting…", true));
+    stop.addEventListener("click", () => run("/api/review/app/stop", "Stopping…", false));
+    restart.addEventListener("click", () => run("/api/review/app/restart", "Restarting…", true));
+    open.addEventListener("click", () => window.open(
+      `/review-window?repo=${encodeURIComponent(current.repo)}&number=${current.number}`, "_blank"));
+  }
+
   function renderReview(r) {
     const warn = r.claude_files.length
       ? `<div class="warn">⚠️ Changes how agents and Claude behave — look closely:\n${r.claude_files.map(esc).join("\n")}</div>` : "";
@@ -306,9 +351,7 @@
         <a href="${esc(r.pr_url)}" target="_blank" rel="noopener">Pull request #${esc(r.pr)}</a>
         <span>Branch <code>${esc(r.branch)}</code> is checked out in <code>${esc(r.path)}</code></span>
       </div>
-      <div class="panel">${r.app_url
-        ? `App: <a class="app-link" href="${esc(r.app_url)}" target="_blank" rel="noopener">${esc(r.app_url)}</a>`
-        : `No app to start for this repo. Ask Claude in the chat if you want to see it running.`}</div>
+      <div class="panel">${appPanel(r)}</div>
       ${warn}
       ${r.qa ? `<h2>QA</h2><div class="panel"><pre>${esc(r.qa)}</pre></div>` : ""}
       <h2>Code changes</h2>
@@ -322,6 +365,7 @@
           <button class="approve" id="approve">Approve &amp; merge</button>
         </div>
       </div>`;
+    if (r.has_app) wireAppPanel();
     const comment = document.getElementById("comment");
     const reject = document.getElementById("reject");
     comment.addEventListener("input", () => { reject.disabled = !comment.value.trim(); });
@@ -350,6 +394,7 @@
 
   // Every decision ends the same way: lock the panel, send, then back to the list.
   async function send(path, extra, working = "Working…") {
+    clearInterval(pingTimer);
     const hint = document.getElementById("hint");
     const panel = () => document.querySelectorAll(".decide button, .decide textarea, #close");
     hint.style.color = "";
@@ -413,7 +458,7 @@
 
   async function openReview(repo, number) {
     current = { repo, number };
-    content.innerHTML = `<div class="spinner">Checking out the branch and starting the app…</div>`;
+    content.innerHTML = `<div class="spinner">Checking out the branch…</div>`;
     try {
       renderReview(await post("/api/review", current));
     } catch (e) {
@@ -423,6 +468,7 @@
   }
 
   async function closeReview() {
+    clearInterval(pingTimer);
     const r = current;
     content.innerHTML = `<div class="spinner">Stopping the app and putting your copy back…</div>`;
     try { await post("/api/review/close", r); } catch (e) { /* nothing was checked out */ }
