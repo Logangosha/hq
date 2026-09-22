@@ -7,12 +7,17 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 import webbrowser
 
 HQ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SERVER = os.path.join(HQ, "dashboard", "server.py")
 PORT = int(os.environ.get("PORT", "8765"))
+# Outside the repo: server.py reads its content once at startup (see its hq_version()
+# docstring), so this is the only record of which branch a running process is actually
+# serving. Keeping it out of HQ's own working copy means it never shows up in dirty().
+SERVED_BRANCH_FILE = os.path.join(tempfile.gettempdir(), f"hq-dashboard-branch-{PORT}")
 
 # ctl.py has no console of its own once detached; without this, Windows pops a fresh
 # console window for every git call this makes.
@@ -73,6 +78,26 @@ def dirty():
     return bool(out.strip())
 
 
+def current_branch():
+    return subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=HQ,
+                           capture_output=True, text=True).stdout.strip()
+
+
+def served_branch():
+    """Branch the currently-running server process was launched against, or None if
+    unknown (never launched by ctl.py, or the marker's gone)."""
+    try:
+        with open(SERVED_BRANCH_FILE, encoding="utf-8") as fh:
+            return fh.read().strip()
+    except FileNotFoundError:
+        return None
+
+
+def _record_served_branch(branch):
+    with open(SERVED_BRANCH_FILE, "w", encoding="utf-8") as fh:
+        fh.write(branch)
+
+
 def ensure_branch(branch):
     """Make `branch` the one checked out in the HQ working copy.
 
@@ -81,9 +106,7 @@ def ensure_branch(branch):
     """
     if dirty():
         return "Uncommitted changes in the HQ working copy — commit or stash them first."
-    current = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=HQ,
-                              capture_output=True, text=True).stdout.strip()
-    if current == branch:
+    if current_branch() == branch:
         return None
     result = subprocess.run(["git", "checkout", branch], cwd=HQ,
                              capture_output=True, text=True)
@@ -141,6 +164,7 @@ def _launch():
             if find_pid(PORT) is not None:
                 break
             time.sleep(0.25)
+        _record_served_branch(current_branch())
         if ok:
             print(f"Started the dashboard on port {PORT} (now at {detail}).")
         else:
@@ -158,15 +182,17 @@ def _stop_and_wait():
 
 
 def start(branch=None):
-    reason = ensure_branch(branch or "main")
+    target = branch or "main"
+    reason = ensure_branch(target)
     if reason:
         print(reason)
         return
-    if branch is not None:
-        # A branch was explicitly named: it must actually be served, even if the
-        # dashboard is already running something else. Without this, ensure_branch
-        # checks the branch out on disk but _launch() no-ops on an already-running
-        # server, so the switch never reaches what's served.
+    if find_pid(PORT) is not None and served_branch() != target:
+        # The running server was launched against a different branch than the one
+        # ensure_branch just checked out (explicitly named, or left over from an
+        # earlier explicit start). server.py reads its content once at startup, so
+        # checking the branch out on disk alone never reaches what's served — only a
+        # relaunch does.
         _stop_and_wait()
     _launch()
 
