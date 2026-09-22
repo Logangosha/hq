@@ -14,6 +14,10 @@ HQ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SERVER = os.path.join(HQ, "dashboard", "server.py")
 PORT = int(os.environ.get("PORT", "8765"))
 
+# ctl.py has no console of its own once detached; without this, Windows pops a fresh
+# console window for every git call this makes.
+NO_WINDOW = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
+
 
 def find_pid(port):
     """PID of whatever's listening on port, or None."""
@@ -74,10 +78,32 @@ def stop():
     print(f"Stopped the dashboard (pid {pid}) on port {PORT}.")
 
 
+def update():
+    """Fast-forward-only pull of the current branch from its tracked remote, if that's
+    safe. Returns (ok, detail): the short sha now checked out if ok, else why the
+    checkout was left alone."""
+    kwargs = {"cwd": HQ, "capture_output": True, "text": True, "encoding": "utf-8", **NO_WINDOW}
+    if subprocess.run(["git", "status", "--porcelain"], **kwargs).stdout.strip():
+        return False, "local edits present"
+    if subprocess.run(["git", "fetch"], **kwargs).returncode != 0:
+        return False, "fetch failed"
+    upstream = subprocess.run(["git", "rev-parse", "@{u}"], **kwargs)
+    if upstream.returncode != 0:
+        return False, "no tracked remote"
+    head = subprocess.run(["git", "rev-parse", "HEAD"], **kwargs).stdout.strip()
+    base = subprocess.run(["git", "merge-base", "HEAD", "@{u}"], **kwargs).stdout.strip()
+    if base != head:
+        return False, "diverged from remote"
+    subprocess.run(["git", "merge", "--ff-only", "@{u}"], **kwargs)
+    sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"], **kwargs).stdout.strip()
+    return True, sha
+
+
 def start():
     if find_pid(PORT) is not None:
         print(f"Already running on port {PORT}.")
     else:
+        ok, detail = update()
         kwargs = {"cwd": HQ, "stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
         if os.name == "nt":
             kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
@@ -88,7 +114,10 @@ def start():
             if find_pid(PORT) is not None:
                 break
             time.sleep(0.25)
-        print(f"Started the dashboard on port {PORT}.")
+        if ok:
+            print(f"Started the dashboard on port {PORT} (now at {detail}).")
+        else:
+            print(f"Started the dashboard on port {PORT} (couldn't update: {detail}).")
     webbrowser.open(f"http://localhost:{PORT}")
 
 

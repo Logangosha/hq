@@ -61,6 +61,18 @@ def run(args, cwd=HQ, check=True):
                           encoding="utf-8", check=check, **NO_WINDOW)
 
 
+def hq_version():
+    """Commit currently being served, and how far behind its tracked remote — computed
+    once at import, like PAGE_HTML: a running server's page stays frozen to what was
+    launched even if the checkout changes later (e.g. during self-review)."""
+    sha = run(["git", "rev-parse", "--short", "HEAD"], check=False).stdout.strip()
+    behind = run(["git", "rev-list", "--count", "HEAD..@{u}"], check=False).stdout.strip()
+    return f"{sha} ({behind} behind)" if behind.isdigit() and int(behind) > 0 else sha
+
+
+PAGE_HTML = PAGE_HTML.replace("{{HQ_VERSION}}", hq_version())
+
+
 REFUSAL_MESSAGES = {
     "rate_limit": "GitHub's rate limit was hit.",
     "auth": "GitHub's token is invalid or expired.",

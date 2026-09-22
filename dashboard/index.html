@@ -110,7 +110,7 @@
   button.reject { color: var(--accent); border-color: var(--accent); }
   @media (prefers-color-scheme: dark) { button.approve { color: #0b1f12; } }
 
-  #budget { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  #budget, #version { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
   #budget.low { color: var(--warn, #b45309); font-weight: 600; }
 
   @media (max-width: 520px) {
@@ -125,6 +125,7 @@
     <h1>HQ</h1>
     <span id="updated">Loading…</span>
     <span id="budget" title="GitHub calls used this hour"></span>
+    <span id="version" title="Code currently being served">{{HQ_VERSION}}</span>
     <button id="refresh" type="button">Refresh</button>
   </header>
   <div id="content"></div>
