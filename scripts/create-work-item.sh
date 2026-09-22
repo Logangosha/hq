@@ -8,6 +8,9 @@
 # The Issue starts at stage:requirements. The label is created if missing.
 set -euo pipefail
 
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
+source "$HERE/scripts/lib/goal-check.sh"
+
 REPO="${1:-}"
 TITLE="${2:-}"
 
@@ -22,7 +25,6 @@ fi
 # --- can we work there? -----------------------------------------------------
 # A domain is a repo with the Work Item workflow (see registry/domains.md).
 # HQ itself is the one exception: work on the system is tracked there.
-HERE="$(cd "$(dirname "$0")/.." && pwd)"
 HQ_REPO="$(cd "$HERE" && gh repo view --json nameWithOwner --jq .nameWithOwner)"
 
 if ! gh repo view "$REPO" >/dev/null 2>&1; then
@@ -40,11 +42,21 @@ fi
 # --- the goal ---------------------------------------------------------------
 if [ "${3:-}" = "-" ]; then
   GOAL="$(cat)"
+  MISSING="$(printf '%s\n' "$GOAL" | goal_missing_parts)"
+  if [ -n "$MISSING" ]; then
+    echo "Goal is missing: $(printf '%s' "$MISSING" | goal_join_missing). Nothing created." >&2
+    exit 1
+  fi
 else
-  CURRENT="${3:-}"
-  DESIRED="${4:-}"
-  if [ -z "$CURRENT" ] || [ -z "$DESIRED" ]; then
-    echo "Give both a current state and a desired state, or pass - and pipe the goal in." >&2
+  CURRENT="$(_goal_trim "${3:-}")"
+  DESIRED="$(_goal_trim "${4:-}")"
+  MISSING=""
+  [ -z "$CURRENT" ] && MISSING="${MISSING}current state
+"
+  [ -z "$DESIRED" ] && MISSING="${MISSING}desired state
+"
+  if [ -n "$MISSING" ]; then
+    echo "Goal is missing: $(printf '%s' "$MISSING" | goal_join_missing). Nothing created." >&2
     exit 1
   fi
   GOAL="**Current state:** $CURRENT

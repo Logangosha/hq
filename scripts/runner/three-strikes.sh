@@ -12,6 +12,13 @@ set -euo pipefail
 
 : "${NUM:?}" "${NAME:?}" "${GITHUB_REPOSITORY:?}" "${GITHUB_REPOSITORY_OWNER:?}"
 
+# Requirements is the first stage an Issue reaches, so it's the one place an
+# incomplete goal (R1-R3) needs catching before an agent runs at all.
+if [ "$NAME" = "requirements" ]; then
+  HERE="$(cd "$(dirname "$0")" && pwd)"
+  bash "$HERE/check-goal.sh"
+fi
+
 RUNS=$(gh issue view "$NUM" --repo "$GITHUB_REPOSITORY" --json comments \
          --jq "[.comments[].body] as \$b
                | (\$b | map(startswith(\"## 6. Review — user\")) | rindex(true)) as \$i
