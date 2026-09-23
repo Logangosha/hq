@@ -118,6 +118,13 @@
   #budget, #version { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
   #budget.low { color: var(--warn, #b45309); font-weight: 600; }
 
+  details.costs { margin-top: 4px; font-size: 12px; color: var(--muted); }
+  details.costs summary { cursor: pointer; }
+  details.costs div { padding: 2px 0 2px 10px; }
+  details.costs table { border-collapse: collapse; margin-top: 8px; width: 100%; font-size: 13px; }
+  details.costs th, details.costs td { text-align: left; padding: 4px 10px 4px 0; }
+  details.costs th { color: var(--muted); font-weight: 600; }
+
   @media (max-width: 520px) {
     .card { flex-wrap: wrap; }
     .chip { order: 3; }
@@ -152,6 +159,7 @@
   }
   const refresh = document.getElementById("refresh");
   let domains = [];
+  let totals = [];  // cost totals-over-time: [{week, model, stage, cost, unknown}]
   let current = null;  // the Work Item being reviewed: {repo, number}
   let timer = null;
   let pingTimer = null;  // keeps the running app instance's heartbeat fresh
@@ -161,6 +169,10 @@
 
   const esc = s => String(s).replace(/[&<>"']/g, c =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+  // Cost/token fields are either a number or a literal "no data"/"unknown" string.
+  const fmt = v => typeof v === "number" ? v.toLocaleString() : v;
+  const costLabel = c => typeof c === "number" ? "$" + c.toFixed(2) : c;
 
   // WCAG relative luminance of a "rrggbb" hex colour, then the text colour (black or
   // white) with the higher contrast ratio against it — works for any background, so
@@ -206,7 +218,9 @@
       <span class="ref">${esc(d.repo)}#${it.number}</span>
       <span class="title"><a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.title)}</a>
         ${why ? `<span class="why">${esc(why)}</span>` : ""}
-        ${it.blocked_by ? `<span class="blocked-by">Waiting on ${esc(it.blocked_by)}</span>` : ""}</span>
+        ${it.blocked_by ? `<span class="blocked-by">Waiting on ${esc(it.blocked_by)}</span>` : ""}
+        ${breakdownPanel(it.breakdown)}</span>
+      <span class="chip" title="Total cost">${esc(costLabel(it.cost))}</span>
       <span class="chip"${it.stage_color ? ` style="background:#${esc(it.stage_color)};color:${readableTextColor(it.stage_color)}"` : ""}>${esc(it.stage.replace(/^\d+ /, ""))}</span>
       ${canReview ? `<button class="primary" data-review="${esc(d.full)}" data-number="${it.number}">Review</button>` : ""}
       ${canAnswer ? `<button class="primary" data-answer="${esc(d.full)}" data-number="${it.number}">Answer</button>` : ""}
@@ -214,6 +228,29 @@
       ${canResume ? `<button data-resume="${esc(d.full)}" data-number="${it.number}">Resume</button>` : ""}
       <button data-restart="${esc(d.full)}" data-number="${it.number}">Restart</button>
     </div>`;
+  }
+
+  // Per-item breakdown (R4/R5): a collapsed row per stage under the card's title.
+  function breakdownPanel(rows) {
+    if (!rows || !rows.length) return "";
+    const lines = rows.map(r =>
+      `<div>${esc(r.stage)} — ${esc(r.model)} · ${esc(r.effort)} · ${fmt(r.turns)} turns · ` +
+      `${fmt(r.input_tokens)} in / ${fmt(r.output_tokens)} out / ${fmt(r.cache_tokens)} cache · ` +
+      `${esc(costLabel(r.cost))}</div>`).join("");
+    return `<details class="costs"><summary>Costs by stage</summary>${lines}</details>`;
+  }
+
+  // R6/R7: one row per (week, model, stage) cost bucket, already sorted week desc.
+  function totalsPanel() {
+    if (!totals.length) return "";
+    const rows = totals.map(t => {
+      const cost = t.cost == null ? `unknown (${t.unknown})`
+        : t.unknown ? `${costLabel(t.cost)} + ${t.unknown} unknown` : costLabel(t.cost);
+      return `<tr><td>${esc(t.week)}</td><td>${esc(t.model)}</td><td>${esc(t.stage)}</td><td>${esc(cost)}</td></tr>`;
+    }).join("");
+    return `<details class="panel costs"><summary>Costs by week</summary>
+      <table><thead><tr><th>Week</th><th>Model</th><th>Stage</th><th>Cost</th></tr></thead>
+      <tbody>${rows}</tbody></table></details>`;
   }
 
   function renderList() {
@@ -226,6 +263,7 @@
       html += `<div class="repo">${esc(d.full)}</div>` +
         (rest.length ? rest.map(i => card(d, i, false)).join("") : `<div class="empty">No Work Items in progress.</div>`);
     }
+    html += `<h2>Costs</h2>` + (totalsPanel() || `<div class="empty">No cost data yet.</div>`);
     content.innerHTML = html;
   }
 
@@ -287,7 +325,8 @@
         if (!current) content.innerHTML = `<div class="refusal">${esc(data.refusal.message)}</div>`;
         updated.textContent = "";
       } else {
-        domains = data;
+        domains = data.domains;
+        totals = data.totals;
         if (!current) renderList();
         updated.textContent = "Updated " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
       }

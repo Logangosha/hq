@@ -243,12 +243,98 @@ def domain_comments(full):
     return by_number
 
 
+HQ_RUN_RE = re.compile(r"<!-- hq-run (\{.*?\}) -->")
+RUN_FIELDS = ("turns", "input_tokens", "output_tokens", "cache_tokens", "cost")
+
+
+def _hq_runs(comments):
+    """Every `<!-- hq-run {...} -->` block among `comments`, tagged with its own
+    comment's created_at so a stage with several runs (bounce/re-run) can be aggregated
+    and the latest one found (R5)."""
+    runs = []
+    for c in comments:
+        m = HQ_RUN_RE.search(c["body"])
+        if not m:
+            continue
+        try:
+            data = json.loads(m.group(1))
+        except json.JSONDecodeError:
+            continue
+        data["created_at"] = c["created_at"]
+        runs.append(data)
+    return runs
+
+
+def _num(v):
+    """A run field as a float, or None if it's "unknown" or otherwise unparsable."""
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _cost_summary(runs):
+    """R2/R3: "no data" with zero hq-run comments, "unknown" if none report a usable
+    cost, else the numeric sum."""
+    if not runs:
+        return "no data"
+    costs = [c for c in (_num(r.get("cost")) for r in runs) if c is not None]
+    return sum(costs) if costs else "unknown"
+
+
+def _stage_breakdown(runs):
+    """One row per stage that has at least one hq-run comment (R4), in the order each
+    stage first appears (`runs` is already chronological). A stage with more than one
+    run (R5) sums turns/tokens/cost across them and takes model/effort from the
+    latest-created_at run."""
+    order, by_stage = [], {}
+    for r in runs:
+        stage = STAGE_NAMES.get(f"stage:{r.get('stage')}", r.get("stage") or "unknown")
+        if stage not in by_stage:
+            order.append(stage)
+            by_stage[stage] = []
+        by_stage[stage].append(r)
+    rows = []
+    for stage in order:
+        group = by_stage[stage]
+        latest = max(group, key=lambda r: r["created_at"])
+        row = {"stage": stage, "model": latest.get("model") or "unknown",
+               "effort": latest.get("effort") or "unknown"}
+        for f in RUN_FIELDS:
+            vals = [v for v in (_num(r.get(f)) for r in group) if v is not None]
+            row[f] = sum(vals) if vals else "unknown"
+        rows.append(row)
+    return rows
+
+
+def _totals_over_time(comments_by_number, totals):
+    """R6/R7: fold every hq-run block from this domain's issues (open or closed — the
+    comments were already fetched repo-wide) into `totals`, keyed by (Monday of its
+    comment's created_at in UTC, model or "unknown", stage or "unknown"). A run with no
+    usable cost is counted separately (`unknown`) rather than dropped."""
+    for comments in comments_by_number.values():
+        for r in _hq_runs(comments):
+            created = datetime.strptime(r["created_at"], "%Y-%m-%dT%H:%M:%SZ")
+            week = (created - timedelta(days=created.weekday())).strftime("%Y-%m-%d")
+            model = r.get("model") or "unknown"
+            stage = STAGE_NAMES.get(f"stage:{r.get('stage')}", r.get("stage") or "unknown")
+            bucket = totals.setdefault((week, model, stage), {"cost": 0.0, "known": 0, "unknown": 0})
+            cost = _num(r.get("cost"))
+            if cost is None:
+                bucket["unknown"] += 1
+            else:
+                bucket["cost"] += cost
+                bucket["known"] += 1
+
+
 def work_items():
-    """Every domain (repos of OWNER's tagged `hq-domain`) with its open Work Items, as
-    JSON: [{repo, full, items: [...]}]. Uses ghcache so an unchanged domain costs nothing
-    and a changed one costs one call, regardless of how many other domains exist. Each
-    item still on an agent's stage is also checked for a stall (F7.10)."""
+    """Every domain (repos of OWNER's tagged `hq-domain`) with its open Work Items, and
+    the cost totals-over-time across all of them: {domains: [{repo, full, items: [...]}],
+    totals: [...]}. Uses ghcache so an unchanged domain costs nothing and a changed one
+    costs one call, regardless of how many other domains exist. Each item still on an
+    agent's stage is also checked for a stall (F7.10)."""
     domains = []
+    totals = {}
     try:
         repos = ghcache.fetch_all(f"users/{owner()}/repos?per_page=100", run)
         for repo in repos:
@@ -278,25 +364,37 @@ def work_items():
                     "created_at": issue["created_at"], "stalled": False, "stall_reason": None,
                     "needs_you": stage.startswith("6 ") or "waiting:user" in waiting,
                 })
+            # Unconditional (not just for checkable/blocked items): needed even when a
+            # domain has zero open items, so its closed-issue history still feeds
+            # _totals_over_time (R6), and every item gets a cost/breakdown (R1, R4).
+            comments_by_number = domain_comments(full)
+            _totals_over_time(comments_by_number, totals)
+            for it in items:
+                runs = _hq_runs(comments_by_number.get(it["number"], []))
+                it["cost"] = _cost_summary(runs)
+                it["breakdown"] = _stage_breakdown(runs)
             # waiting:* (either kind) means the runner won't touch it either — not a stall.
             checkable = [it for it in items if it["stage"] in STAGE_LABEL and not it["waiting"]]
             blocked = [it for it in items if it["stage"] == "0 Blocked"]
-            if checkable or blocked:
-                comments_by_number = domain_comments(full)
-                for it in checkable:
-                    comments = comments_by_number.get(it["number"], [])
-                    stalled, reason, parked = stall_info(full, it, comments)
-                    if stalled:
-                        it["stalled"], it["stall_reason"], it["needs_you"] = True, reason, True
-                        if parked:
-                            it["waiting"].append("waiting:user")
-                for it in blocked:
-                    it["blocked_by"] = parse_blocker(comments_by_number.get(it["number"], []))
-                    reconcile_blocker(full, it)
+            for it in checkable:
+                comments = comments_by_number.get(it["number"], [])
+                stalled, reason, parked = stall_info(full, it, comments)
+                if stalled:
+                    it["stalled"], it["stall_reason"], it["needs_you"] = True, reason, True
+                    if parked:
+                        it["waiting"].append("waiting:user")
+            for it in blocked:
+                it["blocked_by"] = parse_blocker(comments_by_number.get(it["number"], []))
+                reconcile_blocker(full, it)
             domains.append({"full": full, "repo": repo["name"], "items": items})
     except ghcache.GhRefusal as e:
         raise _refusal(e.kind, e.detail)
-    return sorted(domains, key=lambda d: d["repo"])
+    totals_list = sorted(
+        [{"week": w, "model": m, "stage": s,
+          "cost": b["cost"] if b["known"] else None, "unknown": b["unknown"]}
+         for (w, m, s), b in totals.items()],
+        key=lambda t: t["week"], reverse=True)
+    return {"domains": sorted(domains, key=lambda d: d["repo"]), "totals": totals_list}
 
 
 def native_path(path):
@@ -662,7 +760,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
             full, number = body["repo"], int(body["number"])
-            if full not in known and full not in {d["full"] for d in work_items()}:
+            if full not in known and full not in {d["full"] for d in work_items()["domains"]}:
                 raise UserError(f"{full} isn't one of your domains.")
             key = f"{full.split('/')[-1]}#{number}"
             if self.path == "/api/review":
