@@ -396,6 +396,21 @@ def ping_instance(key):
             pass
 
 
+QA_HEADING_RE = re.compile(r"^## 5[a-z]?\. QA")
+
+
+def latest_qa(comments):
+    """The last QA comment, re-runs (`## 5b. QA (re-run)`) included; None if there isn't one."""
+    qa = [c["body"] for c in comments if QA_HEADING_RE.match(c["body"])]
+    return qa[-1] if qa else None
+
+
+def after_merge(body):
+    """The list under `### After merge` in a QA comment, up to the next heading; "" if none."""
+    m = re.search(r"^### After merge[ \t]*\n(.*?)(?=^#|\Z)", body, re.M | re.S)
+    return m.group(1).strip() if m else ""
+
+
 def checkout_review(full, number):
     repo = full.split("/")[-1]
     res = run([BASH, "scripts/review-checkout.sh", repo, str(number)], check=False)
@@ -423,13 +438,13 @@ def checkout_review(full, number):
     diff = run(["gh", "pr", "diff", pr, "--repo", full]).stdout
     comments = json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
                                "--json", "comments"]).stdout)["comments"]
-    qa = [c["body"] for c in comments if c["body"].startswith("## 5. QA")]
+    qa = latest_qa(comments)
     files = [f["path"] for f in info["files"]]
     return {
         "key": key, "pr": pr, "pr_url": kv["pr_url"], "branch": kv["branch"],
         "path": kv["path"], "title": info["title"],
         "has_app": os.path.exists(os.path.join(kv["path"], ".claude", "launch.json")),
-        "qa": qa[-1] if qa else None, "diff": diff,
+        "qa": qa, "after_merge": after_merge(qa) if qa else "", "diff": diff,
         "claude_files": [f for f in files if f.startswith(".claude/")],
     }
 
