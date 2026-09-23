@@ -56,6 +56,17 @@ Long or formatted goals: pass `-` as the third argument and pipe the body in.
 The script handles the `Work Item:` prefix, the labels and `stage:requirements`. Don't
 add labels by hand.
 
+If this request depends on another Work Item finishing first, resolve it to
+`owner/repo#number` the same way you resolve the target repo, and add `--blocked-by`:
+
+```bash
+bash scripts/create-work-item.sh <owner>/<repo> "Title" "Current state" "Desired state" \
+  --blocked-by <owner>/<repo>#<n>
+```
+
+A blocked Work Item starts parked (`waiting:work`, no stage) and only begins Requirements
+once that blocker's PR merges.
+
 ## 4. Reply
 
 One line, then the link. Nothing else — no recap of what you just wrote, they can open it.

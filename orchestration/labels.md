@@ -2,8 +2,9 @@
 
 Labels hold the state of a Work Item. They can be read at a glance, filtered on a phone, and used later to trigger automation.
 
-**An open Work Item always has exactly one `stage:` label.** Merging the PR closes the
-Issue — closed means done, so there is no done label.
+**An open Work Item always has exactly one `stage:` label** — except while blocked
+(`waiting:work`), when it has none: it runs no stage until its blocker merges. Merging
+the PR closes the Issue — closed means done, so there is no done label.
 
 ## Stage (where the work is)
 

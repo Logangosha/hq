@@ -4,12 +4,31 @@
 # Usage:
 #   bash scripts/create-work-item.sh owner/repo "Title" "Current state" "Desired state"
 #   bash scripts/create-work-item.sh owner/repo "Title" -   # goal body on stdin
+#   bash scripts/create-work-item.sh owner/repo "Title" "Current" "Desired" --blocked-by owner/repo#N
 #
 # The Issue starts at stage:requirements. The label is created if missing.
+# With --blocked-by, it starts at waiting:work instead and runs no stage until
+# that Work Item's PR merges (see dashboard/server.py's reconcile_blocker).
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 source "$HERE/scripts/lib/goal-check.sh"
+
+BLOCKED_BY=""
+ARGS=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --blocked-by)
+      BLOCKED_BY="${2:-}"
+      shift 2
+      ;;
+    *)
+      ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+set -- "${ARGS[@]}"
 
 REPO="${1:-}"
 TITLE="${2:-}"
@@ -37,6 +56,20 @@ if [ "$REPO" != "$HQ_REPO" ] && \
   echo "NOT A DOMAIN: $REPO exists but has no Work Item workflow, so no agent would run." >&2
   echo "Nothing created. To set it up: /add-domain ${REPO##*/}" >&2
   exit 3
+fi
+
+# --- the blocker, if any -----------------------------------------------------
+if [ -n "$BLOCKED_BY" ]; then
+  BREPO="${BLOCKED_BY%%#*}"
+  BNUM="${BLOCKED_BY##*#}"
+  if [ -z "$BREPO" ] || [ -z "$BNUM" ] || [ "$BREPO" = "$BLOCKED_BY" ]; then
+    echo "BAD BLOCKER: '$BLOCKED_BY' isn't owner/repo#number. Nothing created." >&2
+    exit 4
+  fi
+  if ! gh issue view "$BNUM" --repo "$BREPO" >/dev/null 2>&1; then
+    echo "NO BLOCKER: $BLOCKED_BY doesn't exist (or you can't see it). Nothing created." >&2
+    exit 4
+  fi
 fi
 
 # --- the goal ---------------------------------------------------------------
@@ -70,15 +103,19 @@ BODY="## Goal
 $GOAL"
 
 # --- labels -----------------------------------------------------------------
-STAGE="stage:requirements"
-
 ensure_label() {  # name, color, description
   gh label list --repo "$REPO" --search "$1" --json name \
     --jq '.[].name' 2>/dev/null | grep -qx "$1" \
     || gh label create "$1" --repo "$REPO" --color "$2" --description "$3" >/dev/null
 }
 
-ensure_label "$STAGE" "1D76DB" "Deciding what must be true when done"
+if [ -n "$BLOCKED_BY" ]; then
+  STAGE="waiting:work"
+  ensure_label "$STAGE" "F9D0C4" "Another Work Item must finish first"
+else
+  STAGE="stage:requirements"
+  ensure_label "$STAGE" "1D76DB" "Deciding what must be true when done"
+fi
 
 # --- create -----------------------------------------------------------------
 URL="$(gh issue create \
@@ -86,5 +123,11 @@ URL="$(gh issue create \
   --title "Work Item: $TITLE" \
   --body "$BODY" \
   --label "$STAGE")"
+
+if [ -n "$BLOCKED_BY" ]; then
+  NUM="${URL##*/}"
+  gh issue comment "$NUM" --repo "$REPO" \
+    --body "Blocked by \`$BLOCKED_BY\`. Runs no stage until that merges." >/dev/null
+fi
 
 echo "$URL"
