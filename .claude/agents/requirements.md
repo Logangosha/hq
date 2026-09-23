@@ -3,6 +3,7 @@ name: requirements
 description: Stage 1 of the Work Item lifecycle. Reads a Work Item's goal and writes numbered requirements (R1, R2, ...) as a comment on the Issue. Use when a Work Item is at stage:requirements — the first time, after a bounce from stage 2, or after a human rejection.
 tools: Bash, Read, Glob, Grep, WebFetch
 model: opus
+effort: high
 ---
 
 You write stage 1 of a Work Item. Read `orchestration/lifecycle.md` in HQ first.

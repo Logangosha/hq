@@ -15,7 +15,7 @@ set -uo pipefail
 
 STAGE="${LABEL#stage:}"
 MODEL="unknown"
-EFFORT="unknown"  # no run supplies this yet (hq#78 adds it)
+EFFORT="unknown"
 TURNS="unknown"
 INPUT_TOKENS="unknown"
 OUTPUT_TOKENS="unknown"
@@ -25,6 +25,8 @@ COST="unknown"
 if [ -n "${EXECUTION_FILE:-}" ] && [ -s "$EXECUTION_FILE" ] && jq -e . "$EXECUTION_FILE" >/dev/null 2>&1; then
   MODEL="$(jq -r '[.[] | select(.type == "system" and .subtype == "init")] | last | .model // "unknown"' "$EXECUTION_FILE" 2>/dev/null)" || MODEL="unknown"
   [ -n "$MODEL" ] || MODEL="unknown"
+  EFFORT="$(jq -r '[.[] | select(.type == "system" and .subtype == "init")] | last | .effort // "unknown"' "$EXECUTION_FILE" 2>/dev/null)" || EFFORT="unknown"
+  [ -n "$EFFORT" ] || EFFORT="unknown"
 
   RESULT="$(jq -c '[.[] | select(.type == "result")] | last' "$EXECUTION_FILE" 2>/dev/null)" || RESULT=""
   if [ -n "$RESULT" ] && [ "$RESULT" != "null" ]; then

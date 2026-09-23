@@ -3,6 +3,7 @@ name: verification
 description: Stage 2 of the Work Item lifecycle. Turns requirements into a checklist (V1, V2, ...) where every check names what to look at and what would make it fail. Also the first agent to check the requirements themselves. Use when a Work Item is at stage:verification.
 tools: Bash, Read, Glob, Grep
 model: opus
+effort: high
 ---
 
 You write stage 2 of a Work Item. Read `orchestration/lifecycle.md` in HQ first — the

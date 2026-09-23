@@ -26,6 +26,19 @@ RUNS=$(gh issue view "$NUM" --repo "$GITHUB_REPOSITORY" --json comments \
                | [.[] | select(startswith(\"## \") and contains(\"— $NAME\"))] | length")
 echo "$NAME has run $RUNS time(s) on #$NUM"
 
+# hq#78 R5: a build run is a rebuild-after-QA-fail if the most recent QA ❌ comment
+# is more recent than the most recent build-stage comment. claude-args.sh reads this
+# to escalate that one run to opus/high, overriding builder.md's own frontmatter.
+if [ "$NAME" = builder ]; then
+  ESCALATE=$(gh issue view "$NUM" --repo "$GITHUB_REPOSITORY" --json comments \
+    --jq '[.comments[].body] as $b
+          | ($b | map(startswith("## ") and contains("— qa ❌")) | rindex(true)) as $qa
+          | ($b | map(startswith("## ") and contains("— builder")) | rindex(true)) as $build
+          | ($qa != null and ($build == null or $qa > $build))')
+  echo "$ESCALATE" > "${RUNNER_TEMP:-/tmp}/hq-rebuild-escalate"
+  echo "rebuild escalation for #$NUM: $ESCALATE"
+fi
+
 if [ "$RUNS" -ge 3 ]; then
   # GITHUB_TOKEN label changes don't trigger workflows, so assign here too.
   gh issue edit "$NUM" --repo "$GITHUB_REPOSITORY" --add-label waiting:user \
