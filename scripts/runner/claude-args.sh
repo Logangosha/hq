@@ -27,7 +27,10 @@ fi
 # bypassPermissions: no one is here to approve prompts, and without it writes to
 # .claude/ (skills, agents) are always refused. The runner is thrown away after the
 # run; everything still reaches main only through a reviewed PR.
-ARGS="--permission-mode bypassPermissions --allowedTools \"Bash,Read,Write,Edit,Glob,Grep\" --max-turns $MAX_TURNS --model $MODEL --effort $EFFORT"
+# --disallowedTools: bypassPermissions allows every tool, so --allowedTools alone
+# doesn't stop the agent handing its stage to a helper agent. A helper left running in
+# the background dies when the run ends and the stage stalls (hq#94, hq#80).
+ARGS="--permission-mode bypassPermissions --allowedTools \"Bash,Read,Write,Edit,Glob,Grep\" --disallowedTools \"Agent,Task\" --max-turns $MAX_TURNS --model $MODEL --effort $EFFORT"
 
 # Settings carry HQ's hooks (install-hooks.sh put them there). Named explicitly so the
 # run doesn't depend on the action picking project settings up on its own.
