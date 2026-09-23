@@ -19,6 +19,7 @@ from html import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+import ctl
 import ghcache
 
 HQ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -612,6 +613,35 @@ def drop(full, number, reason):
     return {"message": "Dropped." + (f" PR #{pr[0]} closed and its branch deleted." if pr else "")}
 
 
+def restart_hq():
+    """Same as `python dashboard/ctl.py restart`, but from inside a request: refuses at
+    once (R3/R9) if the working copy is dirty, otherwise hands off to a detached `ctl.py
+    restart` so the new server survives this process exiting (R4)."""
+    reason = ctl.ensure_branch("main")
+    if reason:
+        raise UserError(reason)
+    kwargs = {"cwd": HQ, "stdin": subprocess.DEVNULL, "stderr": subprocess.STDOUT,
+              "env": dict(os.environ, HQ_NO_BROWSER="1")}
+    if os.name == "nt":
+        kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        kwargs["start_new_session"] = True
+    with open(ctl.RESTART_OUTCOME_FILE, "w", encoding="utf-8") as outcome:
+        subprocess.Popen([sys.executable, ctl.__file__, "restart"], stdout=outcome, **kwargs)
+    return {"boot": os.getpid()}
+
+
+def restart_hq_status():
+    """Polled by the page while a restart is in flight (R6/R7/R9/R10): `boot` changes
+    once the new process has taken over; `outcome` is ctl's own last printed line."""
+    try:
+        with open(ctl.RESTART_OUTCOME_FILE, encoding="utf-8") as fh:
+            lines = [l for l in fh.read().splitlines() if l.strip()]
+    except FileNotFoundError:
+        lines = []
+    return {"boot": os.getpid(), "outcome": lines[-1] if lines else ""}
+
+
 class UserError(Exception):
     pass
 
@@ -651,6 +681,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200, {"branch": branch})
             except subprocess.CalledProcessError as e:
                 self.send(500, {"error": (e.stderr or str(e)).strip()})
+        elif parsed.path == "/api/hq/restart":
+            self.send(200, restart_hq_status())
         elif parsed.path == "/review-window":
             qs = parse_qs(parsed.query)
             full = (qs.get("repo") or [""])[0]
@@ -674,6 +706,11 @@ class Handler(BaseHTTPRequestHandler):
         # so other websites open in your browser can't press these buttons.
         if self.headers.get("X-HQ") != "1":
             return self.send(403, {"error": "Forbidden"})
+        if self.path == "/api/hq/restart":
+            try:
+                return self.send(200, restart_hq())
+            except UserError as e:
+                return self.send(400, {"error": str(e)})
         try:
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
             full, number = body["repo"], int(body["number"])

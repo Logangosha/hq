@@ -18,6 +18,9 @@ PORT = int(os.environ.get("PORT", "8765"))
 # docstring), so this is the only record of which branch a running process is actually
 # serving. Keeping it out of HQ's own working copy means it never shows up in dirty().
 SERVED_BRANCH_FILE = os.path.join(tempfile.gettempdir(), f"hq-dashboard-branch-{PORT}")
+# Outside the repo, same reasoning: where the dashboard's own Restart HQ button reads
+# ctl.py restart's outcome line from, once the detached child exits.
+RESTART_OUTCOME_FILE = os.path.join(tempfile.gettempdir(), f"hq-dashboard-restart-{PORT}.txt")
 
 # ctl.py has no console of its own once detached; without this, Windows pops a fresh
 # console window for every git call this makes.
@@ -169,7 +172,8 @@ def _launch():
             print(f"Started the dashboard on port {PORT} (now at {detail}).")
         else:
             print(f"Started the dashboard on port {PORT} (couldn't update: {detail}).")
-    webbrowser.open(f"http://localhost:{PORT}")
+    if not os.environ.get("HQ_NO_BROWSER"):
+        webbrowser.open(f"http://localhost:{PORT}")
 
 
 def _stop_and_wait():
