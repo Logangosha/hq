@@ -133,6 +133,8 @@
     <span id="budget" title="GitHub calls used this hour"></span>
     <span id="version" title="Code currently being served">{{HQ_VERSION}}</span>
     <button id="refresh" type="button">Refresh</button>
+    <span id="hq-status"></span>
+    <button id="restart-hq" type="button">Restart HQ</button>
   </header>
   <div id="content"></div>
 </main>
@@ -178,6 +180,16 @@
   fetch("/api/branch").then(r => r.json()).then(d => {
     if (d.branch) document.getElementById("branch").textContent = d.branch;
   }).catch(() => {});
+
+  const hqStatus = document.getElementById("hq-status");
+  const restartHq = document.getElementById("restart-hq");
+  {
+    const outcome = sessionStorage.getItem("hq-restart-outcome");
+    if (outcome) {
+      hqStatus.textContent = outcome;
+      sessionStorage.removeItem("hq-restart-outcome");
+    }
+  }
 
   async function post(path, body) {
     const res = await fetch(path, {
@@ -598,6 +610,52 @@
     const rs = e.target.closest("[data-resume]");
     if (rs) return openResumeStopped(rs.dataset.resume, Number(rs.dataset.number));
   });
+  // ---- Restart HQ ----
+
+  const HQ_RESTART_TIMEOUT_MS = 60000;
+
+  restartHq.addEventListener("click", async () => {
+    restartHq.disabled = true;
+    clearTimeout(timer);  // stop the list's own auto-refresh while we own the page
+    hqStatus.textContent = "Restarting HQ…";
+    let bootAtPost;
+    try {
+      ({ boot: bootAtPost } = await post("/api/hq/restart", {}));
+    } catch (e) {
+      hqStatus.textContent = e.message;
+      restartHq.disabled = false;
+      scheduleRefresh();
+      return;
+    }
+    const deadline = Date.now() + HQ_RESTART_TIMEOUT_MS;
+    const poll = setInterval(async () => {
+      let status;
+      try { status = await fetch("/api/hq/restart").then(r => r.json()); }
+      catch (e) { status = null; }
+      if (status && status.boot !== bootAtPost) {
+        clearInterval(poll);
+        if (status.outcome) sessionStorage.setItem("hq-restart-outcome", status.outcome);
+        location.reload();
+        return;
+      }
+      if (status && status.boot === bootAtPost && status.outcome) {
+        // ctl refused after the POST returned (e.g. a fetch failure it detected itself).
+        clearInterval(poll);
+        hqStatus.textContent = status.outcome;
+        restartHq.disabled = false;
+        scheduleRefresh();
+        return;
+      }
+      if (Date.now() > deadline) {
+        clearInterval(poll);
+        hqStatus.textContent = "Restart failed — HQ didn't come back within 60s." +
+          (status && status.outcome ? ` (${status.outcome})` : "");
+        restartHq.disabled = false;
+        scheduleRefresh();
+      }
+    }, 1000);
+  });
+
   refresh.addEventListener("click", () => load());
   resetIdleTimer();
   load();
