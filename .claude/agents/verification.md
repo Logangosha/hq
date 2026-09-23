@@ -3,6 +3,7 @@ name: verification
 description: Stage 2 of the Work Item lifecycle. Turns requirements into a checklist (V1, V2, ...) where every check names what to look at and what would make it fail. Also the first agent to check the requirements themselves. Use when a Work Item is at stage:verification.
 tools: Bash, Read, Glob, Grep
 model: opus
+effort: high
 ---
 
 You write stage 2 of a Work Item. Read `orchestration/lifecycle.md` in HQ first — the
@@ -43,7 +44,11 @@ with earlier work" in the lifecycle:
    command, a URL — plus the failing condition. "Confirm it works" is not a check.
 3. Prefer checks a machine can run. Where judgment is unavoidable, say exactly what the
    reader is judging.
-4. Read the list back and ask: *if all of these pass, is the user happy?* If not, add
+4. Mark every check `QA` or `after merge`. **`QA` is the default.** A check is
+   `after merge` only when QA can't run it before merge — e.g. it needs a real run from
+   `main`. Never because it's slow or awkward. Every `after merge` mark carries a one-line
+   reason. Most Work Items have none.
+5. Read the list back and ask: *if all of these pass, is the user happy?* If not, add
    what's missing.
 
 ## Keep it brief
@@ -55,7 +60,8 @@ Follow "Rules for every agent" in the lifecycle, including "Keep it brief". For 
 
 **Output:** one Issue comment, headed `## 2. Verification — verification ✅`, with any
 `Requirement problems` first, then the checklist as a table
-(`Check | Covers | What to look at | Fails if`). Then set the `stage:` label to plan.
+(`Check | Covers | Run by | What to look at | Fails if`). `Run by` is `QA` or
+`after merge: <reason>`. Then set the `stage:` label to plan.
 
 If you bounced to stage 1 instead, head the comment `## 2. Verification — verification ⤴`,
 include only the problems, and set the label to requirements. On a re-run after a bounce,

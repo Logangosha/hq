@@ -38,7 +38,10 @@ so a review can't move the work you're doing here onto another branch.
 
 Then, beside it, one short block:
 - **What changed:** the PR title and one line.
-- **QA:** the `## 5. QA` comment's table, trimmed to check + result.
+- **QA:** the latest QA comment's table (`## 5. QA`, or a re-run such as
+  `## 5b. QA (re-run)`), trimmed to check + result.
+- **After merge** — only if that comment has a `### After merge` heading: show its list
+  verbatim and tell the user to do these after merging. Leave this bullet out otherwise.
 - **Try this:** one or two things to click, taken from the requirements.
 - **⚠️ Changes `.claude/`** — only if the PR does (`gh pr diff <pr> --name-only`). List
   those files and say what each change does in one line: they change how agents and

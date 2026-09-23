@@ -146,6 +146,8 @@
     <span id="budget" title="GitHub calls used this hour"></span>
     <span id="version" title="Code currently being served">{{HQ_VERSION}}</span>
     <button id="refresh" type="button">Refresh</button>
+    <span id="hq-status"></span>
+    <button id="restart-hq" type="button">Restart HQ</button>
   </header>
   <div id="content"></div>
 </main>
@@ -208,6 +210,16 @@
     if (d.branch) document.getElementById("branch").textContent = d.branch;
   }).catch(() => {});
 
+  const hqStatus = document.getElementById("hq-status");
+  const restartHq = document.getElementById("restart-hq");
+  {
+    const outcome = sessionStorage.getItem("hq-restart-outcome");
+    if (outcome) {
+      hqStatus.textContent = outcome;
+      sessionStorage.removeItem("hq-restart-outcome");
+    }
+  }
+
   async function post(path, body) {
     const res = await fetch(path, {
       method: "POST",
@@ -254,11 +266,11 @@
   // model, turns, total tokens, cost — nothing else.
   function breakdownPanel(rows) {
     const lines = rows.map(r =>
-      `<tr><td>${esc(r.stage)}</td><td>${esc(r.agent)}</td><td>${esc(r.model)}</td>` +
+      `<tr><td>${esc(r.agent)}</td><td>${esc(r.model)}</td>` +
       `<td>${esc(fmt(r.turns))}</td><td>${esc(abbrev(r.tokens))}</td><td>${esc(costLabel(r.cost))}</td></tr>`
     ).join("");
     return `<table class="breakdown">
-      <thead><tr><th>Stage</th><th>Agent</th><th>Model</th><th>Turns</th><th>Tokens</th><th>Cost</th></tr></thead>
+      <thead><tr><th>Agent</th><th>Model</th><th>Turns</th><th>Tokens</th><th>Cost</th></tr></thead>
       <tbody>${lines}</tbody></table>`;
   }
 
@@ -437,6 +449,7 @@
       </div>
       <div class="panel">${appPanel(r)}</div>
       ${warn}
+      ${r.after_merge ? `<h2>After merge — check these</h2><div class="panel"><pre>${esc(r.after_merge)}</pre></div>` : ""}
       ${r.qa ? `<h2>QA</h2><div class="panel"><pre>${esc(r.qa)}</pre></div>` : ""}
       <h2>Code changes</h2>
       ${renderDiff(r.diff)}
@@ -668,6 +681,53 @@
   content.addEventListener("toggle", e => {
     if (e.target.matches("details.costs.panel")) costsOpen = e.target.open;
   }, true);
+
+  // ---- Restart HQ ----
+
+  const HQ_RESTART_TIMEOUT_MS = 60000;
+
+  restartHq.addEventListener("click", async () => {
+    restartHq.disabled = true;
+    clearTimeout(timer);  // stop the list's own auto-refresh while we own the page
+    hqStatus.textContent = "Restarting HQ…";
+    let bootAtPost;
+    try {
+      ({ boot: bootAtPost } = await post("/api/hq/restart", {}));
+    } catch (e) {
+      hqStatus.textContent = e.message;
+      restartHq.disabled = false;
+      scheduleRefresh();
+      return;
+    }
+    const deadline = Date.now() + HQ_RESTART_TIMEOUT_MS;
+    const poll = setInterval(async () => {
+      let status;
+      try { status = await fetch("/api/hq/restart").then(r => r.json()); }
+      catch (e) { status = null; }
+      if (status && status.boot !== bootAtPost) {
+        clearInterval(poll);
+        if (status.outcome) sessionStorage.setItem("hq-restart-outcome", status.outcome);
+        location.reload();
+        return;
+      }
+      if (status && status.boot === bootAtPost && status.outcome) {
+        // ctl refused after the POST returned (e.g. a fetch failure it detected itself).
+        clearInterval(poll);
+        hqStatus.textContent = status.outcome;
+        restartHq.disabled = false;
+        scheduleRefresh();
+        return;
+      }
+      if (Date.now() > deadline) {
+        clearInterval(poll);
+        hqStatus.textContent = "Restart failed — HQ didn't come back within 60s." +
+          (status && status.outcome ? ` (${status.outcome})` : "");
+        restartHq.disabled = false;
+        scheduleRefresh();
+      }
+    }, 1000);
+  });
+
   refresh.addEventListener("click", () => load());
   resetIdleTimer();
   load();

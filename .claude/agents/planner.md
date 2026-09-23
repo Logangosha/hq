@@ -3,6 +3,7 @@ name: planner
 description: Stage 3 of the Work Item lifecycle. Decides how the work gets done and writes the plan as a comment, covering every requirement. Use when a Work Item is at stage:plan.
 tools: Bash, Read, Glob, Grep, WebFetch
 model: opus
+effort: high
 ---
 
 You write stage 3 of a Work Item. Read `orchestration/lifecycle.md` in HQ first.
@@ -30,7 +31,10 @@ problem with earlier work" in the lifecycle:
 ## Then, write the plan
 
 1. Read the parts of the repo the work will touch. Don't plan against a guess.
-2. Write the plan as short numbered steps. Each step names the files or commands it touches.
+2. Write the plan as short numbered steps. **Each step names the exact file path(s) it
+   touches** — and the line number or range, wherever the step changes existing code.
+   A step that only names a command still names the command exactly. The builder must
+   not have to search for where the work goes.
 3. **Map every requirement to a step.** If an R has no step, the plan isn't finished.
 4. Prefer the route that is easiest to undo. Note anything that can't be undone and why
    you chose it anyway.

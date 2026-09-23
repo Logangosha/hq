@@ -19,6 +19,7 @@ from html import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+import ctl
 import ghcache
 
 HQ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -134,6 +135,10 @@ STAGE_AGENT = {
     "1 Requirements": "requirements", "2 Verification": "verification",
     "3 Plan": "planner", "4 Build": "builder", "5 QA": "qa",
 }
+AGENT_LABEL = {
+    "requirements": "Requirements", "verification": "Verification",
+    "planner": "Planner", "builder": "Builder", "qa": "QA",
+}
 # Stages restart() may target — the same five agent stages, so the two lists can't drift.
 RESTART_STAGES = {l.split(":", 1)[1] for l in STAGE_LABEL.values()}
 
@@ -243,21 +248,24 @@ def domain_comments(full):
     return by_number
 
 
-HQ_RUN_RE = re.compile(r"<!-- hq-run (\{.*?\}) -->")
+HQ_RUN_RE = re.compile(r"^<!-- hq-run (\{.*\}) -->$", re.M)
 
 
 def _hq_runs(comments):
     """Every `<!-- hq-run {...} -->` block among `comments`, tagged with its own
     comment's created_at so a stage with several runs (bounce/re-run) can be aggregated
-    and the latest one found (R5)."""
+    and the latest one found (R5). Only a block starting its own line counts, so a quoted
+    example inside comment text can't be picked up; if a comment somehow has more than
+    one, the last one that parses wins."""
     runs = []
     for c in comments:
-        m = HQ_RUN_RE.search(c["body"])
-        if not m:
-            continue
-        try:
-            data = json.loads(m.group(1))
-        except json.JSONDecodeError:
+        data = None
+        for m in HQ_RUN_RE.finditer(c["body"]):
+            try:
+                data = json.loads(m.group(1))
+            except json.JSONDecodeError:
+                continue
+        if data is None:
             continue
         data["created_at"] = c["created_at"]
         runs.append(data)
@@ -298,7 +306,7 @@ def _stage_breakdown(runs):
     for stage in order:
         group = by_stage[stage]
         latest = max(group, key=lambda r: r["created_at"])
-        row = {"stage": stage, "agent": STAGE_AGENT.get(stage, "unknown").title(),
+        row = {"agent": AGENT_LABEL.get(STAGE_AGENT.get(stage), "unknown"),
                "model": latest.get("model") or "unknown"}
         turns = [v for v in (_num(r.get("turns")) for r in group) if v is not None]
         row["turns"] = sum(turns) if turns else "unknown"
@@ -499,6 +507,21 @@ def ping_instance(key):
             pass
 
 
+QA_HEADING_RE = re.compile(r"^## 5[a-z]?\. QA")
+
+
+def latest_qa(comments):
+    """The last QA comment, re-runs (`## 5b. QA (re-run)`) included; None if there isn't one."""
+    qa = [c["body"] for c in comments if QA_HEADING_RE.match(c["body"])]
+    return qa[-1] if qa else None
+
+
+def after_merge(body):
+    """The list under `### After merge` in a QA comment, up to the next heading; "" if none."""
+    m = re.search(r"^### After merge[ \t]*\n(.*?)(?=^#|\Z)", body, re.M | re.S)
+    return m.group(1).strip() if m else ""
+
+
 def checkout_review(full, number):
     repo = full.split("/")[-1]
     res = run([BASH, "scripts/review-checkout.sh", repo, str(number)], check=False)
@@ -526,13 +549,13 @@ def checkout_review(full, number):
     diff = run(["gh", "pr", "diff", pr, "--repo", full]).stdout
     comments = json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
                                "--json", "comments"]).stdout)["comments"]
-    qa = [c["body"] for c in comments if c["body"].startswith("## 5. QA")]
+    qa = latest_qa(comments)
     files = [f["path"] for f in info["files"]]
     return {
         "key": key, "pr": pr, "pr_url": kv["pr_url"], "branch": kv["branch"],
         "path": kv["path"], "title": info["title"],
         "has_app": os.path.exists(os.path.join(kv["path"], ".claude", "launch.json")),
-        "qa": qa[-1] if qa else None, "diff": diff,
+        "qa": qa, "after_merge": after_merge(qa) if qa else "", "diff": diff,
         "claude_files": [f for f in files if f.startswith(".claude/")],
     }
 
@@ -673,15 +696,22 @@ def restart(full, number, reason, target=None):
         raise UserError("Say why you're restarting it, so the agents know what to change.")
     if target is not None and target not in RESTART_STAGES:
         raise UserError(f"'{target}' isn't a stage you can restart at.")
-    labels = [l["name"] for l in json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
-                                                  "--json", "labels"]).stdout)["labels"]
-              if l["name"].startswith("stage:")]
+    all_labels = [l["name"] for l in json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
+                                                      "--json", "labels"]).stdout)["labels"]]
+    labels = [l for l in all_labels if l.startswith("stage:")]
     if not labels:
         raise UserError("No stage to restart — open the Issue to see what's going on.")
     stage = labels[0]
+    # A parked Work Item (stalled, or stopped by the user) keeps its waiting: label, and
+    # the runner skips anything with one — so Restart has to clear it or nothing runs.
+    # waiting:work stays: that one means a blocker hasn't merged yet.
+    unpark = [l for l in all_labels if l in ("waiting:user", "waiting:stopped")]
     run(["gh", "issue", "comment", str(number), "--repo", full, "--body", reason])
     new_stage = f"stage:{target}" if target else stage
-    run(["gh", "issue", "edit", str(number), "--repo", full, "--remove-label", stage])
+    edit = ["gh", "issue", "edit", str(number), "--repo", full, "--remove-label", stage]
+    for l in unpark:
+        edit += ["--remove-label", l]
+    run(edit)
     run(["gh", "issue", "edit", str(number), "--repo", full, "--add-label", new_stage])
     return {"message": f"Restarted at {new_stage.split(':')[1]}."}
 
@@ -698,6 +728,35 @@ def drop(full, number, reason):
     pr = [l.split("=")[1] for l in res.stdout.splitlines() if l.startswith("closed_pr=")]
     ghcache.invalidate(f"repos/{full}/issues?state=open&per_page=100")
     return {"message": "Dropped." + (f" PR #{pr[0]} closed and its branch deleted." if pr else "")}
+
+
+def restart_hq():
+    """Same as `python dashboard/ctl.py restart`, but from inside a request: refuses at
+    once (R3/R9) if the working copy is dirty, otherwise hands off to a detached `ctl.py
+    restart` so the new server survives this process exiting (R4)."""
+    reason = ctl.ensure_branch("main")
+    if reason:
+        raise UserError(reason)
+    kwargs = {"cwd": HQ, "stdin": subprocess.DEVNULL, "stderr": subprocess.STDOUT,
+              "env": dict(os.environ, HQ_NO_BROWSER="1")}
+    if os.name == "nt":
+        kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        kwargs["start_new_session"] = True
+    with open(ctl.RESTART_OUTCOME_FILE, "w", encoding="utf-8") as outcome:
+        subprocess.Popen([sys.executable, ctl.__file__, "restart"], stdout=outcome, **kwargs)
+    return {"boot": os.getpid()}
+
+
+def restart_hq_status():
+    """Polled by the page while a restart is in flight (R6/R7/R9/R10): `boot` changes
+    once the new process has taken over; `outcome` is ctl's own last printed line."""
+    try:
+        with open(ctl.RESTART_OUTCOME_FILE, encoding="utf-8") as fh:
+            lines = [l for l in fh.read().splitlines() if l.strip()]
+    except FileNotFoundError:
+        lines = []
+    return {"boot": os.getpid(), "outcome": lines[-1] if lines else ""}
 
 
 class UserError(Exception):
@@ -739,6 +798,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200, {"branch": branch})
             except subprocess.CalledProcessError as e:
                 self.send(500, {"error": (e.stderr or str(e)).strip()})
+        elif parsed.path == "/api/hq/restart":
+            self.send(200, restart_hq_status())
         elif parsed.path == "/review-window":
             qs = parse_qs(parsed.query)
             full = (qs.get("repo") or [""])[0]
@@ -762,6 +823,11 @@ class Handler(BaseHTTPRequestHandler):
         # so other websites open in your browser can't press these buttons.
         if self.headers.get("X-HQ") != "1":
             return self.send(403, {"error": "Forbidden"})
+        if self.path == "/api/hq/restart":
+            try:
+                return self.send(200, restart_hq())
+            except UserError as e:
+                return self.send(400, {"error": str(e)})
         try:
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
             full, number = body["repo"], int(body["number"])

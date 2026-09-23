@@ -15,12 +15,19 @@ Work Item #$NUM in $REPO has just been labelled \`$LABEL\`, so you are the
 1. Read \`.hq/orchestration/lifecycle.md\` — the rules of the system.
 2. Read \`.claude/agents/$NAME.md\` and do exactly what it says for this
    Issue. It is your whole job description.
-3. Read the Issue and every comment on it first:
-   \`gh issue view $NUM --comments\`
+3. Read the Issue first — the goal, the latest comment from each stage, and every
+   human comment:
+   \`bash .hq/scripts/runner/issue-digest.sh $REPO $NUM\`
+   Superseded stage comments are left out. If the digest points at an earlier run
+   you need to see, \`gh issue view $NUM --comments\` has the full history.
 
 Finish by posting your stage comment and setting the \`stage:\` label to the
 next stage (or back, if you are bouncing it). Use \`gh\` for both. Nothing
 else happens until that label changes.
+
+You run unattended. Nobody reads the chat — not your questions, not your final
+message. If you are blocked, post the reason as a comment on the Issue and add the
+\`waiting:user\` label with \`gh\`. Then stop.
 EOF
 
 OUT="${GITHUB_OUTPUT:-/dev/stdout}"

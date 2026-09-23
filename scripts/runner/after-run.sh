@@ -9,22 +9,28 @@
 # text and as a hidden `<!-- hq-run {...} -->` JSON block. Always exits 0: a missing,
 # empty or unparsable execution file just means the metrics come out "unknown", not a
 # failed job. Same code path for every stage — nothing here branches on it.
+# If the Issue's `stage:` label hasn't moved (still just $LABEL), the run's final
+# message is posted as a quoted comment and the item is parked with `waiting:user` —
+# no more waiting on the 15-minute stall notice to notice a silent agent.
 set -uo pipefail
 
 : "${NUM:?}" "${NAME:?}" "${LABEL:?}" "${OUTCOME:?}"
 
 STAGE="${LABEL#stage:}"
 MODEL="unknown"
-EFFORT="unknown"  # no run supplies this yet (hq#78 adds it)
+EFFORT="unknown"
 TURNS="unknown"
 INPUT_TOKENS="unknown"
 OUTPUT_TOKENS="unknown"
 CACHE_TOKENS="unknown"
 COST="unknown"
+RESULT=""
 
 if [ -n "${EXECUTION_FILE:-}" ] && [ -s "$EXECUTION_FILE" ] && jq -e . "$EXECUTION_FILE" >/dev/null 2>&1; then
   MODEL="$(jq -r '[.[] | select(.type == "system" and .subtype == "init")] | last | .model // "unknown"' "$EXECUTION_FILE" 2>/dev/null)" || MODEL="unknown"
   [ -n "$MODEL" ] || MODEL="unknown"
+  EFFORT="$(jq -r '[.[] | select(.type == "system" and .subtype == "init")] | last | .effort // "unknown"' "$EXECUTION_FILE" 2>/dev/null)" || EFFORT="unknown"
+  [ -n "$EFFORT" ] || EFFORT="unknown"
 
   RESULT="$(jq -c '[.[] | select(.type == "result")] | last' "$EXECUTION_FILE" 2>/dev/null)" || RESULT=""
   if [ -n "$RESULT" ] && [ "$RESULT" != "null" ]; then
@@ -71,4 +77,39 @@ gh issue comment "$NUM" --repo "${GITHUB_REPOSITORY:?}" --body-file "$BODY_FILE"
   || echo "after-run: failed to post comment for #$NUM" >&2
 
 rm -f "$BODY_FILE"
+
+STAGE_LABELS="$(gh issue view "$NUM" --repo "${GITHUB_REPOSITORY:?}" --json labels 2>/dev/null \
+  | jq -c '[.labels[].name | select(startswith("stage:"))]' 2>/dev/null)"
+
+if [ -z "$STAGE_LABELS" ]; then
+  echo "after-run: could not read stage labels for #$NUM, skipping park check" >&2
+elif jq -e --arg l "$LABEL" '. == [$l]' <<<"$STAGE_LABELS" >/dev/null 2>&1; then
+  FINAL="$(jq -r '.result // empty | strings' <<<"$RESULT" 2>/dev/null)"
+  if [ -z "$FINAL" ]; then
+    FINAL="(No final message — the execution file was missing, empty, unreadable or had no result.)"
+  fi
+
+  PARK_FILE="$(mktemp)"
+  {
+    echo "🛑 The **$NAME** agent finished but the stage didn't move (\`$LABEL\` is still set). Parked with \`waiting:user\` — its final message is below."
+    echo
+    while IFS= read -r line; do
+      echo "> $line"
+    done <<<"$FINAL"
+  } > "$PARK_FILE"
+
+  CAPPED="$(jq -Rrs '{body: .[0:65000], cut: (length > 65000)}' "$PARK_FILE")"
+  jq -r '.body' <<<"$CAPPED" > "$PARK_FILE"
+  if [ "$(jq -r '.cut' <<<"$CAPPED")" = "true" ]; then
+    printf '\n\n_(truncated)_' >> "$PARK_FILE"
+  fi
+
+  gh issue comment "$NUM" --repo "${GITHUB_REPOSITORY:?}" --body-file "$PARK_FILE" \
+    || echo "after-run: failed to post final-message comment for #$NUM" >&2
+  gh issue edit "$NUM" --repo "${GITHUB_REPOSITORY:?}" --add-label waiting:user --add-assignee "${GITHUB_REPOSITORY_OWNER:-}" \
+    || echo "after-run: failed to park #$NUM with waiting:user" >&2
+
+  rm -f "$PARK_FILE"
+fi
+
 exit 0
