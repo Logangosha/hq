@@ -127,7 +127,10 @@ The user should be able to read the checklist and answer one question:
 
 Each agent file adds only what's specific to its stage. These apply to all of them.
 
-- **Read the Issue top to bottom.** Later comments correct earlier ones.
+- **Read the digest top to bottom** (`scripts/runner/issue-digest.sh <repo> <n>`) — the goal,
+  the latest comment from each stage, every human comment. Later comments correct earlier
+  ones. Reach for the full history (`gh issue view <n> --comments`) only when the digest
+  points at an earlier run you need to see.
 - **Never edit an earlier comment.** A correction is a new comment below the old one. The
   Issue is the memory, and the memory includes the mistake.
 - **Don't check your own work.** The next stage does. If you spot your own error after
