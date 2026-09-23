@@ -162,6 +162,19 @@
   const esc = s => String(s).replace(/[&<>"']/g, c =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
+  // WCAG relative luminance of a "rrggbb" hex colour, then the text colour (black or
+  // white) with the higher contrast ratio against it — works for any background, so
+  // no stage-name -> colour table is needed here.
+  function readableTextColor(hex) {
+    const c = hex.match(/.{2}/g).map(h => {
+      const v = parseInt(h, 16) / 255;
+      return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    });
+    const luminance = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    const contrastWith = white => (Math.max(luminance, white) + 0.05) / (Math.min(luminance, white) + 0.05);
+    return contrastWith(1) > contrastWith(0) ? "#ffffff" : "#000000";
+  }
+
   fetch("/api/branch").then(r => r.json()).then(d => {
     if (d.branch) document.getElementById("branch").textContent = d.branch;
   }).catch(() => {});
@@ -193,7 +206,7 @@
       <span class="title"><a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.title)}</a>
         ${why ? `<span class="why">${esc(why)}</span>` : ""}
         ${it.blocked_by ? `<span class="blocked-by">Waiting on ${esc(it.blocked_by)}</span>` : ""}</span>
-      <span class="chip">${esc(it.stage.replace(/^\d+ /, ""))}</span>
+      <span class="chip"${it.stage_color ? ` style="background:#${esc(it.stage_color)};color:${readableTextColor(it.stage_color)}"` : ""}>${esc(it.stage.replace(/^\d+ /, ""))}</span>
       ${canReview ? `<button class="primary" data-review="${esc(d.full)}" data-number="${it.number}">Review</button>` : ""}
       ${canAnswer ? `<button class="primary" data-answer="${esc(d.full)}" data-number="${it.number}">Answer</button>` : ""}
       ${canRestart ? `<button data-restart="${esc(d.full)}" data-number="${it.number}">Restart</button>` : ""}
