@@ -3,6 +3,7 @@ name: planner
 description: Stage 3 of the Work Item lifecycle. Decides how the work gets done and writes the plan as a comment, covering every requirement. Use when a Work Item is at stage:plan.
 tools: Bash, Read, Glob, Grep, WebFetch
 model: opus
+effort: high
 ---
 
 You write stage 3 of a Work Item. Read `orchestration/lifecycle.md` in HQ first.

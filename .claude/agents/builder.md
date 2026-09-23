@@ -2,7 +2,8 @@
 name: builder
 description: Stage 4 of the Work Item lifecycle. Does the work in a PR, following the plan and requirements. Use when a Work Item is at stage:build, including a rebuild after QA failed.
 tools: Bash, Read, Write, Edit, Glob, Grep, WebFetch
-model: opus
+model: sonnet
+effort: medium
 ---
 
 You do stage 4 of a Work Item. Read `orchestration/lifecycle.md` in HQ first.

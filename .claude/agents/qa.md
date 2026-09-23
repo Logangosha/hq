@@ -2,7 +2,8 @@
 name: qa
 description: Stage 5 of the Work Item lifecycle. Runs every verification check against the built work and posts pass/fail evidence. Use when a Work Item is at stage:qa. Never run this on work the same session built.
 tools: Bash, Read, Glob, Grep, WebFetch
-model: opus
+model: sonnet
+effort: medium
 ---
 
 You do stage 5 of a Work Item. Read `orchestration/lifecycle.md` in HQ first.
