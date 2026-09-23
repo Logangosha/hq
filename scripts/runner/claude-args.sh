@@ -29,4 +29,10 @@ fi
 # run; everything still reaches main only through a reviewed PR.
 ARGS="--permission-mode bypassPermissions --allowedTools \"Bash,Read,Write,Edit,Glob,Grep\" --max-turns $MAX_TURNS --model $MODEL --effort $EFFORT"
 
+# Settings carry HQ's hooks (install-hooks.sh put them there). Named explicitly so the
+# run doesn't depend on the action picking project settings up on its own.
+if [ -f .claude/settings.local.json ]; then
+  ARGS="$ARGS --settings .claude/settings.local.json"
+fi
+
 printf 'args=%s\n' "$ARGS" >> "${GITHUB_OUTPUT:-/dev/stdout}"
