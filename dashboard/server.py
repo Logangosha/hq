@@ -244,7 +244,6 @@ def domain_comments(full):
 
 
 HQ_RUN_RE = re.compile(r"<!-- hq-run (\{.*?\}) -->")
-RUN_FIELDS = ("turns", "input_tokens", "output_tokens", "cache_tokens", "cost")
 
 
 def _hq_runs(comments):
@@ -285,8 +284,9 @@ def _cost_summary(runs):
 def _stage_breakdown(runs):
     """One row per stage that has at least one hq-run comment (R4), in the order each
     stage first appears (`runs` is already chronological). A stage with more than one
-    run (R5) sums turns/tokens/cost across them and takes model/effort from the
-    latest-created_at run."""
+    run (R5) sums turns/tokens/cost across them and takes model from the latest-created_at
+    run. Signal only, per the user's stage-6 rejection: agent, model, turns, total tokens
+    and cost — no effort, no input/output/cache split."""
     order, by_stage = [], {}
     for r in runs:
         stage = STAGE_NAMES.get(f"stage:{r.get('stage')}", r.get("stage") or "unknown")
@@ -298,11 +298,16 @@ def _stage_breakdown(runs):
     for stage in order:
         group = by_stage[stage]
         latest = max(group, key=lambda r: r["created_at"])
-        row = {"stage": stage, "model": latest.get("model") or "unknown",
-               "effort": latest.get("effort") or "unknown"}
-        for f in RUN_FIELDS:
-            vals = [v for v in (_num(r.get(f)) for r in group) if v is not None]
-            row[f] = sum(vals) if vals else "unknown"
+        row = {"stage": stage, "agent": STAGE_AGENT.get(stage, "unknown").title(),
+               "model": latest.get("model") or "unknown"}
+        turns = [v for v in (_num(r.get("turns")) for r in group) if v is not None]
+        row["turns"] = sum(turns) if turns else "unknown"
+        token_fields = ("input_tokens", "output_tokens", "cache_tokens")
+        token_vals = [_num(r.get(f)) for r in group for f in token_fields]
+        token_vals = [v for v in token_vals if v is not None]
+        row["tokens"] = sum(token_vals) if token_vals else "unknown"
+        costs = [v for v in (_num(r.get("cost")) for r in group) if v is not None]
+        row["cost"] = sum(costs) if costs else "unknown"
         rows.append(row)
     return rows
 
