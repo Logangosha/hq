@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Three strikes (F7.9). The agents are told to stop by themselves; this is the backstop
 # in case one doesn't. A stage comment is headed "## 1. Requirements — requirements",
-# so counting the agent's name in the headings counts its runs. Only runs since the
+# so counting the agent's name in the headings counts its runs. Only the heading line
+# counts: a comment's body may quote another stage's heading (hq#78 did, and got
+# parked before QA ever ran). Only runs since the
 # user's last review decision count: changing your mind twice is normal, and the agents
 # shouldn't read it as a loop they're stuck in.
 #
@@ -23,7 +25,7 @@ RUNS=$(gh issue view "$NUM" --repo "$GITHUB_REPOSITORY" --json comments \
          --jq "[.comments[].body] as \$b
                | (\$b | map(startswith(\"## 6. Review — user\")) | rindex(true)) as \$i
                | (if \$i == null then \$b else \$b[\$i + 1:] end)
-               | [.[] | select(startswith(\"## \") and contains(\"— $NAME\"))] | length")
+               | [.[] | split(\"\n\")[0] | select(startswith(\"## \") and contains(\"— $NAME\"))] | length")
 echo "$NAME has run $RUNS time(s) on #$NUM"
 
 if [ "$RUNS" -ge 3 ]; then
