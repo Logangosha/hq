@@ -35,7 +35,7 @@ Brief, not clipped. Full sentences are fine; padding is not.
 | What | Where |
 |---|---|
 | Big picture | `README.md` |
-| Build roadmap (check off steps as they finish) | `features.md` |
+| Build roadmap (check off steps as they finish) | `features.md` — v1 in `archive/features-v1.md` |
 | Lifecycle rules | `orchestration/lifecycle.md` |
 | Domain repos (where work goes) | `scripts/list-domains.sh` — why nothing is listed: `registry/domains.md` |
 | Which repo a request goes to | `registry/routing.md` |

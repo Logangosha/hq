@@ -1,122 +1,88 @@
-# Features Roadmap
+# Features Roadmap — v2
 
 We build one small step at a time. Each feature ends with a **user check** before moving on.
 
-The flow we're building toward: **you say it** (F5) → **it becomes an Issue** (F5) →
-**GitHub runs it** (F7) → **you're alerted and review** (F8). You appear only at the
-first and last step.
+v1 (F1–F8: HQ, Work Items, the GitHub runner, the review dashboard) is in
+`archive/features-v1.md`. Its open items are carried below with their IDs kept.
 
-From your phone or computer:
-1. `new-work-item` — say what you want and in which repo. It becomes an Issue.
-2. The agents run the chain on GitHub and stop at `stage:review`.
-3. You get a notification.
-4. Open the review dashboard (or `work-items`) and pick the item.
-5. Click **Review**. Claude checks out the branch locally and shows you the changes and the app.
-6. Leave a comment, then **Approve** (merge and close) or **Reject** (back to the agents with your comment).
-
-Each section lists what's **done** (one line each, IDs kept), then what's **next**, in the
-order it should happen.
+Where v2 is heading:
+- **Goals** — say something big; HQ breaks it into Work Items, runs them in order, and
+  tells you when the whole thing is done.
+- **Agents** — set up agents for other kinds of work (email, personal finance, research)
+  that run on a schedule or on request, not only through the build lifecycle.
 
 ---
 
-## Done so far ✅
+## Carried over from v1
 
-- **F1 HQ home base** — README, CLAUDE.md, lifecycle, domain registry, private repo.
-- **F2 Work Item format** — goal-only Issue body, stage labels, `create-labels.sh`, `hq-test-sandbox`.
-- **F3 Test run by hand** — one sandbox Work Item taken through every stage to a merge.
-- **F4 Reusable agents** — one agent per stage in `.claude/agents/`; generic ones live in HQ.
-
-## F5: HQ creates work from plain English
-*Goal: the user says what they want, and HQ creates the Issue in the right place.*
-
-Done: **F5.1** `create-work-item.sh` · **F5.2** routing rules (`registry/routing.md`) ·
-**F5.3** `new-work-item` skill · **F5.4–F5.5** three plain requests became Issues
-*(the user always names the repo, so there's no unnamed-repo test)*.
-
-- [ ] ✅ User check: did each request land in the right repo, with a goal you recognise?
-
-## F6: Setup for a new user
-*Goal: anyone can copy HQ onto a fresh computer and get a Work Item running. Nothing personal is hardcoded.*
-
-Done: **F6.1** HQ is a template repo · **F6.2** `check-setup.sh` · **F6.3** `setup-hq`
-skill (owner, domains, repos, workflow, app, token, test Work Item) · **F6.4** README
-"How to use".
-
-- [ ] F6.5 Test it from a fresh copy of HQ, on a different account
-- [ ] ✅ User check: run the setup yourself. Was it easy?
-
-## F7: GitHub runs it
-*Goal: create an Issue, walk away, and the work happens.*
-
-**The trigger is the `stage:` label, not an @-mention.** The label is already the source of
-truth for where the work is, so using it as the trigger means state and trigger can never
-disagree. An agent that forgets to @ the next one would stall silently with a correct label.
-
-Done: **F7.1** HQ is public, so a domain's Action fetches HQ's agents at run time (no
-token) · **F7.2** Claude GitHub App installed · **F7.3** `CLAUDE_CODE_OAUTH_TOKEN` per
-repo · **F7.4** `work-item.yml` fires on a `stage:` label and runs that stage's agent
-(`enable-agents.sh` installs it) · **F7.5** a repo's own `.claude/agents/` wins, HQ's is
-the fallback · **F7.6** requirements agent ran from a label · **F7.7** the chain runs
-itself (sandbox #13, requirements → review unattended; needs `allowed_bots: "claude"`) ·
-**F7.9** stop and wait when the user is needed (`waiting:*`), or when a stage is reached
-3 times.
-
+- [ ] F5 ✅ User check: did each request land in the right repo, with a goal you recognise?
+- [ ] F6.5 Test setup from a fresh copy of HQ, on a different account
+- [ ] F6 ✅ User check: run the setup yourself. Was it easy?
 - [ ] F7.10 Let the agents look things up: allow `WebSearch` and `WebFetch` in the runner
-      (today only Bash `curl` reaches the network, so they work from memory). Fixes the
-      mismatch where `builder.md` claims WebFetch but the runner doesn't allow it
-- [ ] F7.8 A bounce works: an agent sets the label *backwards* and the right agent picks it
-      up *(deferred — test issues #15, #19 in the sandbox)*
-- [ ] ✅ User check: create an Issue from your phone and watch it move
+- [ ] F7.8 A bounce works: an agent sets the label *backwards* and the right agent picks
+      it up *(test issues #15, #19 in the sandbox)*
+- [ ] F7 ✅ User check: create an Issue from your phone and watch it move
+- [ ] F8.9 The dashboard refreshes itself *(in flight — hq#26)*
+- [ ] F8.2 `work-items` flags what needs you (`stage:review`, `waiting:user`)
+- [ ] F8.7 "How's X going?" — a one-line status per item on the dashboard
+- [ ] F8 ✅ User check: notification → dashboard → review → decision, without touching git
+- [ ] F4.8–F4.9 Workflows that write themselves, from recorded `Decisions` *(waits for a
+      real backlog)*
 
-## F8: You're alerted, and you review
-*Goal: know when something needs you, without going looking.*
+## F9: Goals — big requests become connected Work Items
+*Goal: say something big once; HQ splits it, runs the parts in order, and closes it when
+every part is done.*
 
-Done: **F8.1** reaching `stage:review` assigns the Issue and notifies you *(email arrives;
-phone push not received)* · **F8.3** `/review <repo>#<n>` in chat *(built, never used — the
-dashboard replaced it. Keep for chat-only use, or retire it)* · **F8.4** review dashboard
-listing every Work Item that needs you, across all domains · **F8.5** **Review** button:
-checkout, the app, and the PR's code changes · **F8.6** **Approve** / **Reject** with a
-comment *(Reject proven on hq#21, Approve by merging PR #20)* · **F8.8** **Answer** button
-restarts a stopped Work Item · **F8.10** **Drop it** (`drop-work-item.sh`, `--erase`) ·
-**F8.11** HQ Work Items are reviewed in a separate copy under `.hq-reviews/`, so a review
-can't move the work you're doing in HQ *(proven on hq#23)*.
+A **Goal** is a parent Issue (`type:goal`). Its parts are ordinary Work Items, linked as
+GitHub sub-issues. A part that must wait for another carries `waiting:work`.
+*Judgment call: a Goal lives in its domain repo, or in HQ when it spans repos.*
 
-- [ ] F8.9 The dashboard refreshes itself: every 30s normally, every 5s while an agent is
-      working on something. Holds still while you're mid-review or mid-answer
-      *(in flight — hq#26)*
-- [ ] F8.2 `work-items` flags what needs you — `stage:review` and `waiting:user` — so you
-      can find an item without its number
-- [ ] F8.7 "How's X going?" — a one-line status for each item on the dashboard
-- [ ] ✅ User check: take one Work Item from notification → dashboard → review → decision
-      without touching git. Was it clean?
+- [ ] F9.1 Goal format: `type:goal` label, body = outcome + parts table (part, repo,
+      depends on). Add parent/child rules to `orchestration/lifecycle.md`
+- [ ] F9.2 `new-goal` skill: plain request → proposed breakdown → you approve the list →
+      Goal and parts are created, linked, and ordered
+- [ ] F9.3 Planner can say "too big": it proposes a breakdown on the Issue instead of a
+      plan, and the item becomes a Goal once you approve
+- [ ] F9.4 Unblock: when a part reaches Done, remove `waiting:work` from parts whose
+      blockers are all closed (runner script, not the workflow)
+- [ ] F9.5 A Goal closes only when every part is closed; then it goes to you for a
+      final review of the whole
+- [ ] F9.6 Cross-repo parts: decide how a run opens Issues in another repo (GitHub App
+      token vs. a secret per repo) and weigh what a wrong agent could then reach
+- [ ] F9.7 Dashboard shows each Goal with its parts and progress (e.g. 2 of 5 done)
+- [ ] F9.8 Test with a 3-part sandbox Goal, one part waiting on another
+- [ ] ✅ User check: are the parts and their order clear? Did it finish without you
+      pushing it along?
 
-## F4 (deferred): workflows that write themselves
+## F10: Agents — set up agents and workflows for any kind of work
+*Goal: say "I want an email agent" or "a personal finance agent", and HQ sets one up in
+its own domain repo — safely, and reporting back to you.*
 
-Needs several similar Work Items to generalise from. Revisit once there's a real backlog.
+Two kinds of agent:
+- **Lifecycle agents** — work through Work Items (today's builder, QA, etc.).
+- **Standing agents** — run on a schedule or trigger (e.g. triage email each morning,
+  summarise spending each month) and report to you.
 
-- [ ] F4.8 After a few similar Work Items, Claude reads the recorded `Decisions` and offers
-      a short overlay (about 15 lines) for the user to approve
-- [ ] F4.9 Store approved overlays in `orchestration/workflows/` and use them automatically
-- [ ] ✅ User check: read a proposed workflow. Is it 5 lines you agree with?
+Project-specific agents live in their domain repo, never in HQ. HQ holds only the
+generic parts: the format, the setup skill, and the runner.
 
-## F9: Big goals become smaller Work Items
-*Goal: a big request becomes a set of connected Work Items.*
-
-- [ ] F9.1 Add parent/child rules to the lifecycle
-- [ ] F9.2 Add a "break it down" step to Plan
-- [ ] F9.3 When a child finishes, start work that was waiting on it
-- [ ] F9.4 A parent is done only when all its children are done
-- [ ] F9.5 Cross-repo Work Items: the run's token is scoped to its own repo, so an agent
-      can't open an Issue elsewhere. Decide how (GitHub App token vs. a secret per repo)
-      and weigh it — it widens what a wrong agent can reach
-- [ ] F9.6 Test with a small 3-part sandbox project
-- [ ] ✅ User check: are the parts and their order clear?
-
-## F10: More workflows
-*Goal: the system handles more kinds of work.*
-
-- [ ] F10.1 `software-feature` workflow
-- [ ] F10.2 `research` workflow
-- [ ] F10.3 `bug-fix` workflow
-- [ ] F10.4 Add real domains, once the system is proven
-- [ ] ✅ User check: try one real task with each workflow
+- [ ] F10.1 Agent format: one file per agent = job, trigger (schedule / label / request),
+      tools and data it may use, what it may **never** do alone, and where it reports
+- [ ] F10.2 Safety defaults: read-only first; anything outward (send, pay, delete) is a
+      draft that waits for you (`waiting:user`). Secrets only in GitHub secrets
+- [ ] F10.3 Standing-agent runner: a scheduled workflow stub (installed like
+      `work-item.yml`), logic in `scripts/runner/`
+- [ ] F10.4 Reports: each run posts a short digest to a pinned Issue in its domain; items
+      that need you appear on the dashboard
+- [ ] F10.5 `new-agent` skill: plain request → agent file + trigger + secrets checklist,
+      delivered as a Work Item in the domain repo so it goes through QA and your review
+- [ ] F10.6 Connecting data: how an agent reaches Gmail, a bank export, etc. Pick one
+      approach per source; least access that works
+- [ ] F10.7 First real agent — **email**: morning triage, labels and a digest, replies
+      drafted not sent. Try on a test inbox first
+- [ ] F10.8 Second real agent — **personal finance**: monthly spending summary from an
+      export, read-only
+- [ ] F10.9 Lifecycle workflows for more kinds of Work Item: `software-feature`,
+      `research`, `bug-fix`
+- [ ] ✅ User check: set up an agent by asking for it. Did it do its job without doing
+      anything you didn't approve?
