@@ -512,6 +512,44 @@ def resume(full, number, comment):
     return {"message": f"Answer posted — restarted at {info['stage'].split(':')[1]}."}
 
 
+def stop(full, number):
+    """Park a Work Item before its next stage starts (R2): the runner's `waiting:` guard
+    then skips it. Leaves the `stage:` label untouched (R3), so resume_stopped() knows
+    where to pick back up."""
+    labels = [l["name"] for l in json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
+                                                  "--json", "labels"]).stdout)["labels"]]
+    if not any(l.startswith("stage:") for l in labels):
+        raise UserError("No running stage to stop — open the Issue to see what's going on.")
+    if any(l.startswith("waiting:") for l in labels):
+        raise UserError("Already waiting — nothing to stop.")
+    run(["gh", "issue", "comment", str(number), "--repo", full, "--body", "Stopped by the user."])
+    run(["gh", "issue", "edit", str(number), "--repo", full, "--add-label", "waiting:stopped"])
+    ghcache.invalidate(f"repos/{full}/issues?state=open&per_page=100")
+    return {"message": "Stopped — parked before its next stage."}
+
+
+def resume_stopped(full, number, reason):
+    """Restart a user-stopped Work Item at the stage it was parked on (R6) — same
+    remove/re-add idiom as resume()/restart(), which is what fires the runner's `labeled`
+    webhook."""
+    reason = reason.strip()
+    if not reason:
+        raise UserError("Say why you're resuming it, so the agents know what to change.")
+    labels = [l["name"] for l in json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
+                                                  "--json", "labels"]).stdout)["labels"]
+              if l["name"].startswith("stage:")]
+    if not labels:
+        raise UserError("No stage to resume — open the Issue to see what's going on.")
+    stage = labels[0]
+    run(["gh", "issue", "comment", str(number), "--repo", full,
+         "--body", f"## Resume — user\n\n{reason}"])
+    run(["gh", "issue", "edit", str(number), "--repo", full,
+         "--remove-label", stage, "--remove-label", "waiting:stopped"])
+    run(["gh", "issue", "edit", str(number), "--repo", full, "--add-label", stage])
+    ghcache.invalidate(f"repos/{full}/issues?state=open&per_page=100")
+    return {"message": f"Resumed at {stage.split(':')[1]}."}
+
+
 def restart(full, number, reason, target=None):
     """Retry a stalled Work Item, at its current stage or an earlier one — same idiom as
     resume(): remove then re-add the stage: label, which is what starts the agent."""
@@ -636,6 +674,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200, stopped(full, number))
             elif self.path == "/api/resume":
                 self.send(200, resume(full, number, body.get("comment", "")))
+            elif self.path == "/api/stop":
+                self.send(200, stop(full, number))
+            elif self.path == "/api/resume-stopped":
+                self.send(200, resume_stopped(full, number, body.get("reason", "")))
             elif self.path == "/api/restart":
                 self.send(200, restart(full, number, body.get("reason", ""), body.get("stage")))
             elif self.path == "/api/review/decide":

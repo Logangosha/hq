@@ -195,11 +195,12 @@
   function card(d, it, showWhy) {
     const canReview = it.stage.startsWith("6 ");
     const canAnswer = it.waiting.includes("waiting:user");
-    const canRestart = it.stalled && !canAnswer;
+    const canStop = it.stage_color && !canReview && it.waiting.length === 0;
+    const canResume = it.waiting.includes("waiting:stopped");
     const why = !showWhy ? "" :
       canAnswer ? "An agent stopped and needs your answer"
       : canReview ? "Ready for your review"
-      : canRestart ? it.stall_reason
+      : it.stalled ? it.stall_reason
       : "";
     return `<div class="card">
       <span class="ref">${esc(d.repo)}#${it.number}</span>
@@ -209,7 +210,9 @@
       <span class="chip"${it.stage_color ? ` style="background:#${esc(it.stage_color)};color:${readableTextColor(it.stage_color)}"` : ""}>${esc(it.stage.replace(/^\d+ /, ""))}</span>
       ${canReview ? `<button class="primary" data-review="${esc(d.full)}" data-number="${it.number}">Review</button>` : ""}
       ${canAnswer ? `<button class="primary" data-answer="${esc(d.full)}" data-number="${it.number}">Answer</button>` : ""}
-      ${canRestart ? `<button data-restart="${esc(d.full)}" data-number="${it.number}">Restart</button>` : ""}
+      ${canStop ? `<button data-stop="${esc(d.full)}" data-number="${it.number}">Stop</button>` : ""}
+      ${canResume ? `<button data-resume="${esc(d.full)}" data-number="${it.number}">Resume</button>` : ""}
+      <button data-restart="${esc(d.full)}" data-number="${it.number}">Restart</button>
     </div>`;
   }
 
@@ -229,7 +232,8 @@
   function nextDelay() {
     const items = domains.flatMap(d => d.items);
     const agentWorking = items.some(i =>
-      !i.stage.startsWith("6 ") && !i.waiting.includes("waiting:user") && !i.waiting.includes("waiting:work"));
+      !i.stage.startsWith("6 ") && !i.waiting.includes("waiting:user") && !i.waiting.includes("waiting:work")
+      && !i.waiting.includes("waiting:stopped"));
     return agentWorking ? 5000 : 30000;
   }
 
@@ -533,6 +537,54 @@
     document.getElementById("close").addEventListener("click", closeReview);
   }
 
+  // ---- Stop / Resume (user-parked, distinct from Stopped's agent-parked Answer) ----
+
+  function openStop(repo, number) {
+    current = { repo, number };
+    const d = domains.find(d => d.full === repo);
+    const it = d && d.items.find(i => i.number === number);
+    content.innerHTML = `
+      <button class="back" id="close">← Back</button>
+      <h1 class="review-title">${esc(it ? it.title : `${repo}#${number}`)}</h1>
+      <div class="meta">
+        <span>${esc(repo.split("/").pop())}#${number}</span>
+        ${it ? `<a href="${esc(it.url)}" target="_blank" rel="noopener">Open the Issue</a>` : ""}
+      </div>
+      <div class="decide">
+        <div class="row">
+          <span class="hint" id="hint">Parks it before its next stage starts. Resume later to pick back up.</span>
+          <button class="approve" id="go">Stop</button>
+        </div>
+      </div>`;
+    armed(document.getElementById("go"), "Click again to stop", () => send("/api/stop", {}));
+    document.getElementById("close").addEventListener("click", closeReview);
+  }
+
+  function openResumeStopped(repo, number) {
+    current = { repo, number };
+    const d = domains.find(d => d.full === repo);
+    const it = d && d.items.find(i => i.number === number);
+    content.innerHTML = `
+      <button class="back" id="close">← Back</button>
+      <h1 class="review-title">${esc(it ? it.title : `${repo}#${number}`)}</h1>
+      <div class="meta">
+        <span>${esc(repo.split("/").pop())}#${number}</span>
+        ${it ? `<a href="${esc(it.url)}" target="_blank" rel="noopener">Open the Issue</a>` : ""}
+      </div>
+      <div class="decide">
+        <textarea id="reason" placeholder="Why are you resuming it?"></textarea>
+        <div class="row">
+          <span class="hint" id="hint"></span>
+          <button class="approve" id="go" disabled>Resume</button>
+        </div>
+      </div>`;
+    const reason = document.getElementById("reason");
+    const go = document.getElementById("go");
+    reason.addEventListener("input", () => { go.disabled = !reason.value.trim(); });
+    armed(go, "Click again to resume", () => send("/api/resume-stopped", { reason: reason.value }));
+    document.getElementById("close").addEventListener("click", closeReview);
+  }
+
   content.addEventListener("click", e => {
     const b = e.target.closest("[data-review]");
     if (b) return openReview(b.dataset.review, Number(b.dataset.number));
@@ -540,6 +592,10 @@
     if (a) return openStopped(a.dataset.answer, Number(a.dataset.number));
     const r = e.target.closest("[data-restart]");
     if (r) return openRestart(r.dataset.restart, Number(r.dataset.number));
+    const s = e.target.closest("[data-stop]");
+    if (s) return openStop(s.dataset.stop, Number(s.dataset.number));
+    const rs = e.target.closest("[data-resume]");
+    if (rs) return openResumeStopped(rs.dataset.resume, Number(rs.dataset.number));
   });
   refresh.addEventListener("click", () => load());
   resetIdleTimer();

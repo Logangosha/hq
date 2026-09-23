@@ -19,6 +19,7 @@ LABELS=(
   "stage:review|D93F0B|Waiting for the user to look at it"
   "waiting:user|E99695|A question or decision is needed"
   "waiting:work|F9D0C4|Another Work Item must finish first"
+  "waiting:stopped|C5DEF5|Paused by the user, not the agents"
 )
 
 for entry in "${LABELS[@]}"; do
