@@ -586,15 +586,22 @@ def restart(full, number, reason, target=None):
         raise UserError("Say why you're restarting it, so the agents know what to change.")
     if target is not None and target not in RESTART_STAGES:
         raise UserError(f"'{target}' isn't a stage you can restart at.")
-    labels = [l["name"] for l in json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
-                                                  "--json", "labels"]).stdout)["labels"]
-              if l["name"].startswith("stage:")]
+    all_labels = [l["name"] for l in json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
+                                                      "--json", "labels"]).stdout)["labels"]]
+    labels = [l for l in all_labels if l.startswith("stage:")]
     if not labels:
         raise UserError("No stage to restart — open the Issue to see what's going on.")
     stage = labels[0]
+    # A parked Work Item (stalled, or stopped by the user) keeps its waiting: label, and
+    # the runner skips anything with one — so Restart has to clear it or nothing runs.
+    # waiting:work stays: that one means a blocker hasn't merged yet.
+    unpark = [l for l in all_labels if l in ("waiting:user", "waiting:stopped")]
     run(["gh", "issue", "comment", str(number), "--repo", full, "--body", reason])
     new_stage = f"stage:{target}" if target else stage
-    run(["gh", "issue", "edit", str(number), "--repo", full, "--remove-label", stage])
+    edit = ["gh", "issue", "edit", str(number), "--repo", full, "--remove-label", stage]
+    for l in unpark:
+        edit += ["--remove-label", l]
+    run(edit)
     run(["gh", "issue", "edit", str(number), "--repo", full, "--add-label", new_stage])
     return {"message": f"Restarted at {new_stage.split(':')[1]}."}
 
