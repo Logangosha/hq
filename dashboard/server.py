@@ -261,9 +261,11 @@ def work_items():
             for issue in issues:
                 if "pull_request" in issue:
                     continue
-                labels = [l["name"] for l in issue["labels"]]
-                stage_label = next((l for l in labels if l.startswith("stage:")), None)
+                label_objs = issue["labels"]
+                labels = [l["name"] for l in label_objs]
+                stage_label_obj = next((l for l in label_objs if l["name"].startswith("stage:")), None)
                 waiting = [l for l in labels if l.startswith("waiting:")]
+                stage_label = stage_label_obj["name"] if stage_label_obj else None
                 stage = STAGE_NAMES.get(stage_label, "")
                 if not stage and not waiting:
                     continue  # no stage and nothing to do -> not a Work Item view needs
@@ -271,6 +273,7 @@ def work_items():
                     stage = "0 Blocked" if "waiting:work" in waiting else "0 Stopped"
                 items.append({
                     "number": issue["number"], "title": issue["title"], "stage": stage,
+                    "stage_color": stage_label_obj["color"] if stage in STAGE_NAMES.values() else None,
                     "url": issue["html_url"], "waiting": waiting, "blocked_by": None,
                     "created_at": issue["created_at"], "stalled": False, "stall_reason": None,
                     "needs_you": stage.startswith("6 ") or "waiting:user" in waiting,
