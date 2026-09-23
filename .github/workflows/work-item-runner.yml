@@ -87,6 +87,13 @@ jobs:
           REPO: ${{ github.repository }}
         run: bash .hq/scripts/runner/prompt.sh
 
+      - name: The agent's flags
+        id: flags
+        env:
+          NAME: ${{ steps.agent.outputs.name }}
+          MAX_TURNS: ${{ steps.agent.outputs.max_turns }}
+        run: bash .hq/scripts/runner/claude-args.sh
+
       - uses: anthropics/claude-code-action@v1
         id: run_agent
         env:
@@ -96,10 +103,8 @@ jobs:
           # Each stage is started by the previous stage's label change, which the
           # claude bot makes. Without this the chain stops after stage 1.
           allowed_bots: "claude"
-          # bypassPermissions: no one is here to approve prompts, and without it writes
-          # to .claude/ (skills, agents) are always refused. The runner is thrown away
-          # after the run; everything still reaches main only through a reviewed PR.
-          claude_args: '--permission-mode bypassPermissions --allowedTools "Bash,Read,Write,Edit,Glob,Grep" --max-turns ${{ steps.agent.outputs.max_turns }}'
+          # Flags (permissions, turns, model, effort) come from claude-args.sh.
+          claude_args: ${{ steps.flags.outputs.args }}
           prompt: ${{ steps.prompt.outputs.text }}
 
       - name: Report a failed agent step
@@ -110,3 +115,15 @@ jobs:
           NAME: ${{ steps.agent.outputs.name }}
           LABEL: ${{ github.event.label.name }}
         run: bash .hq/scripts/runner/report-failure.sh
+
+      - name: After the run
+        if: always() && steps.run_agent.outcome != 'skipped'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NUM: ${{ github.event.issue.number }}
+          NAME: ${{ steps.agent.outputs.name }}
+          LABEL: ${{ github.event.label.name }}
+          OUTCOME: ${{ steps.run_agent.outcome }}
+          EXECUTION_FILE: ${{ steps.run_agent.outputs.execution_file }}
+        run: bash .hq/scripts/runner/after-run.sh
