@@ -26,7 +26,7 @@ Solid arrows are the normal path. Dotted arrows are bounces — see "Bouncing ba
 | 2 | **Verification** | Verification agent | Check the requirements, then write one or more checks for each | Every requirement has at least one check (V1, V2, ...) |
 | 3 | **Plan** | Planner agent | Check stages 1–2, then decide how to do the work | Every requirement is covered by the plan |
 | 4 | **Build** | Builder agent | Check the plan, then do the work in a PR | PR open, saying `Closes #<n>` |
-| 5 | **QA** | QA agent (not the builder) | Run every check and record the evidence | Every check has passed |
+| 5 | **QA** | QA agent (not the builder) | Run every check and record the evidence | Every `QA` check has passed, and the pre-merge part of every `after merge` check |
 | 6 | **Human review** | The user | Look at the result (`/review`) | The user merges or comments |
 | 7 | **Done** | — | The merged PR closes the Issue | — |
 
@@ -113,6 +113,19 @@ success without proof.
 
 The user should be able to read the checklist and answer one question:
 *"If all of these pass, am I happy?"*
+
+### Checks that run after merge
+
+Some checks can only be proven after merge — e.g. a change to the runner only takes effect
+on the next real run from `main`.
+
+- Verification marks every check `QA` (the default) or `after merge`, with a one-line
+  reason for each `after merge`. Most Work Items have none.
+- QA still does and records the pre-merge part: the change is in the diff, the syntax is
+  valid, a local dry run where possible. The unproven rest doesn't fail or stall it. A
+  check marked `after merge` that QA could have run is a bad check: QA fails it.
+- QA ends its comment with a `### After merge` list: what to do, what counts as a fail.
+- The user proves those checks after merging. Review shows them the list.
 
 ## How the Issue is written
 

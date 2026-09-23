@@ -376,6 +376,7 @@
       </div>
       <div class="panel">${appPanel(r)}</div>
       ${warn}
+      ${r.after_merge ? `<h2>After merge — check these</h2><div class="panel"><pre>${esc(r.after_merge)}</pre></div>` : ""}
       ${r.qa ? `<h2>QA</h2><div class="panel"><pre>${esc(r.qa)}</pre></div>` : ""}
       <h2>Code changes</h2>
       ${renderDiff(r.diff)}
