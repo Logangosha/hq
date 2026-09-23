@@ -512,6 +512,17 @@ def resume(full, number, comment):
     return {"message": f"Answer posted — restarted at {info['stage'].split(':')[1]}."}
 
 
+def ensure_label(full, name, color, description):
+    """Same idiom as scripts/create-work-item.sh's ensure_label(): create the label in the
+    target repo if it isn't already there. Needed here (R12) because a repo can be an
+    existing domain whose labels were created before this one existed."""
+    found = run(["gh", "label", "list", "--repo", full, "--search", name,
+                 "--json", "name", "--jq", ".[].name"], check=False).stdout.split("\n")
+    if name not in found:
+        run(["gh", "label", "create", name, "--repo", full, "--color", color,
+             "--description", description, "--force"])
+
+
 def stop(full, number):
     """Park a Work Item before its next stage starts (R2): the runner's `waiting:` guard
     then skips it. Leaves the `stage:` label untouched (R3), so resume_stopped() knows
@@ -522,6 +533,7 @@ def stop(full, number):
         raise UserError("No running stage to stop — open the Issue to see what's going on.")
     if any(l.startswith("waiting:") for l in labels):
         raise UserError("Already waiting — nothing to stop.")
+    ensure_label(full, "waiting:stopped", "C5DEF5", "Paused by the user, not the agents")
     run(["gh", "issue", "comment", str(number), "--repo", full, "--body", "Stopped by the user."])
     run(["gh", "issue", "edit", str(number), "--repo", full, "--add-label", "waiting:stopped"])
     ghcache.invalidate(f"repos/{full}/issues?state=open&per_page=100")
