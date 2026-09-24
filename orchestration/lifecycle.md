@@ -30,6 +30,29 @@ Solid arrows are the normal path. Dotted arrows are bounces — see "Bouncing ba
 | 6 | **Human review** | The user | Look at the result (`/review`) | The user merges or comments |
 | 7 | **Done** | — | The merged PR closes the Issue | — |
 
+## Small Work Items
+
+A Work Item labelled `size:small` skips Verification and QA and runs **Scope → Build →
+Human review** instead:
+
+1. **Scope** (`scope.md`, Sonnet): writes numbered requirements and the plan for them in
+   **one** Issue comment, headed `## 1. Scope — scope ✅` (a re-run: `## 1b. Scope
+   (re-run) — scope ✅`), then sets `stage:build`.
+2. **Build**: the same `builder.md`. Exception to "Builder and QA are separate" (core rule
+   4): on a small item the builder posts evidence for each requirement in its stage
+   comment, and the user's review at stage 6 replaces QA.
+3. **Human review**: unchanged.
+
+**What makes an item small:** a quick fix or simple change, 1–3 files in one repo, an
+obvious fix. Anything touching agents, skills, the runner, secrets or real data is always
+normal. When unsure, it's normal.
+
+If Scope finds the item isn't small, it removes `size:small`, says why, and sets
+`stage:requirements` instead.
+
+Bounces on a small item: Build → Scope (instead of Plan or Requirements), User → Scope
+(instead of Requirements).
+
 ## Bouncing back
 
 No agent checks its own output. Each stage is the first fresh look at the one before it,
@@ -51,6 +74,9 @@ comments above it. There is no separate "needs rework" state.
 | 5 QA | 2 Verification | A check is wrong or can't be run as written |
 | 5 QA | 1 Requirements | Every check passes but the goal plainly isn't met |
 | 6 User | 1 Requirements | The user comments instead of merging |
+| 4 Build (small) | Scope | Same reasons, on a `size:small` item |
+| 6 User (small) | Scope | Same reason, on a `size:small` item |
+| Scope | 1 Requirements | The item turns out not to be small (see Small Work Items) |
 
 ### Three responses, chosen by cost
 

@@ -24,7 +24,7 @@ Brief, not clipped. Full sentences are fine; padding is not.
 1. **The Issue is the memory.** Don't rely on chat history. Every decision, result, and piece of evidence goes on the Issue.
 2. **Done means proven.** Nothing is done without evidence that each requirement was met.
 3. **Follow the lifecycle** in `orchestration/lifecycle.md`: Requirements → Verification → Plan → Build → QA → Human review → Done.
-4. **Builder and QA are separate.** The agent that builds does not grade its own work.
+4. **Builder and QA are separate.** The agent that builds does not grade its own work — except small Work Items, see `orchestration/lifecycle.md`.
 5. **Human rejection goes back to Requirements**, with the user's comments included.
 6. **Don't make the user choose.** Work out the domain and the approach yourself, then
    state your guess in one line so they can correct it. Never ask them to pick a workflow.

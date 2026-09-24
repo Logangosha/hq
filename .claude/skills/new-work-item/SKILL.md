@@ -45,16 +45,24 @@ goal rather than inventing it — stage 1 will pick it up.
 **Write no requirements, no checks, no plan.** Those are the agents' work and arrive as
 comments. If you catch yourself planning, stop.
 
+## 2b. Small or normal
+
+Judge it yourself against `orchestration/lifecycle.md`'s small criteria: a quick fix or
+simple change, 1–3 files in one repo, an obvious fix. Anything touching agents, skills,
+the runner, secrets or real data is always normal. When unsure, it's normal. **Never ask
+the user to choose** — decide, and state your guess in the reply (step 4).
+
 ## 3. Create it
 
 ```bash
 bash scripts/create-work-item.sh <owner>/<repo> "Title" "Current state" "Desired state"
 ```
 
+Small item: add `--small`. It starts at `stage:scope` instead of `stage:requirements`.
+
 Long or formatted goals: pass `-` as the third argument and pipe the body in.
 
-The script handles the `Work Item:` prefix, the labels and `stage:requirements`. Don't
-add labels by hand.
+The script handles the `Work Item:` prefix and the labels. Don't add labels by hand.
 
 If this request depends on other Work Items finishing first, resolve each to
 `owner/repo#number` the same way you resolve the target repo, and repeat `--blocked-by`
@@ -66,8 +74,8 @@ bash scripts/create-work-item.sh <owner>/<repo> "Title" "Current state" "Desired
 ```
 
 A blocked Work Item starts parked (`waiting:work`, no stage) and only begins Requirements
-once every blocker's PR has merged. If a blocker is closed without merging, it goes to the
-user to decide.
+(or Scope, if small) once every blocker's PR has merged. If a blocker is closed without
+merging, it goes to the user to decide.
 
 ## 4. Reply
 
@@ -75,9 +83,12 @@ One line, then the link. Nothing else — no recap of what you just wrote, they 
 
 > Bakery docs → `bakery-site`. #12
 
-If you guessed the repo, or left a gap in the goal, that goes in the same line:
+If you guessed the repo, sized it small, or left a gap in the goal, that goes in the same
+line:
 
 > Guessing `bakery-site` over `hq` — bakery content, not the system. #12
+
+> Small fix — one file, wording only. #13
 
 ## If they ask for several things
 

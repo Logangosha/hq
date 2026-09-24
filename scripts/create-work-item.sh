@@ -8,6 +8,9 @@
 #
 # --blocked-by can repeat, in any repo: --blocked-by a/b#1 --blocked-by c/d#2.
 #
+# --small marks the Issue size:small and starts it at stage:scope instead of
+# stage:requirements (see orchestration/lifecycle.md, "Small Work Items").
+#
 # The Issue starts at stage:requirements. The label is created if missing.
 # With one or more --blocked-by, it starts at waiting:work instead and runs no
 # stage until every one of those Work Items' PRs has merged (see
@@ -18,6 +21,7 @@ HERE="$(cd "$(dirname "$0")/.." && pwd)"
 source "$HERE/scripts/lib/goal-check.sh"
 
 BLOCKED_BY=()
+SMALL=0
 ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -28,6 +32,10 @@ while [ $# -gt 0 ]; do
       fi
       BLOCKED_BY+=("$2")
       shift 2
+      ;;
+    --small)
+      SMALL=1
+      shift
       ;;
     *)
       ARGS+=("$1")
@@ -131,20 +139,36 @@ ensure_label() {  # name, color, description
     || gh label create "$1" --repo "$REPO" --color "$2" --description "$3" >/dev/null
 }
 
+if [ "$SMALL" -eq 1 ]; then
+  ensure_label "size:small" "C2E0C6" "Small path: Scope, Build, Review"
+fi
+
 if [ "${#BLOCKED_BY[@]}" -gt 0 ]; then
   STAGE="waiting:work"
   ensure_label "$STAGE" "F9D0C4" "Another Work Item must finish first"
+elif [ "$SMALL" -eq 1 ]; then
+  STAGE="stage:scope"
+  ensure_label "$STAGE" "7057FF" "Small item: requirements and plan in one step"
 else
   STAGE="stage:requirements"
   ensure_label "$STAGE" "1D76DB" "Deciding what must be true when done"
 fi
 
 # --- create -----------------------------------------------------------------
-URL="$(gh issue create \
-  --repo "$REPO" \
-  --title "Work Item: $TITLE" \
-  --body "$BODY" \
-  --label "$STAGE")"
+if [ "$SMALL" -eq 1 ]; then
+  URL="$(gh issue create \
+    --repo "$REPO" \
+    --title "Work Item: $TITLE" \
+    --body "$BODY" \
+    --label "$STAGE" \
+    --label "size:small")"
+else
+  URL="$(gh issue create \
+    --repo "$REPO" \
+    --title "Work Item: $TITLE" \
+    --body "$BODY" \
+    --label "$STAGE")"
+fi
 
 if [ "${#BLOCKED_BY[@]}" -gt 0 ]; then
   NUM="${URL##*/}"

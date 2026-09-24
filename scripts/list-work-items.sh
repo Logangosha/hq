@@ -17,6 +17,7 @@ STATUS=$?
 
 stage_name() {
   case "$1" in
+    stage:scope) echo "1 Scope" ;;
     stage:requirements) echo "1 Requirements" ;;
     stage:verification) echo "2 Verification" ;;
     stage:plan) echo "3 Plan" ;;

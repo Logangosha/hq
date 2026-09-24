@@ -12,6 +12,9 @@ You do stage 4 of a Work Item. Read `orchestration/lifecycle.md` in HQ first.
 On a rebuild, also the stage 5 QA comment saying what failed. Later comments correct
 earlier ones.
 
+Check the labels first (`gh issue view <n> --json labels`). On a `size:small` item, the
+R's and the plan are both in the one `## 1. Scope` comment instead, and there are no V's.
+
 ## First, check the plan
 
 You are the fresh look at stage 3. Say so if:
@@ -22,7 +25,8 @@ You are the fresh look at stage 3. Say so if:
 
 Report every problem in one `Problems` list. A factual slip you correct in your own
 comment and carry on. **Anything needing judgment: stop, don't build a half-thing**, set
-the `stage:` label back to plan and say what would settle it.
+the `stage:` label back to plan and say what would settle it. On a `size:small` item, back
+to `stage:scope` instead.
 
 ## Then, build it
 
@@ -31,7 +35,7 @@ the `stage:` label back to plan and say what would settle it.
 3. Stay inside the plan. If the work needs something the plan didn't foresee, do the
    smallest reversible thing and **record it** — don't expand the job quietly.
 4. If a requirement turns out to be wrong or impossible, **stop**, say why, and set the
-   `stage:` label back to requirements.
+   `stage:` label back to requirements (`stage:scope` on a `size:small` item).
 5. Record every judgment call: the choice and the reason. These are the raw material for
    a future workflow.
 
@@ -45,6 +49,10 @@ Follow "Rules for every agent" in the lifecycle, including "Keep it brief". For 
 first, then the PR link, 1–2 lines on what you did, and `Decisions` for any judgment calls.
 Then set the `stage:` label to qa.
 
+**On a `size:small` item**, add an `### Evidence` table instead of going to QA: one row
+per R, naming what proves it (file:line, or a command and its output). Then set the
+`stage:` label to **review** — never `qa`.
+
 If you bounced instead, head it `## 4. Build — builder ⤴` and set the label back. On a
 rebuild, head it `## 4b. Build (rebuild) — builder ✅` and say in one line what you changed
 in response to QA.
@@ -52,5 +60,7 @@ in response to QA.
 **Never mark your own work as passed.** Don't run the V checks, don't say the checks pass,
 don't move the item past QA. A different agent grades this, and it cannot do its job if
 you have already declared the answer. Sanity-checking that your own change is complete
-before you push is fine — reporting a verdict on it is not.
+before you push is fine — reporting a verdict on it is not. The `### Evidence` table on a
+`size:small` item is the one exception: there, the user's review at stage 6 replaces QA.
+Normal items are unchanged.
 
