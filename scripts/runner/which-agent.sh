@@ -14,6 +14,8 @@ case "${LABEL#stage:}" in
 esac
 test -f ".claude/agents/$NAME.md" || { echo "No agent for $LABEL"; exit 1; }
 
+NAME="$NAME" bash "$(dirname "$0")/tool-permissions.sh"
+
 # QA re-runs every check, so it needs more room than the others.
 case "$NAME" in
   qa) MAX_TURNS=120 ;;
