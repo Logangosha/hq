@@ -770,7 +770,7 @@ def resume(full, number, comment):
     args = ["gh", "issue", "edit", str(number), "--repo", full,
             "--remove-label", info["stage"]]
     for l in waiting:
-        args += ["--remove-label", l["name"]]
+        args += ["--remove-label", l]
     run(args, check=False)  # the stage label may not be there to remove
     # Adding it back is what starts the agent: the workflow fires on a label being added.
     run(["gh", "issue", "edit", str(number), "--repo", full, "--add-label", info["stage"]])
