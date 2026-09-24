@@ -132,15 +132,29 @@
   .breakdown th, .breakdown td { text-align: left; padding: 4px 10px 4px 0; }
   .breakdown th { color: var(--muted); font-weight: 600; }
 
-  .progress { flex: 0 0 100%; order: 8; display: flex; gap: 4px; margin-top: 4px; }
+  .progress { flex: 0 0 100%; order: 8; margin-top: 4px; }
+  .track {
+    position: relative; display: flex; justify-content: space-between; gap: 12px;
+  }
+  .track::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 2px;
+    transform: translateY(-50%); background: var(--muted); z-index: 0;
+  }
   .seg {
-    flex: 1; text-align: center; font-size: 11px; padding: 4px 2px; border-radius: 6px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-size: 12px; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+    position: relative; z-index: 1; margin: 0; border: 0; font-weight: 400;
+    flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
     background: var(--chip); color: var(--muted);
   }
-  .seg.done { background: var(--ok); color: #fff; }
-  .seg.current { background: var(--accent); color: #fff; font-weight: 600; }
-  .seg.ahead { background: var(--chip); color: var(--muted); }
+  .seg.done { background: var(--seg, var(--chip)); color: var(--seg-text, var(--muted)); }
+  .seg.current {
+    background: var(--seg, var(--chip)); color: var(--seg-text, var(--muted));
+    font-weight: 700; box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--seg, var(--muted));
+  }
+  .seg.ahead {
+    background: var(--surface); box-shadow: inset 0 0 0 1.5px var(--seg, var(--muted));
+    color: var(--muted);
+  }
 
   @media (max-width: 520px) {
     .chip { order: 3; }
@@ -294,10 +308,12 @@
   }
 
   function progressPanel(segs) {
-    const bars = segs.map(seg =>
-      `<span class="seg ${seg.state}" title="${esc(progressTitle(seg))}">${esc(seg.name.replace(/^\d+ /, ""))}</span>`
-    ).join("");
-    return `<div class="progress">${bars}</div>`;
+    const bars = segs.map(seg => {
+      const style = seg.color
+        ? ` style="--seg:#${esc(seg.color)};--seg-text:${readableTextColor(seg.color)}"` : "";
+      return `<span class="seg ${seg.state}"${style} title="${esc(progressTitle(seg))}">${esc(seg.name.replace(/^\d+ /, ""))}</span>`;
+    }).join("");
+    return `<div class="progress"><div class="track">${bars}</div></div>`;
   }
 
   // Per-item breakdown (R4/R5): shown when the tile is expanded (R11-R13), below

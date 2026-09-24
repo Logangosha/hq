@@ -324,9 +324,11 @@ def _stage_breakdown(runs):
     return rows
 
 
-def _progress(stage_label, events, runs, now):
+def _progress(stage_label, events, runs, now, colors=None):
     """F8.7: one dict per STAGE_ORDER segment — {name, state, entered, duration, ongoing,
-    cost, unknown_runs} — built with no `gh` calls so QA can feed it fake events/runs.
+    cost, unknown_runs, color} — built with no `gh` calls so QA can feed it fake events/runs.
+    `colors`: {label: hex} for the item's repo, e.g. from `repos/{full}/labels` — Done has
+    no label so it always gets color=None (R11).
 
     entered: a `labeled` event for that stage's label ever landed, or it has a run (R8).
     state (R3/R4): position relative to `stage_label` (current label, or None if the item
@@ -388,6 +390,7 @@ def _progress(stage_label, events, runs, now):
             "duration": durations.get(label), "ongoing": ongoing.get(label, False),
             "cost": sum(known_costs) if known_costs else None,
             "unknown_runs": sum(1 for c in costs if c is None),
+            "color": (colors or {}).get(label),
         })
     return segments
 
@@ -456,13 +459,17 @@ def work_items():
             comments_by_number = domain_comments(full)
             _totals_over_time(comments_by_number, totals)
             now = datetime.utcnow()
+            # R11/V20: current colour off `labels`, not a `labeled` event's (historic) one.
+            repo_labels = ghcache.fetch_all(f"repos/{full}/labels?per_page=100", run)
+            stage_colors = {l["name"]: l["color"] for l in repo_labels if l["name"] in STAGE_NAMES}
             for it in items:
                 runs = _hq_runs(comments_by_number.get(it["number"], []))
                 it["cost"] = _cost_summary(runs)
                 it["breakdown"] = _stage_breakdown(runs)
                 events = ghcache.fetch_all(
                     f"repos/{full}/issues/{it['number']}/events?per_page=100", run)
-                it["progress"] = _progress(it.pop("_stage_label"), events, runs, now)
+                it["progress"] = _progress(
+                    it.pop("_stage_label"), events, runs, now, colors=stage_colors)
             # waiting:* (either kind) means the runner won't touch it either — not a stall.
             checkable = [it for it in items if it["stage"] in STAGE_LABEL and not it["waiting"]]
             blocked = [it for it in items if it["stage"] == "0 Blocked"]
