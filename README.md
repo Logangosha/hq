@@ -38,6 +38,7 @@ reaches its stage, does its part, and hands off to the next one.
 | `planner` | 3 | Checks stages 1–2, then writes the plan |
 | `builder` | 4 | Checks the plan, then does the work in a PR |
 | `qa` | 5 | Runs every check and posts the evidence. It never fixes anything itself. |
+| `scope` | 1–3 (small) | Writes requirements and plan in one comment for a `size:small` item |
 
 Each agent checks the stage before it and can send the work back if something's wrong.
 Skills live in `.claude/skills/`, agents in `.claude/agents/`.

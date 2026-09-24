@@ -14,9 +14,9 @@ set -euo pipefail
 
 : "${NUM:?}" "${NAME:?}" "${GITHUB_REPOSITORY:?}" "${GITHUB_REPOSITORY_OWNER:?}"
 
-# Requirements is the first stage an Issue reaches, so it's the one place an
-# incomplete goal (R1-R3) needs catching before an agent runs at all.
-if [ "$NAME" = "requirements" ]; then
+# Requirements and Scope are the first stage an Issue can reach, so they're the
+# place an incomplete goal (R1-R3) needs catching before an agent runs at all.
+if [ "$NAME" = "requirements" ] || [ "$NAME" = "scope" ]; then
   HERE="$(cd "$(dirname "$0")" && pwd)"
   bash "$HERE/check-goal.sh"
 fi

@@ -17,9 +17,11 @@ LABELS=(
   "stage:build|FBCA04|Doing the work"
   "stage:qa|006B75|Running the checks"
   "stage:review|D93F0B|Waiting for the user to look at it"
+  "stage:scope|7057FF|Small item: requirements and plan in one step"
   "waiting:user|E99695|A question or decision is needed"
   "waiting:work|F9D0C4|Another Work Item must finish first"
   "waiting:stopped|C5DEF5|Paused by the user, not the agents"
+  "size:small|C2E0C6|Small path: Scope, Build, Review"
 )
 
 for entry in "${LABELS[@]}"; do

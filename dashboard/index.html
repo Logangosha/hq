@@ -276,6 +276,7 @@
         ${it.blocked_by && it.blocked_by.length ? `<span class="blocked-by">Waiting on ${
           it.blocked_by.map(b => esc(`${b.ref} (${b.state})`)).join(", ")}</span>` : ""}</span>
       <span class="chip" title="Total cost">${esc(costLabel(it.cost))}</span>
+      <span class="chip" title="Work Item size">${esc(it.size)}</span>
       <span class="chip"${it.stage_color ? ` style="background:#${esc(it.stage_color)};color:${readableTextColor(it.stage_color)}"` : ""}>${esc(it.stage.replace(/^\d+ /, ""))}</span>
       ${canReview ? `<button class="primary" data-review="${esc(d.full)}" data-number="${it.number}">Review</button>` : ""}
       ${canAnswer ? `<button class="primary" data-answer="${esc(d.full)}" data-number="${it.number}">Answer</button>` : ""}
@@ -507,6 +508,7 @@
       ${warn}
       ${r.after_merge ? `<h2>After merge — check these</h2><div class="panel"><pre>${esc(r.after_merge)}</pre></div>` : ""}
       ${r.qa ? `<h2>QA</h2><div class="panel"><pre>${esc(r.qa)}</pre></div>` : ""}
+      ${!r.qa && r.evidence ? `<h2>Build evidence</h2><div class="panel"><pre>${esc(r.evidence)}</pre></div>` : ""}
       <h2>Code changes</h2>
       ${renderDiff(r.diff)}
       <div class="decide">
@@ -648,6 +650,7 @@
         <div class="row">
           <select id="target">
             <option value="">Same stage${it ? ` (${esc(it.stage.replace(/^\d+ /, ""))})` : ""}</option>
+            <option value="scope">1 Scope</option>
             <option value="requirements">1 Requirements</option>
             <option value="verification">2 Verification</option>
             <option value="plan">3 Plan</option>

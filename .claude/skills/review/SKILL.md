@@ -1,6 +1,6 @@
 ---
 name: review
-description: Let the user look at a finished Work Item on their own computer, then approve (merge) or reject it (back to Requirements with their comments). Use when a Work Item is at stage:review and the user says "review <repo>#<n>", "let me see it", "show me the app", or "/review".
+description: Let the user look at a finished Work Item on their own computer, then approve (merge) or reject it (back to Requirements, or to Scope for a small item, with their comments). Use when a Work Item is at stage:review and the user says "review <repo>#<n>", "let me see it", "show me the app", or "/review".
 ---
 
 # Review
@@ -39,7 +39,8 @@ so a review can't move the work you're doing here onto another branch.
 Then, beside it, one short block:
 - **What changed:** the PR title and one line.
 - **QA:** the latest QA comment's table (`## 5. QA`, or a re-run such as
-  `## 5b. QA (re-run)`), trimmed to check + result.
+  `## 5b. QA (re-run)`), trimmed to check + result. On a `size:small` item (no QA
+  comment), show the `### Evidence` table from the latest `## 4. Build` comment instead.
 - **After merge** — only if that comment has a `### After merge` heading: show its list
   verbatim and tell the user to do these after merging. Leave this bullet out otherwise.
 - **Try this:** one or two things to click, taken from the requirements.
@@ -58,13 +59,14 @@ gh pr merge <pr> --repo <owner>/<repo> --squash --delete-branch
 The PR's `Closes #<n>` closes the Issue. That's Done.
 
 **Anything else is a rejection.** Their words go on the Issue verbatim, then the label
-goes back — which starts the requirements agent:
+goes back — to Scope on a `size:small` item, otherwise Requirements:
 ```bash
 gh issue comment <n> --repo <owner>/<repo> --body "## 6. Review — user ❌
 
 <their words>"
 gh issue edit <n> --repo <owner>/<repo> --remove-label stage:review --add-label stage:requirements
 ```
+(`size:small`: `--add-label stage:scope` instead of `stage:requirements`.)
 Leave the PR open; the rebuild reuses it.
 
 ## 5. Clean up — always, even if they stop half-way

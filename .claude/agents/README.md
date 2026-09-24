@@ -9,11 +9,12 @@ These are the reusable agent roles for the Work Item lifecycle. One file per sta
 | 3. Plan | `planner.md` |
 | 4. Build | `builder.md` |
 | 5. QA | `qa.md` |
+| Scope (small items) | `scope.md` |
 
 ## What belongs here, and what doesn't
 
 **HQ holds generic capabilities only** — things that work across many repos, domains and
-kinds of work. The five above are generic: they know the lifecycle, not the subject.
+kinds of work. The agents above are generic: they know the lifecycle, not the subject.
 
 **Anything specific to one project lives in that project's repo**, in its own
 `.claude/agents/` or `.claude/skills/`. A deploy agent that knows one app's infrastructure,

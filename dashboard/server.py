@@ -32,6 +32,7 @@ with open(PAGE, encoding="utf-8") as fh:
     PAGE_HTML = fh.read()
 
 STAGE_NAMES = {
+    "stage:scope": "1 Scope",
     "stage:requirements": "1 Requirements",
     "stage:verification": "2 Verification",
     "stage:plan": "3 Plan",
@@ -41,8 +42,12 @@ STAGE_NAMES = {
 }
 
 # The progress bar's 7 segments, in lifecycle order (F8.7). Done has no label — the
-# dashboard only lists open Issues, so it's always "ahead"/"not started".
-STAGE_ORDER = list(STAGE_NAMES.items()) + [(None, "Done")]
+# dashboard only lists open Issues, so it's always "ahead"/"not started". Scope is a
+# small-item-only stage, so it's excluded here (SMALL_ORDER below covers it).
+STAGE_ORDER = [(l, n) for l, n in STAGE_NAMES.items() if l != "stage:scope"] + [(None, "Done")]
+
+# The small path's 3-segment progress bar (R13): Scope, Build, Review, no Done segment.
+SMALL_ORDER = [("stage:scope", "Scope"), ("stage:build", "Build"), ("stage:review", "Review")]
 
 
 def find_bash():
@@ -132,14 +137,17 @@ def owner():
 # scripts/runner/which-agent.sh). Stage 6 (human review) is deliberately absent: it's the
 # user's turn, so a finished run there is normal, not a stall.
 STAGE_LABEL = {
+    "1 Scope": "stage:scope",
     "1 Requirements": "stage:requirements", "2 Verification": "stage:verification",
     "3 Plan": "stage:plan", "4 Build": "stage:build", "5 QA": "stage:qa",
 }
 STAGE_AGENT = {
+    "1 Scope": "scope",
     "1 Requirements": "requirements", "2 Verification": "verification",
     "3 Plan": "planner", "4 Build": "builder", "5 QA": "qa",
 }
 AGENT_LABEL = {
+    "scope": "Scope",
     "requirements": "Requirements", "verification": "Verification",
     "planner": "Planner", "builder": "Builder", "qa": "QA",
 }
@@ -268,18 +276,21 @@ def reconcile_blockers(full, it, comments):
                   for b in it["blocked_by"])
     if not settled:
         return
+    small = it.get("size") == "small"
+    next_stage = "stage:scope" if small else "stage:requirements"
+    next_name = "Scope" if small else "Requirements"
     if len(refs) == 1:
-        text = f"Blocker `{refs[0]}` merged. Starting Requirements."
+        text = f"Blocker `{refs[0]}` merged. Starting {next_name}."
     else:
         joined = ", ".join(f"`{r}`" for r in refs)
-        text = f"Blockers {joined} done. Starting Requirements."
+        text = f"Blockers {joined} done. Starting {next_name}."
     run(["gh", "issue", "comment", number, "--repo", full, "--body", text])
     # Two calls, remove then add (same idiom as resume()): the labeled event that
-    # starts the requirements agent must not still show waiting:work, or the
-    # runner's waiting: guard skips it.
+    # starts the next agent must not still show waiting:work, or the runner's
+    # waiting: guard skips it.
     run(["gh", "issue", "edit", number, "--repo", full, "--remove-label", "waiting:work"])
-    run(["gh", "issue", "edit", number, "--repo", full, "--add-label", "stage:requirements"])
-    it["stage"], it["waiting"] = "1 Requirements", []
+    run(["gh", "issue", "edit", number, "--repo", full, "--add-label", next_stage])
+    it["stage"], it["waiting"] = ("1 Scope" if small else "1 Requirements"), []
 
 
 def domain_comments(full):
@@ -366,7 +377,7 @@ def _stage_breakdown(runs):
     return rows
 
 
-def _progress(stage_label, events, runs, now, colors=None):
+def _progress(stage_label, events, runs, now, colors=None, order=None):
     """F8.7: one dict per STAGE_ORDER segment — {name, state, entered, duration, ongoing,
     cost, unknown_runs, color} — built with no `gh` calls so QA can feed it fake events/runs.
     `colors`: {label: hex} for the item's repo, e.g. from `repos/{full}/labels` — Done has
@@ -382,7 +393,8 @@ def _progress(stage_label, events, runs, now, colors=None):
     cost/unknown_runs (R6/R7): sum of numeric `cost` over that stage's runs; `unknown_runs`
     counts runs with no numeric cost. No runs at all -> cost None (Human review/Done always
     do, since they have no agent)."""
-    order_labels = [label for label, _ in STAGE_ORDER]
+    order = order or STAGE_ORDER
+    order_labels = [label for label, _ in order]
     stage_events = sorted(
         (e for e in events if e.get("event") in ("labeled", "unlabeled")
          and (e.get("label") or {}).get("name") in STAGE_NAMES),
@@ -415,9 +427,11 @@ def _progress(stage_label, events, runs, now, colors=None):
 
     # `stage_label` is None both when there's no stage: label and for Done's own (label-less)
     # entry — only the former should suppress "current" everywhere, so check truthiness.
-    current_idx = order_labels.index(stage_label) if stage_label else None
+    # It can also be a label outside this order (e.g. `order` is SMALL_ORDER but the item
+    # somehow carries a non-small stage label) — treated the same as "no current stage".
+    current_idx = order_labels.index(stage_label) if stage_label and stage_label in order_labels else None
     segments = []
-    for i, (label, name) in enumerate(STAGE_ORDER):
+    for i, (label, name) in enumerate(order):
         suffix = label.split(":", 1)[1] if label else None
         stage_runs = runs_by_stage.get(suffix, [])
         entered = label in entered_labels or bool(stage_runs)
@@ -493,6 +507,7 @@ def work_items():
                     "url": issue["html_url"], "waiting": waiting, "blocked_by": [],
                     "created_at": issue["created_at"], "stalled": False, "stall_reason": None,
                     "needs_you": stage.startswith("6 ") or "waiting:user" in waiting,
+                    "size": "small" if "size:small" in labels else "normal",
                     "_stage_label": stage_label,
                 })
             # Unconditional (not just for checkable/blocked items): needed even when a
@@ -511,7 +526,8 @@ def work_items():
                 events = ghcache.fetch_all(
                     f"repos/{full}/issues/{it['number']}/events?per_page=100", run)
                 it["progress"] = _progress(
-                    it.pop("_stage_label"), events, runs, now, colors=stage_colors)
+                    it.pop("_stage_label"), events, runs, now, colors=stage_colors,
+                    order=SMALL_ORDER if it["size"] == "small" else None)
             # waiting:* (either kind) means the runner won't touch it either — not a stall.
             checkable = [it for it in items if it["stage"] in STAGE_LABEL and not it["waiting"]]
             blocked = [it for it in items if it["stage"] == "0 Blocked"]
@@ -647,6 +663,16 @@ def after_merge(body):
     return m.group(1).strip() if m else ""
 
 
+BUILD_HEADING_RE = re.compile(r"^## 4[a-z]?\. Build")
+
+
+def latest_build_comment(comments):
+    """The latest Build comment's full body (size:small items have their evidence there,
+    with no QA comment); "" if there isn't one."""
+    builds = [c["body"] for c in comments if BUILD_HEADING_RE.match(c["body"])]
+    return builds[-1] if builds else ""
+
+
 def checkout_review(full, number):
     repo = full.split("/")[-1]
     res = run([BASH, "scripts/review-checkout.sh", repo, str(number)], check=False)
@@ -681,6 +707,7 @@ def checkout_review(full, number):
         "path": kv["path"], "title": info["title"],
         "has_app": os.path.exists(os.path.join(kv["path"], ".claude", "launch.json")),
         "qa": qa, "after_merge": after_merge(qa) if qa else "", "diff": diff,
+        "evidence": latest_build_comment(comments) if not qa else "",
         "claude_files": [f for f in files if f.startswith(".claude/")],
     }
 
@@ -698,7 +725,8 @@ def close_review(full, number):
 
 
 def decide(full, number, decision, comment):
-    """F8.6, the review skill's step 4: approve merges, reject goes back to Requirements."""
+    """F8.6, the review skill's step 4: approve merges, reject goes back to Requirements
+    (or Scope, on a size:small item)."""
     key = f"{full.split('/')[-1]}#{number}"
     if key not in reviews:
         raise UserError("Open this Work Item with Review first.")
@@ -723,9 +751,12 @@ def decide(full, number, decision, comment):
         return {"message": f"Approved — PR #{pr} merged."}
     run(["gh", "issue", "comment", num, "--repo", full,
          "--body", f"## 6. Review — user ❌\n\n{comment}"])
-    # The rebuild reuses the open PR. The label change starts the requirements agent.
+    labels = [l["name"] for l in json.loads(run(["gh", "issue", "view", num, "--repo", full,
+                                                  "--json", "labels"]).stdout)["labels"]]
+    next_stage = "stage:scope" if "size:small" in labels else "stage:requirements"
+    # The rebuild reuses the open PR. The label change starts the next agent.
     run(["gh", "issue", "edit", num, "--repo", full,
-         "--remove-label", "stage:review", "--add-label", "stage:requirements"])
+         "--remove-label", "stage:review", "--add-label", next_stage])
     ghcache.invalidate(f"repos/{full}/issues?state=open&per_page=100")
     return {"message": "Sent back to the agents with your comment."}
 
@@ -734,10 +765,12 @@ def stopped(full, number):
     """What a stopped Work Item is waiting for: its goal and the agent's last word."""
     data = json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
                            "--json", "title,body,comments,labels"]).stdout)
-    stage = [l["name"] for l in data["labels"] if l["name"].startswith("stage:")]
+    label_names = [l["name"] for l in data["labels"]]
+    stage = [l for l in label_names if l.startswith("stage:")]
+    default_stage = "stage:scope" if "size:small" in label_names else "stage:requirements"
     return {"title": data["title"], "goal": data["body"],
             "last": data["comments"][-1]["body"] if data["comments"] else "",
-            "stage": stage[0] if stage else "stage:requirements",
+            "stage": stage[0] if stage else default_stage,
             "url": f"https://github.com/{full}/issues/{number}"}
 
 
