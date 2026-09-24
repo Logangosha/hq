@@ -6,20 +6,27 @@
 #   bash scripts/create-work-item.sh owner/repo "Title" -   # goal body on stdin
 #   bash scripts/create-work-item.sh owner/repo "Title" "Current" "Desired" --blocked-by owner/repo#N
 #
+# --blocked-by can repeat, in any repo: --blocked-by a/b#1 --blocked-by c/d#2.
+#
 # The Issue starts at stage:requirements. The label is created if missing.
-# With --blocked-by, it starts at waiting:work instead and runs no stage until
-# that Work Item's PR merges (see dashboard/server.py's reconcile_blocker).
+# With one or more --blocked-by, it starts at waiting:work instead and runs no
+# stage until every one of those Work Items' PRs has merged (see
+# dashboard/server.py's reconcile_blockers).
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 source "$HERE/scripts/lib/goal-check.sh"
 
-BLOCKED_BY=""
+BLOCKED_BY=()
 ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --blocked-by)
-      BLOCKED_BY="${2:-}"
+      if [ $# -lt 2 ] || [ -z "$2" ]; then
+        echo "BAD BLOCKER: --blocked-by needs a value (owner/repo#number). Nothing created." >&2
+        exit 4
+      fi
+      BLOCKED_BY+=("$2")
       shift 2
       ;;
     *)
@@ -58,18 +65,33 @@ if [ "$REPO" != "$HQ_REPO" ] && \
   exit 3
 fi
 
-# --- the blocker, if any -----------------------------------------------------
-if [ -n "$BLOCKED_BY" ]; then
-  BREPO="${BLOCKED_BY%%#*}"
-  BNUM="${BLOCKED_BY##*#}"
-  if [ -z "$BREPO" ] || [ -z "$BNUM" ] || [ "$BREPO" = "$BLOCKED_BY" ]; then
-    echo "BAD BLOCKER: '$BLOCKED_BY' isn't owner/repo#number. Nothing created." >&2
-    exit 4
-  fi
-  if ! gh issue view "$BNUM" --repo "$BREPO" >/dev/null 2>&1; then
-    echo "NO BLOCKER: $BLOCKED_BY doesn't exist (or you can't see it). Nothing created." >&2
-    exit 4
-  fi
+# --- the blockers, if any ----------------------------------------------------
+# Dedupe while preserving order.
+if [ "${#BLOCKED_BY[@]}" -gt 0 ]; then
+  declare -A _SEEN=()
+  _DEDUPED=()
+  for b in "${BLOCKED_BY[@]}"; do
+    if [ -z "${_SEEN[$b]:-}" ]; then
+      _SEEN[$b]=1
+      _DEDUPED+=("$b")
+    fi
+  done
+  BLOCKED_BY=("${_DEDUPED[@]}")
+fi
+
+if [ "${#BLOCKED_BY[@]}" -gt 0 ]; then
+  for b in "${BLOCKED_BY[@]}"; do
+    BREPO="${b%%#*}"
+    BNUM="${b##*#}"
+    if [ -z "$BREPO" ] || [ -z "$BNUM" ] || [ "$BREPO" = "$b" ]; then
+      echo "BAD BLOCKER: '$b' isn't owner/repo#number. Nothing created." >&2
+      exit 4
+    fi
+    if ! gh issue view "$BNUM" --repo "$BREPO" >/dev/null 2>&1; then
+      echo "NO BLOCKER: $b doesn't exist (or you can't see it). Nothing created." >&2
+      exit 4
+    fi
+  done
 fi
 
 # --- the goal ---------------------------------------------------------------
@@ -109,7 +131,7 @@ ensure_label() {  # name, color, description
     || gh label create "$1" --repo "$REPO" --color "$2" --description "$3" >/dev/null
 }
 
-if [ -n "$BLOCKED_BY" ]; then
+if [ "${#BLOCKED_BY[@]}" -gt 0 ]; then
   STAGE="waiting:work"
   ensure_label "$STAGE" "F9D0C4" "Another Work Item must finish first"
 else
@@ -124,10 +146,19 @@ URL="$(gh issue create \
   --body "$BODY" \
   --label "$STAGE")"
 
-if [ -n "$BLOCKED_BY" ]; then
+if [ "${#BLOCKED_BY[@]}" -gt 0 ]; then
   NUM="${URL##*/}"
-  gh issue comment "$NUM" --repo "$REPO" \
-    --body "Blocked by \`$BLOCKED_BY\`. Runs no stage until that merges." >/dev/null
+  REFS=""
+  for b in "${BLOCKED_BY[@]}"; do
+    REFS="${REFS}\`$b\`, "
+  done
+  REFS="${REFS%, }"
+  if [ "${#BLOCKED_BY[@]}" -eq 1 ]; then
+    COMMENT="Blocked by $REFS. Runs no stage until that merges."
+  else
+    COMMENT="Blocked by $REFS. Runs no stage until all of them merge."
+  fi
+  gh issue comment "$NUM" --repo "$REPO" --body "$COMMENT" >/dev/null
 fi
 
 echo "$URL"

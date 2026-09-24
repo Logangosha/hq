@@ -94,7 +94,7 @@ stage 6.** Rejection is cheap because the choice was reversible.
 A Work Item can be paused at any stage. It keeps its stage and resumes from there.
 
 - `waiting:user` — stuck for one of the reasons above.
-- `waiting:work` — another Work Item must finish first.
+- `waiting:work` — one or more other Work Items must all finish first.
 
 The user can cancel a Work Item at any time.
 
