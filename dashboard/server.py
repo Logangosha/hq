@@ -40,6 +40,10 @@ STAGE_NAMES = {
     "stage:review": "6 Human review",
 }
 
+# The progress bar's 7 segments, in lifecycle order (F8.7). Done has no label — the
+# dashboard only lists open Issues, so it's always "ahead"/"not started".
+STAGE_ORDER = list(STAGE_NAMES.items()) + [(None, "Done")]
+
 
 def find_bash():
     # On Windows, plain "bash" can be WSL's, which has no gh login. Use Git's.
@@ -320,6 +324,77 @@ def _stage_breakdown(runs):
     return rows
 
 
+def _progress(stage_label, events, runs, now, colors=None):
+    """F8.7: one dict per STAGE_ORDER segment — {name, state, entered, duration, ongoing,
+    cost, unknown_runs, color} — built with no `gh` calls so QA can feed it fake events/runs.
+    `colors`: {label: hex} for the item's repo, e.g. from `repos/{full}/labels` — Done has
+    no label so it always gets color=None (R11).
+
+    entered: a `labeled` event for that stage's label ever landed, or it has a run (R8).
+    state (R3/R4): position relative to `stage_label` (current label, or None if the item
+    carries no stage: label) — done/current/ahead, or done/ahead by `entered` if None.
+    duration (R5): summed wall-clock time across every visit. A visit starts at `labeled`
+    and ends at the next `unlabeled` of the same label, the next `labeled` of any stage:*
+    label, or `now` (then `ongoing=True`). Stages with no labeled event ever -> duration
+    None ("unknown", R7).
+    cost/unknown_runs (R6/R7): sum of numeric `cost` over that stage's runs; `unknown_runs`
+    counts runs with no numeric cost. No runs at all -> cost None (Human review/Done always
+    do, since they have no agent)."""
+    order_labels = [label for label, _ in STAGE_ORDER]
+    stage_events = sorted(
+        (e for e in events if e.get("event") in ("labeled", "unlabeled")
+         and (e.get("label") or {}).get("name") in STAGE_NAMES),
+        key=lambda e: e["created_at"])
+
+    durations, ongoing, entered_labels = {}, {}, set()
+    open_visit = None  # (label, start_datetime)
+
+    def close(label, start, end):
+        durations[label] = durations.get(label, 0.0) + (end - start).total_seconds()
+
+    for e in stage_events:
+        label = e["label"]["name"]
+        ts = datetime.strptime(e["created_at"], "%Y-%m-%dT%H:%M:%SZ")
+        if e["event"] == "labeled":
+            entered_labels.add(label)
+            if open_visit is not None:
+                close(*open_visit, ts)
+            open_visit = (label, ts)
+        elif open_visit is not None and open_visit[0] == label:
+            close(*open_visit, ts)
+            open_visit = None
+    if open_visit is not None:
+        close(*open_visit, now)
+        ongoing[open_visit[0]] = True
+
+    runs_by_stage = {}
+    for r in runs:
+        runs_by_stage.setdefault(r.get("stage"), []).append(r)
+
+    # `stage_label` is None both when there's no stage: label and for Done's own (label-less)
+    # entry — only the former should suppress "current" everywhere, so check truthiness.
+    current_idx = order_labels.index(stage_label) if stage_label else None
+    segments = []
+    for i, (label, name) in enumerate(STAGE_ORDER):
+        suffix = label.split(":", 1)[1] if label else None
+        stage_runs = runs_by_stage.get(suffix, [])
+        entered = label in entered_labels or bool(stage_runs)
+        if current_idx is not None:
+            state = "done" if i < current_idx else "current" if i == current_idx else "ahead"
+        else:
+            state = "done" if entered else "ahead"
+        costs = [_num(r.get("cost")) for r in stage_runs]
+        known_costs = [c for c in costs if c is not None]
+        segments.append({
+            "name": name, "state": state, "entered": entered,
+            "duration": durations.get(label), "ongoing": ongoing.get(label, False),
+            "cost": sum(known_costs) if known_costs else None,
+            "unknown_runs": sum(1 for c in costs if c is None),
+            "color": (colors or {}).get(label),
+        })
+    return segments
+
+
 def _totals_over_time(comments_by_number, totals):
     """R6/R7: fold every hq-run block from this domain's issues (open or closed — the
     comments were already fetched repo-wide) into `totals`, keyed by (Monday of its
@@ -376,16 +451,25 @@ def work_items():
                     "url": issue["html_url"], "waiting": waiting, "blocked_by": None,
                     "created_at": issue["created_at"], "stalled": False, "stall_reason": None,
                     "needs_you": stage.startswith("6 ") or "waiting:user" in waiting,
+                    "_stage_label": stage_label,
                 })
             # Unconditional (not just for checkable/blocked items): needed even when a
             # domain has zero open items, so its closed-issue history still feeds
             # _totals_over_time (R6), and every item gets a cost/breakdown (R1, R4).
             comments_by_number = domain_comments(full)
             _totals_over_time(comments_by_number, totals)
+            now = datetime.utcnow()
+            # R11/V20: current colour off `labels`, not a `labeled` event's (historic) one.
+            repo_labels = ghcache.fetch_all(f"repos/{full}/labels?per_page=100", run)
+            stage_colors = {l["name"]: l["color"] for l in repo_labels if l["name"] in STAGE_NAMES}
             for it in items:
                 runs = _hq_runs(comments_by_number.get(it["number"], []))
                 it["cost"] = _cost_summary(runs)
                 it["breakdown"] = _stage_breakdown(runs)
+                events = ghcache.fetch_all(
+                    f"repos/{full}/issues/{it['number']}/events?per_page=100", run)
+                it["progress"] = _progress(
+                    it.pop("_stage_label"), events, runs, now, colors=stage_colors)
             # waiting:* (either kind) means the runner won't touch it either — not a stall.
             checkable = [it for it in items if it["stage"] in STAGE_LABEL and not it["waiting"]]
             blocked = [it for it in items if it["stage"] == "0 Blocked"]
