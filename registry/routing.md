@@ -22,9 +22,9 @@ bakery repo, not a writing project.
 4. **No domain fits** → stop. Don't invent a repo and don't force it into the closest one.
    Tell the user what's missing and propose a domain in one line. Creating a repo needs
    their yes.
-5. **Unsure between two** → guess, create it, and say which you picked in one line.
-   Routing is reversible (`gh issue transfer`), so a wrong guess is cheap. Don't make the
-   user choose.
+5. **Unsure between two** → guess, put the guess in the proposal, and create it only on
+   the user's yes. Routing is reversible (`gh issue transfer`), so a wrong guess is cheap.
+   Don't make the user choose.
 
 ## Workflow
 
