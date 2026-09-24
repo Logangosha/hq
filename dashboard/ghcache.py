@@ -6,7 +6,7 @@ entry younger than FRESH_SECONDS (below the fastest poll cadence, index.html's
 nextDelay()) is returned with no network call at all; otherwise a conditional GET
 (If-None-Match) either confirms the cached body (304, free) or replaces it (200).
 
-Only plain REST list endpoints (repos/{owner}/{repo}/issues, users/{owner}/repos, ...)
+Only plain REST list endpoints (repos/{owner}/{repo}/issues, user/repos, ...)
 support ETag/304 like this — the Search API doesn't, so it must not be fetched here.
 """
 import hashlib

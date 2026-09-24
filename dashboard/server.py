@@ -480,8 +480,10 @@ def work_items():
     domains = []
     totals = {}
     try:
-        repos = ghcache.fetch_all(f"users/{owner()}/repos?per_page=100", run)
+        repos = ghcache.fetch_all("user/repos?per_page=100&affiliation=owner", run)
         for repo in repos:
+            if repo["owner"]["login"] != owner():
+                continue
             if repo["archived"] or "hq-domain" not in (repo.get("topics") or []):
                 continue
             full = f"{owner()}/{repo['name']}"
