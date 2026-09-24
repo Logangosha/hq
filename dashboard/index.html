@@ -42,8 +42,9 @@
   }
   .card {
     background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
-    padding: 12px 14px; margin-bottom: 8px; display: flex; gap: 12px; align-items: center;
+    padding: 12px 14px; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
   }
+  .card.expandable { cursor: pointer; }
   .needs .card { border-left: 3px solid var(--accent); }
   .ref { color: var(--muted); font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
   .title { flex: 1; min-width: 0; }
@@ -118,8 +119,20 @@
   #budget, #version { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
   #budget.low { color: var(--warn, #b45309); font-weight: 600; }
 
+  details.costs { margin-top: 4px; font-size: 12px; color: var(--muted); }
+  details.costs summary { cursor: pointer; }
+  details.costs table { border-collapse: collapse; margin-top: 8px; width: 100%; font-size: 13px; }
+  details.costs th, details.costs td { text-align: left; padding: 4px 10px 4px 0; }
+  details.costs th { color: var(--muted); font-weight: 600; }
+
+  .breakdown {
+    flex: 0 0 100%; order: 9; border-collapse: collapse; margin-top: 8px;
+    width: 100%; font-size: 13px; color: var(--muted);
+  }
+  .breakdown th, .breakdown td { text-align: left; padding: 4px 10px 4px 0; }
+  .breakdown th { color: var(--muted); font-weight: 600; }
+
   @media (max-width: 520px) {
-    .card { flex-wrap: wrap; }
     .chip { order: 3; }
   }
 </style>
@@ -154,6 +167,9 @@
   }
   const refresh = document.getElementById("refresh");
   let domains = [];
+  let totals = [];  // cost totals-over-time: [{week, model, stage, cost, unknown}]
+  const expanded = new Set();  // "owner/repo#n" keys whose breakdown is open (R13)
+  let costsOpen = false;  // whether the Costs-by-week panel survives a poll (R13)
   let current = null;  // the Work Item being reviewed: {repo, number}
   let timer = null;
   let pingTimer = null;  // keeps the running app instance's heartbeat fresh
@@ -163,6 +179,19 @@
 
   const esc = s => String(s).replace(/[&<>"']/g, c =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+  // Cost/token fields are either a number or a literal "no data"/"unknown" string.
+  const fmt = v => typeof v === "number" ? v.toLocaleString() : v;
+  const costLabel = c => typeof c === "number" ? "$" + c.toFixed(2) : c;
+
+  // Abbreviated token count for human reading (R10): 3.8M, 510K, 842. Passes
+  // "no data"/"unknown" through unchanged.
+  function abbrev(v) {
+    if (typeof v !== "number") return v;
+    if (v >= 1e6) return (v / 1e6).toFixed(1) + "M";
+    if (v >= 1e3) return (v / 1e3).toFixed(1) + "K";
+    return String(v);
+  }
 
   // WCAG relative luminance of a "rrggbb" hex colour, then the text colour (black or
   // white) with the higher contrast ratio against it — works for any background, so
@@ -214,18 +243,48 @@
       : canReview ? "Ready for your review"
       : it.stalled ? it.stall_reason
       : "";
-    return `<div class="card">
+    const key = `${d.full}#${it.number}`;
+    const hasBreakdown = it.breakdown && it.breakdown.length;
+    return `<div class="card${hasBreakdown ? " expandable" : ""}"${hasBreakdown ? ` data-expand="${esc(key)}"` : ""}>
       <span class="ref">${esc(d.repo)}#${it.number}</span>
       <span class="title"><a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.title)}</a>
         ${why ? `<span class="why">${esc(why)}</span>` : ""}
         ${it.blocked_by ? `<span class="blocked-by">Waiting on ${esc(it.blocked_by)}</span>` : ""}</span>
+      <span class="chip" title="Total cost">${esc(costLabel(it.cost))}</span>
       <span class="chip"${it.stage_color ? ` style="background:#${esc(it.stage_color)};color:${readableTextColor(it.stage_color)}"` : ""}>${esc(it.stage.replace(/^\d+ /, ""))}</span>
       ${canReview ? `<button class="primary" data-review="${esc(d.full)}" data-number="${it.number}">Review</button>` : ""}
       ${canAnswer ? `<button class="primary" data-answer="${esc(d.full)}" data-number="${it.number}">Answer</button>` : ""}
       ${canStop ? `<button data-stop="${esc(d.full)}" data-number="${it.number}">Stop</button>` : ""}
       ${canResume ? `<button data-resume="${esc(d.full)}" data-number="${it.number}">Resume</button>` : ""}
       <button data-restart="${esc(d.full)}" data-number="${it.number}">Restart</button>
+      ${hasBreakdown && expanded.has(key) ? breakdownPanel(it.breakdown) : ""}
     </div>`;
+  }
+
+  // Per-item breakdown (R4/R5): shown when the tile is expanded (R11-R13), below
+  // everything already on the card (R12). Signal only, per the user's rejection: agent,
+  // model, turns, total tokens, cost — nothing else.
+  function breakdownPanel(rows) {
+    const lines = rows.map(r =>
+      `<tr><td>${esc(r.agent)}</td><td>${esc(r.model)}</td>` +
+      `<td>${esc(fmt(r.turns))}</td><td>${esc(abbrev(r.tokens))}</td><td>${esc(costLabel(r.cost))}</td></tr>`
+    ).join("");
+    return `<table class="breakdown">
+      <thead><tr><th>Agent</th><th>Model</th><th>Turns</th><th>Tokens</th><th>Cost</th></tr></thead>
+      <tbody>${lines}</tbody></table>`;
+  }
+
+  // R6/R7: one row per (week, model, stage) cost bucket, already sorted week desc.
+  function totalsPanel() {
+    if (!totals.length) return "";
+    const rows = totals.map(t => {
+      const cost = t.cost == null ? `unknown (${t.unknown})`
+        : t.unknown ? `${costLabel(t.cost)} + ${t.unknown} unknown` : costLabel(t.cost);
+      return `<tr><td>${esc(t.week)}</td><td>${esc(t.model)}</td><td>${esc(t.stage)}</td><td>${esc(cost)}</td></tr>`;
+    }).join("");
+    return `<details class="panel costs"${costsOpen ? " open" : ""}><summary>Costs by week</summary>
+      <table><thead><tr><th>Week</th><th>Model</th><th>Stage</th><th>Cost</th></tr></thead>
+      <tbody>${rows}</tbody></table></details>`;
   }
 
   function renderList() {
@@ -238,6 +297,7 @@
       html += `<div class="repo">${esc(d.full)}</div>` +
         (rest.length ? rest.map(i => card(d, i, false)).join("") : `<div class="empty">No Work Items in progress.</div>`);
     }
+    html += `<h2>Costs</h2>` + (totalsPanel() || `<div class="empty">No cost data yet.</div>`);
     content.innerHTML = html;
   }
 
@@ -299,7 +359,8 @@
         if (!current) content.innerHTML = `<div class="refusal">${esc(data.refusal.message)}</div>`;
         updated.textContent = "";
       } else {
-        domains = data;
+        domains = data.domains;
+        totals = data.totals;
         if (!current) renderList();
         updated.textContent = "Updated " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
       }
@@ -609,7 +670,18 @@
     if (s) return openStop(s.dataset.stop, Number(s.dataset.number));
     const rs = e.target.closest("[data-resume]");
     if (rs) return openResumeStopped(rs.dataset.resume, Number(rs.dataset.number));
+    if (e.target.closest("button, a")) return;
+    const exp = e.target.closest("[data-expand]");
+    if (exp) {
+      const key = exp.dataset.expand;
+      expanded.has(key) ? expanded.delete(key) : expanded.add(key);
+      renderList();
+    }
   });
+  content.addEventListener("toggle", e => {
+    if (e.target.matches("details.costs.panel")) costsOpen = e.target.open;
+  }, true);
+
   // ---- Restart HQ ----
 
   const HQ_RESTART_TIMEOUT_MS = 60000;
