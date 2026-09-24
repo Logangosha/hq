@@ -193,51 +193,93 @@ def stall_info(full, item, comments):
     return True, reason, parked
 
 
-BLOCKER_RE = re.compile(r"Blocked by `([^`]+)`")
+BLOCKER_RE = re.compile(r"Blocked by ((?:`[^`]+`(?:, )?)+)")
+BLOCKER_REF_RE = re.compile(r"`([^`]+)`")
+DROP_RE = re.compile(r"^🛑 Blocker `([^`]+)`")
+ANSWER_RE = re.compile(r"^## Answer — user")
 
 
-def parse_blocker(comments):
-    """The `owner/repo#N` a blocked Work Item names in its creation comment, or None."""
+def parse_blockers(comments):
+    """Every `owner/repo#N` a blocked Work Item names in its creation comment (the
+    first comment that matches), in order. Reads both the old one-blocker comment
+    and the new several-blocker one — same regex, one or many refs in the group."""
     for c in comments:
         m = BLOCKER_RE.search(c["body"])
         if m:
-            return m.group(1)
-    return None
+            return BLOCKER_REF_RE.findall(m.group(1))
+    return []
 
 
-def reconcile_blocker(full, it):
-    """Release a blocked Work Item once its blocker closes (R4-R6): merged starts
-    Requirements; closed without merging surfaces the drop for the user instead of
-    releasing on its own. Runs from the same poll as stall_info, so a PR merged
-    straight on GitHub is picked up too, not only one merged through the dashboard."""
-    ref = it["blocked_by"]
-    if not ref or "waiting:user" in it["waiting"]:
-        return  # nothing recorded, or already surfaced and parked for the user
+def blocker_state(ref):
+    """'open', 'merged' (CLOSED+COMPLETED) or 'closed without merging' for `ref`.
+    A blocker we can't read counts as open — the item stays parked, don't guess."""
     bfull, bnum = ref.rsplit("#", 1)
     res = run(["gh", "issue", "view", bnum, "--repo", bfull, "--json", "state,stateReason"],
               check=False)
     if res.returncode != 0:
-        return  # blocker issue gone or inaccessible — leave it parked, don't guess
+        return "open"
     info = json.loads(res.stdout)
     if info["state"] != "CLOSED":
-        return
+        return "open"
+    return "merged" if info["stateReason"] == "COMPLETED" else "closed without merging"
+
+
+def dropped_settled(ref, comments):
+    """True if a 🛑 drop comment for `ref` has a later Answer comment (R6): the user
+    has already dealt with this one dropped blocker, so it shouldn't hold the item
+    forever once the rest merge."""
+    drop_at = None
+    for c in comments:
+        if DROP_RE.match(c["body"]) and DROP_RE.match(c["body"]).group(1) == ref:
+            drop_at = c.get("created_at") or c.get("createdAt")
+    if drop_at is None:
+        return False
+    return any(ANSWER_RE.match(c["body"])
+               and (c.get("created_at") or c.get("createdAt")) > drop_at
+               for c in comments)
+
+
+def reconcile_blockers(full, it, comments):
+    """Release a blocked Work Item once every blocker closes (R4-R6): merged (or a
+    dropped-and-answered blocker) starts Requirements; a newly closed-without-merging
+    blocker surfaces the drop for the user instead of releasing on its own. Runs from
+    the same poll as stall_info, so a PR merged straight on GitHub is picked up too,
+    not only one merged through the dashboard."""
+    refs = parse_blockers(comments)
+    it["blocked_by"] = [{"ref": r, "state": blocker_state(r)} for r in refs]
+    if not refs or "waiting:user" in it["waiting"]:
+        return  # nothing recorded, or already surfaced and parked for the user
     number = str(it["number"])
-    if info["stateReason"] == "COMPLETED":
-        run(["gh", "issue", "comment", number, "--repo", full,
-             "--body", f"Blocker `{ref}` merged. Starting Requirements."])
-        # Two calls, remove then add (same idiom as resume()): the labeled event that
-        # starts the requirements agent must not still show waiting:work, or the
-        # runner's waiting: guard skips it.
-        run(["gh", "issue", "edit", number, "--repo", full, "--remove-label", "waiting:work"])
-        run(["gh", "issue", "edit", number, "--repo", full, "--add-label", "stage:requirements"])
-        it["stage"], it["waiting"] = "1 Requirements", []
-    else:
+    dropped = [b["ref"] for b in it["blocked_by"] if b["state"] == "closed without merging"]
+    new_drops = [r for r in dropped
+                 if not any(DROP_RE.match(c["body"]) and DROP_RE.match(c["body"]).group(1) == r
+                            for c in comments)]
+    if new_drops:
+        ref = new_drops[0]  # one 🛑 per ref, ever — surface one at a time
         run(["gh", "issue", "comment", number, "--repo", full,
              "--body", f"🛑 Blocker `{ref}` was closed without merging. A person needs to "
                        "decide: release this Work Item (Answer) or drop it too."])
         run(["gh", "issue", "edit", number, "--repo", full, "--add-label", "waiting:user"])
         it["waiting"].append("waiting:user")
         it["needs_you"] = True
+        return
+    settled = all(b["state"] == "merged" or
+                  (b["state"] == "closed without merging" and dropped_settled(b["ref"], comments))
+                  for b in it["blocked_by"])
+    if not settled:
+        return
+    if len(refs) == 1:
+        text = f"Blocker `{refs[0]}` merged. Starting Requirements."
+    else:
+        joined = ", ".join(f"`{r}`" for r in refs)
+        text = f"Blockers {joined} done. Starting Requirements."
+    run(["gh", "issue", "comment", number, "--repo", full, "--body", text])
+    # Two calls, remove then add (same idiom as resume()): the labeled event that
+    # starts the requirements agent must not still show waiting:work, or the
+    # runner's waiting: guard skips it.
+    run(["gh", "issue", "edit", number, "--repo", full, "--remove-label", "waiting:work"])
+    run(["gh", "issue", "edit", number, "--repo", full, "--add-label", "stage:requirements"])
+    it["stage"], it["waiting"] = "1 Requirements", []
 
 
 def domain_comments(full):
@@ -448,7 +490,7 @@ def work_items():
                 items.append({
                     "number": issue["number"], "title": issue["title"], "stage": stage,
                     "stage_color": stage_label_obj["color"] if stage in STAGE_NAMES.values() else None,
-                    "url": issue["html_url"], "waiting": waiting, "blocked_by": None,
+                    "url": issue["html_url"], "waiting": waiting, "blocked_by": [],
                     "created_at": issue["created_at"], "stalled": False, "stall_reason": None,
                     "needs_you": stage.startswith("6 ") or "waiting:user" in waiting,
                     "_stage_label": stage_label,
@@ -481,8 +523,7 @@ def work_items():
                     if parked:
                         it["waiting"].append("waiting:user")
             for it in blocked:
-                it["blocked_by"] = parse_blocker(comments_by_number.get(it["number"], []))
-                reconcile_blocker(full, it)
+                reconcile_blockers(full, it, comments_by_number.get(it["number"], []))
             domains.append({"full": full, "repo": repo["name"], "items": items})
     except ghcache.GhRefusal as e:
         raise _refusal(e.kind, e.detail)
@@ -701,16 +742,31 @@ def stopped(full, number):
 
 
 def resume(full, number, comment):
-    """Answer a stopped Work Item and start it moving again."""
+    """Answer a stopped Work Item and start it moving again. A blocked Work Item
+    (waiting:work, no stage: label) Answering a dropped-blocker 🛑 only settles that
+    one blocker (R6): it stays parked at waiting:work if any other blocker is still
+    open, rather than releasing straight to Requirements."""
     comment = comment.strip()
     if not comment:
         raise UserError("Write your answer first — it's what unblocks the agents.")
-    info = stopped(full, number)
+    labels = [l["name"] for l in json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
+                                                  "--json", "labels"]).stdout)["labels"]]
+    stage_labels = [l for l in labels if l.startswith("stage:")]
     run(["gh", "issue", "comment", str(number), "--repo", full,
          "--body", f"## Answer — user\n\n{comment}"])
-    waiting = [l for l in json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
-                                          "--json", "labels"]).stdout)["labels"]
-               if l["name"].startswith("waiting:")]
+    if not stage_labels and "waiting:work" in labels:
+        comments = json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
+                                   "--json", "comments"]).stdout)["comments"]
+        refs = parse_blockers(comments)
+        open_refs = [r for r in refs if blocker_state(r) == "open"]
+        if open_refs:
+            run(["gh", "issue", "edit", str(number), "--repo", full,
+                 "--remove-label", "waiting:user"])
+            ghcache.invalidate(f"repos/{full}/issues?state=open&per_page=100")
+            joined = ", ".join(f"`{r}`" for r in open_refs)
+            return {"message": f"Answer posted — still waiting on {joined}."}
+    info = stopped(full, number)
+    waiting = [l for l in labels if l.startswith("waiting:")]
     args = ["gh", "issue", "edit", str(number), "--repo", full,
             "--remove-label", info["stage"]]
     for l in waiting:

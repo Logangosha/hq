@@ -56,16 +56,18 @@ Long or formatted goals: pass `-` as the third argument and pipe the body in.
 The script handles the `Work Item:` prefix, the labels and `stage:requirements`. Don't
 add labels by hand.
 
-If this request depends on another Work Item finishing first, resolve it to
-`owner/repo#number` the same way you resolve the target repo, and add `--blocked-by`:
+If this request depends on other Work Items finishing first, resolve each to
+`owner/repo#number` the same way you resolve the target repo, and repeat `--blocked-by`
+once per dependency — they can be in any repo:
 
 ```bash
 bash scripts/create-work-item.sh <owner>/<repo> "Title" "Current state" "Desired state" \
-  --blocked-by <owner>/<repo>#<n>
+  --blocked-by <owner>/<repo>#<n> --blocked-by <owner>/<repo>#<m>
 ```
 
 A blocked Work Item starts parked (`waiting:work`, no stage) and only begins Requirements
-once that blocker's PR merges.
+once every blocker's PR has merged. If a blocker is closed without merging, it goes to the
+user to decide.
 
 ## 4. Reply
 
