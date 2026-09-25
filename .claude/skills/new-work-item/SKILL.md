@@ -5,12 +5,12 @@ description: Turn a plain request into a Work Item Issue in the right repo. Use 
 
 # New Work Item
 
-The user says what they want. You produce one Issue and one line of reply.
+The user says what they want. You show a proposal, and create the Issue only after their yes.
 
 ## 1. Work out the repo
 
-Read `registry/routing.md` and follow it. **Don't ask which repo** — decide, and say which
-you picked if it wasn't obvious. A wrong route is undone with `gh issue transfer`.
+Read `registry/routing.md` and follow it. **Don't ask which repo** — decide; the repo goes
+in the proposal (step 3). A wrong route is undone with `gh issue transfer`.
 
 Stop only if no domain fits. Then say what's missing and propose one; creating a repo
 needs the user's yes.
@@ -45,20 +45,66 @@ goal rather than inventing it — stage 1 will pick it up.
 **Write no requirements, no checks, no plan.** Those are the agents' work and arrive as
 comments. If you catch yourself planning, stop.
 
-## 2b. Small or normal
+## 2b. Small, normal or big
 
 Judge it yourself against `orchestration/lifecycle.md`'s small criteria: a quick fix or
 simple change, 1–3 files in one repo, an obvious fix. Anything touching agents, skills,
-the runner, secrets or real data is always normal. When unsure, it's normal. **Never ask
-the user to choose** — decide, and state your guess in the reply (step 4).
+the runner, secrets or real data is always normal.
 
-## 3. Create it
+**Normal** — one Work Item in one repo: the default for anything that isn't small.
+
+**Big** — it can only be delivered as several Work Items that depend on each other (e.g. a
+new multi-part feature, or ordered work across repos). One agent file is normal, not big.
+
+When unsure between normal and big, choose normal. **Never ask the user to choose** —
+decide, and state your guess in the proposal (step 3).
+
+## 3. Propose
+
+Before creating anything, show:
+
+- **Repo**
+- **Size** — small / normal / big, with a one-line reason
+- **Title**
+- **Goal** — current state and desired state
+
+End with **Proceed?**. Nothing is created yet.
+
+> **Repo:** `bakery-site`
+> **Size:** small — one file, wording only
+> **Title:** Fix staff page
+> **Current state:** `docs/staff.md` still lists B. Miller.
+> **Desired state:** `docs/staff.md` lists the current staff.
+>
+> Proceed?
+
+A correction — a different size, repo, title or goal — produces an updated proposal and a
+new **Proceed?**. A correction is never taken as a yes; only a clear yes moves on to step 4.
+
+For a **big** request, the size reason also says big requests aren't supported yet
+(`Logangosha/hq#114`) — the user can correct the size before anything is created.
+
+## 4. On yes, create it
+
+Runs only after the user's yes to the latest proposal.
+
+**Small:**
+
+```bash
+bash scripts/create-work-item.sh <owner>/<repo> "Title" "Current state" "Desired state" --small
+```
+
+It starts at `stage:scope` instead of `stage:requirements`.
+
+**Normal:**
 
 ```bash
 bash scripts/create-work-item.sh <owner>/<repo> "Title" "Current state" "Desired state"
 ```
 
-Small item: add `--small`. It starts at `stage:scope` instead of `stage:requirements`.
+**Big:** don't run the script and don't create an Issue. Reply that the request is big,
+that big requests go through the blueprint step (`Logangosha/hq#114`), and that it isn't
+supported yet.
 
 Long or formatted goals: pass `-` as the third argument and pipe the body in.
 
@@ -77,20 +123,20 @@ A blocked Work Item starts parked (`waiting:work`, no stage) and only begins Req
 (or Scope, if small) once every blocker's PR has merged. If a blocker is closed without
 merging, it goes to the user to decide.
 
-## 4. Reply
+## 5. Reply
 
 One line, then the link. Nothing else — no recap of what you just wrote, they can open it.
 
 > Bakery docs → `bakery-site`. #12
 
-If you guessed the repo, sized it small, or left a gap in the goal, that goes in the same
-line:
+For a big request, there's no link — say what's missing instead:
 
-> Guessing `bakery-site` over `hq` — bakery content, not the system. #12
-
-> Small fix — one file, wording only. #13
+> This needs several dependent Work Items — big requests aren't supported yet
+> (`Logangosha/hq#114`).
 
 ## If they ask for several things
 
-One Work Item each, unless they're genuinely one change. Create them all, then one line
-listing the links. Work spanning two repos is two Work Items — say which depends on which.
+One proposal per request, numbered, in one message, ending with a single **Proceed?**. The
+user can say yes, or correct or drop any one of them — each redraws just that proposal.
+Create only after the yes, then one line listing the links. Work spanning two repos is two
+Work Items — say which depends on which.
