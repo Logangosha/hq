@@ -81,8 +81,29 @@ End with **Proceed?**. Nothing is created yet.
 A correction — a different size, repo, title or goal — produces an updated proposal and a
 new **Proceed?**. A correction is never taken as a yes; only a clear yes moves on to step 4.
 
-For a **big** request, the size reason also says big requests aren't supported yet
-(`Logangosha/hq#114`) — the user can correct the size before anything is created.
+### Big: the blueprint
+
+For a **big** request, the proposal above becomes a **blueprint** instead of a single
+goal. First, ask clarifying questions — but only if a part's goal would otherwise need
+an invented detail; otherwise skip straight to the blueprint.
+
+List the parts in delivery order. Each part has a title, a repo, a size (small or
+normal — never big), a one-line goal, and what it waits on (none, or earlier part
+numbers only).
+
+> **Blueprint: Invoicing**
+>
+> | # | Title | Repo | Size | Goal | Waits on |
+> |---|---|---|---|---|---|
+> | 1 | Add invoice model | `billing-api` | normal | Store an invoice per order | none |
+> | 2 | Invoice PDF export | `billing-api` | small | Render an invoice as PDF | 1 |
+> | 3 | Invoice tab in dashboard | `billing-web` | normal | Show invoices on the account page | 1 |
+>
+> Proceed?
+
+Ends with **Proceed?**, same as any proposal. A correction redraws the **whole**
+blueprint with a new **Proceed?** — never a partial patch. Nothing is created before a
+clear yes.
 
 ## 4. On yes, create it
 
@@ -102,9 +123,31 @@ It starts at `stage:scope` instead of `stage:requirements`.
 bash scripts/create-work-item.sh <owner>/<repo> "Title" "Current state" "Desired state"
 ```
 
-**Big:** don't run the script and don't create an Issue. Reply that the request is big,
-that big requests go through the blueprint step (`Logangosha/hq#114`), and that it isn't
-supported yet.
+**Big:** create the parent, then each part in blueprint order.
+
+The parent's home is the parts' repo if they all share one, otherwise `hq`.
+
+```bash
+bash scripts/parent.sh create <owner>/<repo> "Title" "Outcome"
+```
+
+Then per part, in order:
+
+```bash
+bash scripts/create-work-item.sh <owner>/<repo> "Part title" "Current state" "Desired state" \
+  [--small] [--blocked-by <owner>/<repo>#<n> ...]
+bash scripts/parent.sh add <owner>/<repo>#<parent-n> <owner>/<repo>#<part-n>
+```
+
+Use `--small` for a small part. Give a part one `--blocked-by` per part it waits on,
+resolved to the Issue number just created for that part; a part that waits on nothing
+gets no `--blocked-by` and starts at `stage:requirements` (`stage:scope` if small) —
+don't add labels by hand and don't change a part's starting stage.
+
+Never add a label to the parent — no agent stage ever runs on it.
+
+**If any step fails, stop immediately.** The reply names every Issue already created
+(parent and parts), so nothing already made is lost track of.
 
 Long or formatted goals: pass `-` as the third argument and pipe the body in.
 
@@ -129,10 +172,45 @@ One line, then the link. Nothing else — no recap of what you just wrote, they 
 
 > Bakery docs → `bakery-site`. #12
 
-For a big request, there's no link — say what's missing instead:
+For a **big** request, the reply is the parent's link, same shape:
 
-> This needs several dependent Work Items — big requests aren't supported yet
-> (`Logangosha/hq#114`).
+> Invoicing → 3 parts in `billing-api`, `billing-web`. #120
+
+## 6. Changing a parent
+
+Only for a parent created by this skill (`parent.sh create`). It isn't a Work Item, so
+its part list can be edited over time.
+
+**Add a part.** Propose it — same fields as the blueprint, plus where it goes (usually
+last) — ending **Proceed?**. On yes, create it as in step 4's Big path, then place it:
+
+```bash
+bash scripts/parent.sh add <owner>/<repo>#<parent-n> <owner>/<repo>#<new-part-n>
+bash scripts/parent.sh move <owner>/<repo>#<parent-n> <owner>/<repo>#<new-part-n> --after <owner>/<repo>#<prior-part-n>
+```
+
+(skip `move` if the part belongs last — `add` already appends it.)
+
+**Reorder.** Show the new order, ending **Proceed?**. On yes, `parent.sh move` each part
+that changed position:
+
+```bash
+bash scripts/parent.sh move <owner>/<repo>#<parent-n> <owner>/<repo>#<part-n> --after <owner>/<repo>#<other-n>
+```
+
+**Drop.** Name the part, ending **Proceed?**. On yes:
+
+```bash
+bash scripts/drop-work-item.sh <repo> <part-n>
+bash scripts/parent.sh remove <owner>/<repo>#<parent-n> <owner>/<repo>#<part-n>
+bash scripts/parent.sh close-if-done <owner>/<repo>#<parent-n>
+```
+
+Reordering doesn't rewire `--blocked-by` — if a move would break a dependency, say so in
+the proposal instead of changing blockers.
+
+Progress ("N of M done") is GitHub's own sub-issue count on the parent — nothing to
+maintain by hand.
 
 ## If they ask for several things
 

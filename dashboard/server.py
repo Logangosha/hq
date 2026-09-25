@@ -293,6 +293,29 @@ def reconcile_blockers(full, it, comments):
     it["stage"], it["waiting"] = ("1 Scope" if small else "1 Requirements"), []
 
 
+def nest_parts(domains):
+    """Move each open part (F9) out of its own domain's `items` into its parent's
+    `parts`, in sub-issue order — wherever the part's repo is, so cross-repo parents
+    work too (R17). A part is never left both nested and top-level."""
+    by_ref = {(d["full"], it["number"]): it for d in domains for it in d["items"]}
+    by_full = {d["full"]: d for d in domains}
+    remove = {d["full"]: set() for d in domains}
+    for d in domains:
+        for p in d["parents"]:
+            for full, number in p.pop("_refs"):
+                it = by_ref.get((full, number))
+                if it is None:
+                    continue
+                it["full"], it["repo"] = full, by_full[full]["repo"] if full in by_full else full.split("/")[-1]
+                p["parts"].append(it)
+                remove[full].add(number)
+    for d in domains:
+        if remove[d["full"]]:
+            d["items"] = [it for it in d["items"] if it["number"] not in remove[d["full"]]]
+        d["items"] = d.pop("parents") + d["items"]
+    return domains
+
+
 def domain_comments(full):
     """Every issue comment in the domain, grouped by issue number. One cached,
     ETag-conditional call (like the rest of work_items()) instead of one per issue."""
@@ -489,9 +512,31 @@ def work_items():
             full = f"{owner()}/{repo['name']}"
             known.add(full)
             items = []
+            parents = []
             issues = ghcache.fetch_all(f"repos/{full}/issues?state=open&per_page=100", run)
             for issue in issues:
                 if "pull_request" in issue:
+                    continue
+                # A parent (F9) has no stage label — it's found by its sub-issues
+                # instead, before the "not a Work Item" check below would drop it.
+                if (issue.get("sub_issues_summary") or {}).get("total", 0) > 0:
+                    subs = ghcache.fetch_all(
+                        f"repos/{full}/issues/{issue['number']}/sub_issues?per_page=100", run)
+                    open_subs = [s for s in subs if s["state"] == "open"]
+                    if not open_subs:
+                        run(["bash", os.path.join(HQ, "scripts", "parent.sh"),
+                             "close-if-done", f"{full}#{issue['number']}"])
+                        continue
+                    summary = issue["sub_issues_summary"]
+                    parents.append({
+                        "number": issue["number"], "title": issue["title"],
+                        "url": issue["html_url"], "parent": True, "stage": "Parent",
+                        "waiting": [], "needs_you": False,
+                        "done": summary["completed"], "total": summary["total"],
+                        "parts": [],
+                        "_refs": [(s["repository_url"].split("/repos/", 1)[-1], s["number"])
+                                  for s in open_subs],
+                    })
                     continue
                 label_objs = issue["labels"]
                 labels = [l["name"] for l in label_objs]
@@ -542,9 +587,10 @@ def work_items():
                         it["waiting"].append("waiting:user")
             for it in blocked:
                 reconcile_blockers(full, it, comments_by_number.get(it["number"], []))
-            domains.append({"full": full, "repo": repo["name"], "items": items})
+            domains.append({"full": full, "repo": repo["name"], "items": items, "parents": parents})
     except ghcache.GhRefusal as e:
         raise _refusal(e.kind, e.detail)
+    nest_parts(domains)
     totals_list = sorted(
         [{"week": w, "model": m, "stage": s,
           "cost": b["cost"] if b["known"] else None, "unknown": b["unknown"]}

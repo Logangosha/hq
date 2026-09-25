@@ -29,28 +29,31 @@ Where v2 is heading:
 - [ ] F4.8–F4.9 Workflows that write themselves, from recorded `Decisions` *(waits for a
       real backlog)*
 
-## F9: Goals — big requests become connected Work Items
-*Goal: say something big once; HQ splits it, runs the parts in order, and closes it when
-every part is done.*
+## F9: Big requests become an ordered set of Work Items
+*Goal: say something big once; `/new-work-item` splits it into an ordered blueprint, and
+runs the parts in order, closing the whole thing once every part is done.*
 
-A **Goal** is a parent Issue (`type:goal`). Its parts are ordinary Work Items, linked as
-GitHub sub-issues. A part that must wait for another carries `waiting:work`.
-*Judgment call: a Goal lives in its domain repo, or in HQ when it spans repos.*
+A big request gets a **parent Issue** (`scripts/parent.sh`) — never a Work Item itself: no
+`stage:` label, so no agent stage ever runs on it. Its parts are ordinary Work Items,
+linked as GitHub sub-issues in delivery order. A part that must wait on others gets one
+`--blocked-by` per part it waits on.
+*Judgment call: the parent lives in the parts' repo if they share one, otherwise in HQ.*
 
-- [ ] F9.1 Goal format: `type:goal` label, body = outcome + parts table (part, repo,
-      depends on). Add parent/child rules to `orchestration/lifecycle.md`
-- [ ] F9.2 `new-goal` skill: plain request → proposed breakdown → you approve the list →
-      Goal and parts are created, linked, and ordered
-- [ ] F9.3 Planner can say "too big": it proposes a breakdown on the Issue instead of a
-      plan, and the item becomes a Goal once you approve
-- [ ] F9.4 Unblock: when a part reaches Done, remove `waiting:work` from parts whose
-      blockers are all closed (runner script, not the workflow)
-- [ ] F9.5 A Goal closes only when every part is closed; then it goes to you for a
-      final review of the whole
-- [ ] F9.6 Cross-repo parts: decide how a run opens Issues in another repo (GitHub App
-      token vs. a secret per repo) and weigh what a wrong agent could then reach
-- [ ] F9.7 Dashboard shows each Goal with its parts and progress (e.g. 2 of 5 done)
-- [ ] F9.8 Test with a 3-part sandbox Goal, one part waiting on another
+- [x] F9.1 `/new-work-item` proposes a **blueprint** for a big request — parts in order,
+      each with a title, repo, size, one-line goal, and what it waits on — ending
+      **Proceed?**
+- [x] F9.2 On yes: `scripts/parent.sh create` makes the parent; each part is created with
+      `scripts/create-work-item.sh` (`--blocked-by` for order) and linked with
+      `scripts/parent.sh add`
+- [x] F9.3 `scripts/parent.sh` also adds, reorders and drops a part on an existing
+      parent, each proposed to the user first
+- [x] F9.4 The parent's `## Parts` list is regenerated from its sub-issues on every
+      change, so the two can't drift
+- [x] F9.5 The dashboard poll closes the parent once every part is closed, with a comment
+      saying so
+- [x] F9.6 Dashboard shows each open parent with its open parts nested beneath it, using
+      GitHub's native sub-issue progress (e.g. "2 of 5 done")
+- [ ] F9.7 Test with a 3-part sandbox parent, one part waiting on the other two
 - [ ] ✅ User check: are the parts and their order clear? Did it finish without you
       pushing it along?
 
