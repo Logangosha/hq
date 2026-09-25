@@ -44,7 +44,8 @@
     background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
     padding: 12px 14px; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
   }
-  .card.expandable { cursor: pointer; }
+  .card.expandable, .card.parent { cursor: pointer; }
+  .toggle-marker { color: var(--muted); width: 1em; text-align: center; }
   .needs .card { border-left: 3px solid var(--accent); }
   .ref { color: var(--muted); font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
   .title { flex: 1; min-width: 0; }
@@ -194,6 +195,12 @@
   let domains = [];
   let totals = [];  // cost totals-over-time: [{week, model, stage, cost, unknown}]
   const expanded = new Set();  // "owner/repo#n" keys whose breakdown is open (R13)
+  // "owner/repo#n" keys of parent cards collapsed by the user; persisted so the
+  // state survives a reload (R2/R3).
+  const collapsedParents = new Set(JSON.parse(localStorage.getItem("hq-collapsed-parents") || "[]"));
+  function saveCollapsedParents() {
+    localStorage.setItem("hq-collapsed-parents", JSON.stringify([...collapsedParents]));
+  }
   let costsOpen = false;  // whether the Costs-by-week panel survives a poll (R13)
   let current = null;  // the Work Item being reviewed: {repo, number}
   let timer = null;
@@ -273,11 +280,14 @@
   }
 
   function parentCard(d, p, parts, showWhy) {
-    return `<div class="card parent">
+    const key = `${d.full}#${p.number}`;
+    const collapsed = collapsedParents.has(key);
+    return `<div class="card parent" data-toggle-parent="${esc(key)}">
+      <span class="toggle-marker">${collapsed ? "▸" : "▾"}</span>
       <span class="ref">${esc(d.repo)}#${p.number}</span>
       <span class="title"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)}</a></span>
       <span class="chip">${esc(p.done)} of ${esc(p.total)} done</span>
-    </div><div class="parts">${parts.map(x => card({ full: x.full, repo: x.repo }, x, showWhy)).join("")}</div>`;
+    </div>${collapsed ? "" : `<div class="parts">${parts.map(x => card({ full: x.full, repo: x.repo }, x, showWhy)).join("")}</div>`}`;
   }
 
   function card(d, it, showWhy) {
@@ -761,6 +771,13 @@
     const rs = e.target.closest("[data-resume]");
     if (rs) return openResumeStopped(rs.dataset.resume, Number(rs.dataset.number));
     if (e.target.closest("button, a")) return;
+    const tp = e.target.closest("[data-toggle-parent]");
+    if (tp) {
+      const key = tp.dataset.toggleParent;
+      collapsedParents.has(key) ? collapsedParents.delete(key) : collapsedParents.add(key);
+      saveCollapsedParents();
+      return renderList();
+    }
     const exp = e.target.closest("[data-expand]");
     if (exp) {
       const key = exp.dataset.expand;
