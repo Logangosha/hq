@@ -1,12 +1,13 @@
 # Work Item stub. Installed into each domain repo as .github/workflows/work-item.yml
 # by scripts/enable-agents.sh, which fills in Logangosha/hq and main.
-# It only hands the event to HQ's runner, so it never needs updating:
-# change .github/workflows/work-item-runner.yml in HQ instead.
+# It hands stage: labels to HQ's runner, and also releases waiting:work Work Items
+# (any repo) the moment one of this repo's Issues closes as merged — see
+# scripts/runner/release-blocked.sh, which is all the logic lives in.
 name: Work Item
 
 on:
   issues:
-    types: [labeled]
+    types: [labeled, closed]
 
 concurrency:
   group: work-item-${{ github.event.issue.number }}
@@ -21,8 +22,23 @@ permissions:
 
 jobs:
   run:
+    if: github.event.action == 'labeled'
     uses: Logangosha/hq/.github/workflows/work-item-runner.yml@main
     with:
       hq_repo: Logangosha/hq
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+  release:
+    if: github.event.action == 'closed' && github.event.issue.state_reason == 'completed'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: hq-release-blocked
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - run: git clone --depth 1 https://github.com/Logangosha/hq.git .hq
+      - run: bash .hq/scripts/runner/release-blocked.sh
+        env:
+          GH_TOKEN: ${{ secrets.HQ_RELEASE_TOKEN }}
