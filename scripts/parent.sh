@@ -58,7 +58,7 @@ add() {
   local parent="$1" part="$2" id
   id="$(sub_issue_id "$part")"
   gh api -X POST "repos/$(ref_repo "$parent")/issues/$(ref_num "$parent")/sub_issues" \
-    -f sub_issue_id="$id" >/dev/null
+    -F sub_issue_id="$id" >/dev/null
   sync "$parent"
 }
 
@@ -72,7 +72,7 @@ move() {
     *) echo "BAD MOVE: '$mode' — use --after or --before." >&2; exit 4 ;;
   esac
   gh api -X PATCH "repos/$(ref_repo "$parent")/issues/$(ref_num "$parent")/sub_issues/priority" \
-    -f sub_issue_id="$id" -f "$field=$oid" >/dev/null
+    -F sub_issue_id="$id" -F "$field=$oid" >/dev/null
   sync "$parent"
 }
 
@@ -80,7 +80,7 @@ remove() {
   local parent="$1" part="$2" id
   id="$(sub_issue_id "$part")"
   gh api -X DELETE "repos/$(ref_repo "$parent")/issues/$(ref_num "$parent")/sub_issue" \
-    -f sub_issue_id="$id" >/dev/null
+    -F sub_issue_id="$id" >/dev/null
   sync "$parent"
 }
 
