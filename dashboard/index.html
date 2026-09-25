@@ -58,6 +58,7 @@
   }
   .needs .chip { background: var(--accent-soft); color: var(--accent); }
   .repo { font-weight: 600; margin: 18px 0 8px; font-size: 14px; }
+  .parts { margin-left: 24px; }
   .empty { color: var(--muted); font-size: 14px; padding: 4px 0 8px; }
   .all-clear { color: var(--ok); }
   .error, .warn {
@@ -257,6 +258,28 @@
 
   // ---- List ----
 
+  // Every non-parent item, nested or not, each carrying the `full` repo it actually
+  // lives in — so a part nested under a parent (possibly in another repo) can still
+  // be found by (full, number) the same way a top-level item is (F9).
+  function allItems() {
+    const all = [];
+    for (const d of domains) {
+      for (const it of d.items) {
+        if (it.parent) all.push(...it.parts);
+        else all.push(Object.assign({}, it, { full: it.full || d.full }));
+      }
+    }
+    return all;
+  }
+
+  function parentCard(d, p, parts, showWhy) {
+    return `<div class="card parent">
+      <span class="ref">${esc(d.repo)}#${p.number}</span>
+      <span class="title"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)}</a></span>
+      <span class="chip">${esc(p.done)} of ${esc(p.total)} done</span>
+    </div><div class="parts">${parts.map(x => card({ full: x.full, repo: x.repo }, x, showWhy)).join("")}</div>`;
+  }
+
   function card(d, it, showWhy) {
     const canReview = it.stage.startsWith("6 ");
     const canAnswer = it.waiting.includes("waiting:user");
@@ -344,22 +367,33 @@
       <tbody>${rows}</tbody></table></details>`;
   }
 
+  // A part goes to "Needs you" or "In progress" like any item — never both — so a
+  // parent only renders the parts belonging to the section it's shown in.
+  function parentsFor(d, wantNeedsYou) {
+    return d.items.filter(i => i.parent)
+      .map(p => [p, p.parts.filter(x => !!x.needs_you === wantNeedsYou)])
+      .filter(([, parts]) => parts.length);
+  }
+
   function renderList() {
-    const needs = domains.flatMap(d => d.items.filter(i => i.needs_you).map(i => card(d, i, true)));
+    const needs = domains.flatMap(d =>
+      d.items.filter(i => !i.parent && i.needs_you).map(i => card(d, i, true))
+        .concat(parentsFor(d, true).map(([p, parts]) => parentCard(d, p, parts, true))));
     let html = `<h2>Needs you</h2><section class="needs">` +
       (needs.length ? needs.join("") : `<div class="empty all-clear">Nothing needs you right now.</div>`) +
       `</section><h2>In progress</h2>`;
     for (const d of domains) {
-      const rest = d.items.filter(i => !i.needs_you);
+      const rest = d.items.filter(i => !i.parent && !i.needs_you).map(i => card(d, i, false))
+        .concat(parentsFor(d, false).map(([p, parts]) => parentCard(d, p, parts, false)));
       html += `<div class="repo">${esc(d.full)}</div>` +
-        (rest.length ? rest.map(i => card(d, i, false)).join("") : `<div class="empty">No Work Items in progress.</div>`);
+        (rest.length ? rest.join("") : `<div class="empty">No Work Items in progress.</div>`);
     }
     html += `<h2>Costs</h2>` + (totalsPanel() || `<div class="empty">No cost data yet.</div>`);
     content.innerHTML = html;
   }
 
   function nextDelay() {
-    const items = domains.flatMap(d => d.items);
+    const items = allItems();
     const agentWorking = items.some(i =>
       !i.stage.startsWith("6 ") && !i.waiting.includes("waiting:user") && !i.waiting.includes("waiting:work")
       && !i.waiting.includes("waiting:stopped"));
@@ -635,8 +669,7 @@
   // from, so opening the panel costs no extra call.
   async function openRestart(repo, number) {
     current = { repo, number };
-    const d = domains.find(d => d.full === repo);
-    const it = d && d.items.find(i => i.number === number);
+    const it = allItems().find(i => i.full === repo && i.number === number);
     content.innerHTML = `
       <button class="back" id="close">← Back</button>
       <h1 class="review-title">${esc(it ? it.title : `${repo}#${number}`)}</h1>
@@ -674,8 +707,7 @@
 
   function openStop(repo, number) {
     current = { repo, number };
-    const d = domains.find(d => d.full === repo);
-    const it = d && d.items.find(i => i.number === number);
+    const it = allItems().find(i => i.full === repo && i.number === number);
     content.innerHTML = `
       <button class="back" id="close">← Back</button>
       <h1 class="review-title">${esc(it ? it.title : `${repo}#${number}`)}</h1>
@@ -695,8 +727,7 @@
 
   function openResumeStopped(repo, number) {
     current = { repo, number };
-    const d = domains.find(d => d.full === repo);
-    const it = d && d.items.find(i => i.number === number);
+    const it = allItems().find(i => i.full === repo && i.number === number);
     content.innerHTML = `
       <button class="back" id="close">← Back</button>
       <h1 class="review-title">${esc(it ? it.title : `${repo}#${number}`)}</h1>
