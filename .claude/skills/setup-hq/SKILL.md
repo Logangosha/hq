@@ -51,6 +51,15 @@ Give one at a time, wait for "done" between them.
    fallback that strips it — Windows PowerShell:
    `gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo <owner>/<repo> --body ((Get-Clipboard -Raw) -replace '\s','')`
    — Mac: `pbpaste | tr -d '[:space:]' | gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo <owner>/<repo>`
+4. **Release token** (lets a blocked Work Item start the moment its blocker merges,
+   instead of waiting for the dashboard): open
+   `https://github.com/settings/personal-access-tokens/new` → owner: them → repository
+   access: **All repositories** → permissions: **Issues: Read and write**, **Metadata:
+   Read-only** → Generate token, then copy it. Send them
+   `https://github.com/<owner>/<repo>/settings/secrets/actions/new` per domain:
+   - **Name:** `HQ_RELEASE_TOKEN`
+   - **Secret:** paste the token.
+   - **Add secret.**
 
 If `claude` isn't found after installing, its folder isn't on PATH yet — open a new
 terminal, or on Windows add `%USERPROFILE%\.local\bin` to the user Path.

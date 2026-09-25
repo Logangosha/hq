@@ -40,15 +40,15 @@ The `hq-domain` topic is what lets the user see all their domains on GitHub in o
 bash scripts/enable-agents.sh <owner>/<repo>
 ```
 
-## 5. Token *(the user does this)*
+## 5. Tokens *(the user does this)*
 
-Check first — it may already be there:
+Check first — they may already be there:
 
 ```bash
 gh secret list --repo <owner>/<repo>
 ```
 
-If `CLAUDE_CODE_OAUTH_TOKEN` is missing, walk them through step 4 of
+If `CLAUDE_CODE_OAUTH_TOKEN` or `HQ_RELEASE_TOKEN` is missing, walk them through step 4 of
 `.claude/skills/setup-hq/SKILL.md` (the web page route), with the repo filled in. Wait for
 "done", then check again.
 

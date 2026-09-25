@@ -60,6 +60,9 @@ for D in $DOMAINS; do
     && ok "CLAUDE_CODE_OAUTH_TOKEN secret" \
     || bad "no Claude token secret" "copy the token from 'claude setup-token', then in PowerShell:
        gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo $R --body ((Get-Clipboard -Raw) -replace '\\s','')"
+  gh secret list --repo "$R" 2>/dev/null | grep -q HQ_RELEASE_TOKEN \
+    && ok "HQ_RELEASE_TOKEN secret" \
+    || bad "no release token secret" "setup-hq step 4.4"
 done
 
 echo
