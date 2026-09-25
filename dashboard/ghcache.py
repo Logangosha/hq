@@ -14,6 +14,7 @@ import json
 import os
 import tempfile
 import time
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 FRESH_SECONDS = 4  # below index.html's fastest poll cadence (5s)
 
@@ -121,6 +122,8 @@ def fetch(url, run):
 
     if status == 304 and entry:
         entry["fetched_at"] = now
+        if headers.get("link"):
+            entry["link"] = headers["link"]
         cache[url] = entry
         _save(cache)
         return json.loads(entry["body"]), entry.get("link")
@@ -145,12 +148,28 @@ def fetch(url, run):
     return json.loads(body), headers.get("link")
 
 
+def _page_after(url):
+    """url with page=<current, default 1>+1, per_page as int (default 30), other params kept."""
+    split = urlsplit(url)
+    params = dict(parse_qsl(split.query))
+    page = int(params.get("page", 1))
+    per_page = int(params.get("per_page", 30))
+    params["page"] = str(page + 1)
+    params["per_page"] = str(per_page)
+    return urlunsplit(split._replace(query=urlencode(params))), per_page
+
+
 def fetch_all(url, run):
-    """Like fetch(), but follows Link: rel="next" and returns every page's items combined."""
+    """Like fetch(), but follows Link: rel="next" and returns every page's items combined.
+
+    A 304 carries no Link, so a full last page's cached "no next" may be stale; the next
+    page is probed.
+    """
     items = []
     while url:
         page, link = fetch(url, run)
         items.extend(page)
+        next_url, per_page = _page_after(url)
         url = None
         if link:
             for part in link.split(","):
@@ -158,4 +177,6 @@ def fetch_all(url, run):
                     url = part.split(";")[0].strip().strip("<>")
                     # gh api takes paths, not full URLs
                     url = url.split("api.github.com/", 1)[-1]
+        if not url and len(page) >= per_page:
+            url = next_url
     return items
