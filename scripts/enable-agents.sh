@@ -4,7 +4,7 @@
 #
 # Installs the small stub workflow (which calls HQ's runner at hq-ref, default main)
 # and the labels. Re-running it is safe. The repo also needs the CLAUDE_CODE_OAUTH_TOKEN
-# secret — this script checks and tells you if it's missing.
+# and HQ_RELEASE_TOKEN secrets — this script checks and tells you if either is missing.
 set -euo pipefail
 
 REPO="${1:-}"
@@ -29,9 +29,13 @@ gh api "repos/$REPO/contents/$PATH_IN_REPO" -X PUT \
 
 bash "$HERE/scripts/create-labels.sh" "$REPO"
 
-if gh secret list --repo "$REPO" | grep -q CLAUDE_CODE_OAUTH_TOKEN; then
+MISSING=""
+gh secret list --repo "$REPO" | grep -q CLAUDE_CODE_OAUTH_TOKEN || MISSING="$MISSING CLAUDE_CODE_OAUTH_TOKEN"
+gh secret list --repo "$REPO" | grep -q HQ_RELEASE_TOKEN || MISSING="$MISSING HQ_RELEASE_TOKEN"
+
+if [ -z "$MISSING" ]; then
   echo "Agents enabled in $REPO."
 else
-  echo "Workflow installed in $REPO, but the secret is missing. Run:"
-  echo "  gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo $REPO"
+  echo "Workflow installed in $REPO, but secret(s) are missing. Run:"
+  for S in $MISSING; do echo "  gh secret set $S --repo $REPO"; done
 fi

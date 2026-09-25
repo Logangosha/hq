@@ -23,7 +23,7 @@ bash scripts/check-setup.sh
 | No domains | You — ask which repo, then the `add-domain` skill |
 | HQ belongs to someone else | The user — copy HQ into their own account (README → How to use) |
 | HQ not public | The user — GitHub → `hq` → Settings → Change visibility |
-| Token secret missing | The user — step 4 of `.claude/skills/setup-hq/SKILL.md` |
+| Token secret missing (Claude or release) | The user — step 4 of `.claude/skills/setup-hq/SKILL.md` |
 | git / gh / gh login missing | The user — give the install link or `gh auth login` |
 
 Re-run the check after each fix, and finish on "All set".

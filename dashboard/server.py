@@ -205,6 +205,7 @@ BLOCKER_RE = re.compile(r"Blocked by ((?:`[^`]+`(?:, )?)+)")
 BLOCKER_REF_RE = re.compile(r"`([^`]+)`")
 DROP_RE = re.compile(r"^🛑 Blocker `([^`]+)`")
 ANSWER_RE = re.compile(r"^## Answer — user")
+RELEASED_RE = re.compile(r"^Blockers? .*(merged|done)\. Starting ")
 
 
 def parse_blockers(comments):
@@ -275,6 +276,19 @@ def reconcile_blockers(full, it, comments):
                   (b["state"] == "closed without merging" and dropped_settled(b["ref"], comments))
                   for b in it["blocked_by"])
     if not settled:
+        return
+    # Fresh re-check right before releasing (R5): the runner's release-blocked.sh
+    # (this repo or another domain's) may have released it since the comments above
+    # were read.
+    fresh = run(["gh", "issue", "view", number, "--repo", full, "--json", "labels,comments"],
+                check=False)
+    if fresh.returncode != 0:
+        return
+    info = json.loads(fresh.stdout)
+    fresh_labels = [l["name"] for l in info["labels"]]
+    if ("waiting:work" not in fresh_labels
+            or any(l.startswith("stage:") or l == "waiting:user" for l in fresh_labels)
+            or any(RELEASED_RE.match(c["body"]) for c in info["comments"])):
         return
     small = it.get("size") == "small"
     next_stage = "stage:scope" if small else "stage:requirements"
