@@ -30,7 +30,7 @@ Older roadmaps: `archive/features-v1.md` (HQ, Work Items, runner, dashboard) and
 
 Test domain: `hq-test-recipes` — a few recipe files, so agent output is easy to judge.
 
-- [ ] F11.1 Starter files, added by `add-domain` to every new repo: `README.md` (what this
+- [x] F11.1 Starter files, added by `add-domain` to every new repo: `README.md` (what this
       domain is), `CLAUDE.md` (rules for agents here), empty `.claude/agents/`,
       `.claude/skills/` and `workflows/`
 - [ ] F11.2 Create `hq-test-recipes` (asking first) with 3–4 recipe files

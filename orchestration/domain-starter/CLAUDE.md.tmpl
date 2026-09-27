@@ -1,0 +1,17 @@
+# __NAME__ — Instructions for Claude
+
+This repo is a domain of HQ (`__HQ_REPO__`). Work here follows HQ's Work Item lifecycle:
+`orchestration/lifecycle.md` in `__HQ_REPO__` (checked out at `.hq/orchestration/lifecycle.md`
+during a run).
+
+## Rules
+- **The Issue is the memory.** Every decision, result and piece of evidence goes on the
+  Work Item Issue, not in chat.
+- **Never store passwords, keys, or secrets anywhere in git.**
+
+## Where things go
+- `.claude/agents/` — agents specific to this domain.
+- `.claude/skills/` — skills specific to this domain.
+- `workflows/` — workflows specific to this domain.
+
+A file in any of these three folders wins over an HQ one of the same name.

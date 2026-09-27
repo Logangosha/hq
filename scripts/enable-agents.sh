@@ -18,14 +18,20 @@ HQ_REPO="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 PATH_IN_REPO=".github/workflows/work-item.yml"
 
-CONTENT="$(sed -e "s|__HQ_REPO__|${HQ_REPO}|g" -e "s|__REF__|${REF}|g" "$HERE/orchestration/work-item.yml" | base64 -w0)"
+RENDERED="$(sed -e "s|__HQ_REPO__|${HQ_REPO}|g" -e "s|__REF__|${REF}|g" "$HERE/orchestration/work-item.yml")"
+CONTENT="$(printf '%s' "$RENDERED" | base64 -w0)"
+NEW_SHA="$(printf '%s' "$RENDERED" | git hash-object --stdin)"
 
 SHA="$(gh api "repos/$REPO/contents/$PATH_IN_REPO" --jq .sha 2>/dev/null || true)"
 
-gh api "repos/$REPO/contents/$PATH_IN_REPO" -X PUT \
-  -f message="Run Work Item agents from $HQ_REPO" \
-  -f content="$CONTENT" \
-  ${SHA:+-f sha="$SHA"} >/dev/null
+if [ "$SHA" = "$NEW_SHA" ]; then
+  :
+else
+  gh api "repos/$REPO/contents/$PATH_IN_REPO" -X PUT \
+    -f message="Run Work Item agents from $HQ_REPO" \
+    -f content="$CONTENT" \
+    ${SHA:+-f sha="$SHA"} >/dev/null
+fi
 
 bash "$HERE/scripts/create-labels.sh" "$REPO"
 
