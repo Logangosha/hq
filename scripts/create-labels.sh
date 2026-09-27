@@ -22,6 +22,7 @@ LABELS=(
   "waiting:work|F9D0C4|Another Work Item must finish first"
   "waiting:stopped|C5DEF5|Paused by the user, not the agents"
   "size:small|C2E0C6|Small path: Scope, Build, Review"
+  "run|BFD4F2|One-off agent run, not a Work Item"
 )
 
 for entry in "${LABELS[@]}"; do

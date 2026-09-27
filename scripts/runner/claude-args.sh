@@ -5,8 +5,11 @@
 # Model and effort come from the stage agent's own frontmatter
 # (.claude/agents/$NAME.md, installed into the domain checkout by
 # install-agents.sh), unless three-strikes.sh flagged this as a rebuild after a QA
-# fail, in which case it's overridden to opus/high (hq#78 R5).
-# Usage: NAME=builder MAX_TURNS=80 bash .hq/scripts/runner/claude-args.sh
+# fail, in which case it's overridden to opus/high (hq#78 R5). If the agent's
+# frontmatter has neither, DEFAULT_MODEL/DEFAULT_EFFORT are used instead (a manual
+# run's agent may not set them; stage agents always do, so they're unaffected).
+# Usage: NAME=builder MAX_TURNS=80 [DEFAULT_MODEL=sonnet DEFAULT_EFFORT=medium] \
+#        bash .hq/scripts/runner/claude-args.sh
 # Writes args=<flags> to $GITHUB_OUTPUT (stdout when that isn't set).
 set -euo pipefail
 
@@ -17,6 +20,8 @@ test -f "$AGENT_FILE" || { echo "No agent file at $AGENT_FILE"; exit 1; }
 FRONTMATTER="$(sed -n '/^---$/,/^---$/p' "$AGENT_FILE")"
 MODEL="$(sed -n 's/^model: *//p' <<<"$FRONTMATTER" | head -1)"
 EFFORT="$(sed -n 's/^effort: *//p' <<<"$FRONTMATTER" | head -1)"
+MODEL="${MODEL:-${DEFAULT_MODEL:-}}"
+EFFORT="${EFFORT:-${DEFAULT_EFFORT:-}}"
 : "${MODEL:?no model: in $AGENT_FILE}" "${EFFORT:?no effort: in $AGENT_FILE}"
 
 if [ "$NAME" = builder ] && [ "$(cat "${RUNNER_TEMP:-/tmp}/hq-rebuild-escalate" 2>/dev/null || echo false)" = true ]; then
