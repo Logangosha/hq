@@ -1,6 +1,6 @@
 ---
 name: add-domain
-description: Add a new domain repo to HQ so Work Items can run in it — repo (created if missing, after asking), description, workflow, labels and the Claude token. Use when the user says "add a repo", "add a domain", "start using HQ in <repo>", or a Work Item is wanted in a repo that has no Work Item workflow yet.
+description: Add a new domain repo to HQ so Work Items can run in it — repo (created if missing, after asking), description, starter files, workflow, labels and the Claude token. Use when the user says "add a repo", "add a domain", "start using HQ in <repo>", or a Work Item is wanted in a repo that has no Work Item workflow yet.
 ---
 
 # Add a domain
@@ -20,7 +20,8 @@ command — the only thing they do by hand is the token, because it's a credenti
 gh repo view <owner>/<repo>
 ```
 
-Missing → ask once, then `gh repo create <owner>/<repo> --private --add-readme -d "<what belongs here>"`.
+Missing → ask once, then `gh repo create <owner>/<repo> --private -d "<what belongs here>"`.
+No `--add-readme`: the starter README (step 4) is the repo's first file.
 
 ## 3. Description
 
@@ -34,13 +35,22 @@ gh repo edit <owner>/<repo> --description "<what belongs here>" --add-topic hq-d
 The `hq-domain` topic is what lets the user see all their domains on GitHub in one link
 (the `domains` skill gives it). Always add it, even if the description is already fine.
 
-## 4. Workflow and labels
+## 4. Starter files
+
+```bash
+bash scripts/add-starter-files.sh <owner>/<repo>
+```
+
+Adds `README.md`, `CLAUDE.md`, and a note in `.claude/agents/`, `.claude/skills/` and
+`workflows/` — only the ones missing. Never overwrites. Safe to re-run.
+
+## 5. Workflow and labels
 
 ```bash
 bash scripts/enable-agents.sh <owner>/<repo>
 ```
 
-## 5. Tokens *(the user does this)*
+## 6. Tokens *(the user does this)*
 
 Check first — they may already be there:
 
@@ -52,6 +62,6 @@ If `CLAUDE_CODE_OAUTH_TOKEN` or `HQ_RELEASE_TOKEN` is missing, walk them through
 `.claude/skills/setup-hq/SKILL.md` (the web page route), with the repo filled in. Wait for
 "done", then check again.
 
-## 6. Confirm
+## 7. Confirm
 
 One line: the repo is ready, and they can now say `/new-work-item … in <repo>`.
