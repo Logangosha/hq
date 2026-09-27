@@ -40,9 +40,9 @@ Test domain: `hq-test-recipes` — a few recipe files, so agent output is easy t
 *Goal: `/run <agent> in <repo>` starts that agent on GitHub; the result lands where you
 can see it.*
 
-- [ ] F12.1 Domain stub gains a request trigger (`workflow_dispatch`: agent + ask); logic
+- [x] F12.1 Domain stub gains a request trigger (`workflow_dispatch`: agent + ask); logic
       in `scripts/runner/`
-- [ ] F12.2 A run's result is an Issue labelled `run` in that domain; file changes come as
+- [x] F12.2 A run's result is an Issue labelled `run` in that domain; file changes come as
       a PR on it
 - [ ] F12.3 `/run` skill in HQ
 - [ ] F12.4 Domain agent `shopping-list` in the test repo: builds a shopping list from
