@@ -44,7 +44,7 @@ can see it.*
       in `scripts/runner/`
 - [x] F12.2 A run's result is an Issue labelled `run` in that domain; file changes come as
       a PR on it
-- [ ] F12.3 `/run` skill in HQ
+- [x] F12.3 `/run` skill in HQ
 - [ ] F12.4 Domain agent `shopping-list` in the test repo: builds a shopping list from
       chosen recipes, as a PR
 - [ ] ✅ User check: run it from HQ (and from your phone). Is the result right and easy to find?
