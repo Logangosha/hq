@@ -1,91 +1,86 @@
-# Features Roadmap — v2
+# Features Roadmap — v3
 
 We build one small step at a time. Each feature ends with a **user check** before moving on.
+Order rule: get something into the user's hands to try as early as possible.
 
-v1 (F1–F8: HQ, Work Items, the GitHub runner, the review dashboard) is in
-`archive/features-v1.md`. Its open items are carried below with their IDs kept.
+Older roadmaps: `archive/features-v1.md` (HQ, Work Items, runner, dashboard) and
+`archive/features-v2.md` (big requests, agent plans). Their open items stay open there.
 
-Where v2 is heading:
-- **Goals** — say something big; HQ breaks it into Work Items, runs them in order, and
-  tells you when the whole thing is done.
-- **Agents** — set up agents for other kinds of work (email, personal finance, research)
-  that run on a schedule or on request, not only through the build lifecycle.
+## The model
+
+| Noun | What it is |
+|---|---|
+| **Domain** | A project = one repo. Holds its files, Issues and capabilities |
+| **Skill** | Something you type; runs now, in a session |
+| **Agent** | One role: job, tools, what it may never do alone, where it reports |
+| **Workflow** | Agents in order, started by a trigger |
+| **Connection** | An account a domain can reach; secret in GitHub, never in git |
+
+- **Scope:** *generic* capabilities live in HQ and work in every domain; *domain* ones live
+  in that repo and win over a generic one of the same name.
+- **Triggers:** request · label · schedule · event.
+- **Making** a capability is a Work Item. **Running** one is a *run*: it leaves a report,
+  or a draft that waits for you.
+- Runs happen on GitHub Actions — no computer of yours needs to be on.
 
 ---
 
-## Carried over from v1
+## F11: A test domain to try everything in
+*Goal: one small repo, set up the way every new domain will be.*
 
-- [ ] F5 ✅ User check: did each request land in the right repo, with a goal you recognise?
-- [ ] F6.5 Test setup from a fresh copy of HQ, on a different account
-- [ ] F6 ✅ User check: run the setup yourself. Was it easy?
-- [ ] F7.10 Let the agents look things up: allow `WebSearch` and `WebFetch` in the runner
-- [ ] F7.8 A bounce works: an agent sets the label *backwards* and the right agent picks
-      it up *(test issues #15, #19 in the sandbox)*
-- [ ] F7 ✅ User check: create an Issue from your phone and watch it move
-- [ ] F8.9 The dashboard refreshes itself *(in flight — hq#26)*
-- [ ] F8.2 `work-items` flags what needs you (`stage:review`, `waiting:user`)
-- [ ] F8.7 "How's X going?" — a one-line status per item on the dashboard
-- [ ] F8 ✅ User check: notification → dashboard → review → decision, without touching git
-- [ ] F4.8–F4.9 Workflows that write themselves, from recorded `Decisions` *(waits for a
-      real backlog)*
+Test domain: `hq-test-recipes` — a few recipe files, so agent output is easy to judge.
 
-## F9: Big requests become an ordered set of Work Items
-*Goal: say something big once; `/new-work-item` splits it into an ordered blueprint, and
-runs the parts in order, closing the whole thing once every part is done.*
+- [ ] F11.1 Starter files, added by `add-domain` to every new repo: `README.md` (what this
+      domain is), `CLAUDE.md` (rules for agents here), empty `.claude/agents/`,
+      `.claude/skills/` and `workflows/`
+- [ ] F11.2 Create `hq-test-recipes` (asking first) with 3–4 recipe files
+- [ ] ✅ User check: open the repo. Is it clear what it is and where things go?
 
-A big request gets a **parent Issue** (`scripts/parent.sh`) — never a Work Item itself: no
-`stage:` label, so no agent stage ever runs on it. Its parts are ordinary Work Items,
-linked as GitHub sub-issues in delivery order. A part that must wait on others gets one
-`--blocked-by` per part it waits on.
-*Judgment call: the parent lives in the parts' repo if they share one, otherwise in HQ.*
+## F12: Run an agent on request
+*Goal: `/run <agent> in <repo>` starts that agent on GitHub; the result lands where you
+can see it.*
 
-- [x] F9.1 `/new-work-item` proposes a **blueprint** for a big request — parts in order,
-      each with a title, repo, size, one-line goal, and what it waits on — ending
-      **Proceed?**
-- [x] F9.2 On yes: `scripts/parent.sh create` makes the parent; each part is created with
-      `scripts/create-work-item.sh` (`--blocked-by` for order) and linked with
-      `scripts/parent.sh add`
-- [x] F9.3 `scripts/parent.sh` also adds, reorders and drops a part on an existing
-      parent, each proposed to the user first
-- [x] F9.4 The parent's `## Parts` list is regenerated from its sub-issues on every
-      change, so the two can't drift
-- [x] F9.5 The dashboard poll closes the parent once every part is closed, with a comment
-      saying so
-- [x] F9.6 Dashboard shows each open parent with its open parts nested beneath it, using
-      GitHub's native sub-issue progress (e.g. "2 of 5 done")
-- [ ] F9.7 Test with a 3-part sandbox parent, one part waiting on the other two
-- [ ] ✅ User check: are the parts and their order clear? Did it finish without you
-      pushing it along?
+- [ ] F12.1 Domain stub gains a request trigger (`workflow_dispatch`: agent + ask); logic
+      in `scripts/runner/`
+- [ ] F12.2 A run's result is an Issue labelled `run` in that domain; file changes come as
+      a PR on it
+- [ ] F12.3 `/run` skill in HQ
+- [ ] F12.4 Domain agent `shopping-list` in the test repo: builds a shopping list from
+      chosen recipes, as a PR
+- [ ] ✅ User check: run it from HQ (and from your phone). Is the result right and easy to find?
 
-## F10: Agents — set up agents and workflows for any kind of work
-*Goal: say "I want an email agent" or "a personal finance agent", and HQ sets one up in
-its own domain repo — safely, and reporting back to you.*
+## F13: A generic agent that works in any domain
+*Goal: one agent in HQ, run in any repo, that learns the repo before it answers.*
 
-Two kinds of agent:
-- **Lifecycle agents** — work through Work Items (today's builder, QA, etc.).
-- **Standing agents** — run on a schedule or trigger (e.g. triage email each morning,
-  summarise spending each month) and report to you.
+- [ ] F13.1 Generic `research` agent in HQ: reads the domain, searches the web, posts a
+      report with sources. Read-only
+- [ ] F13.2 Run it in the test repo and in `hq` with the same `/run`
+- [ ] ✅ User check: are both reports useful and grounded in the right repo?
 
-Project-specific agents live in their domain repo, never in HQ. HQ holds only the
-generic parts: the format, the setup skill, and the runner.
+## F14: Workflows — agents in a chain
+*Goal: a file in `workflows/` names its trigger and its agents in order; `/run` starts it.*
 
-- [ ] F10.1 Agent format: one file per agent = job, trigger (schedule / label / request),
-      tools and data it may use, what it may **never** do alone, and where it reports
-- [ ] F10.2 Safety defaults: read-only first; anything outward (send, pay, delete) is a
-      draft that waits for you (`waiting:user`). Secrets only in GitHub secrets
-- [ ] F10.3 Standing-agent runner: a scheduled workflow stub (installed like
-      `work-item.yml`), logic in `scripts/runner/`
-- [ ] F10.4 Reports: each run posts a short digest to a pinned Issue in its domain; items
-      that need you appear on the dashboard
-- [ ] F10.5 `new-agent` skill: plain request → agent file + trigger + secrets checklist,
-      delivered as a Work Item in the domain repo so it goes through QA and your review
-- [ ] F10.6 Connecting data: how an agent reaches Gmail, a bank export, etc. Pick one
-      approach per source; least access that works
-- [ ] F10.7 First real agent — **email**: morning triage, labels and a digest, replies
-      drafted not sent. Try on a test inbox first
-- [ ] F10.8 Second real agent — **personal finance**: monthly spending summary from an
-      export, read-only
-- [ ] F10.9 Lifecycle workflows for more kinds of Work Item: `software-feature`,
-      `research`, `bug-fix`
-- [ ] ✅ User check: set up an agent by asking for it. Did it do its job without doing
-      anything you didn't approve?
+- [ ] F14.1 Workflow format: trigger, agents in order, connections, where it reports
+- [ ] F14.2 Test workflow in the test repo: `research` → `shopping-list`
+- [ ] ✅ User check: run it. Did each agent hand off correctly?
+
+## F15: Scheduled runs
+*Goal: a workflow runs by itself on a schedule.*
+
+- [ ] F15.1 Schedule trigger from the workflow file (GitHub cron)
+- [ ] F15.2 Test: the F14 workflow weekly; its runs show on the dashboard
+- [ ] ✅ User check: did it run with your computer off?
+
+## F16: What can X do?
+- [ ] F16.1 `/capabilities <repo>`: its agents, skills and workflows, generic ones included
+- [ ] F16.2 The same on the dashboard, per domain
+- [ ] ✅ User check: can you tell at a glance what each domain can do?
+
+## F17: Cross-domain agents
+- [ ] F17.1 A generic workflow in HQ that runs over every domain
+- [ ] F17.2 First one: `librarian` — keeps an index of what's in each domain, read-only
+- [ ] ✅ User check: ask the librarian where something is. Does it know?
+
+## Later
+- Connections (email, accounts) — carried from F10.6–F10.8 in `archive/features-v2.md`
+- Event triggers (email arrives, PR merges)
