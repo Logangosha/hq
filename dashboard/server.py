@@ -538,7 +538,7 @@ def work_items():
                         f"repos/{full}/issues/{issue['number']}/sub_issues?per_page=100", run)
                     open_subs = [s for s in subs if s["state"] == "open"]
                     if not open_subs:
-                        run(["bash", os.path.join(HQ, "scripts", "parent.sh"),
+                        run([BASH, "scripts/parent.sh",
                              "close-if-done", f"{full}#{issue['number']}"])
                         continue
                     summary = issue["sub_issues_summary"]
