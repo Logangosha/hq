@@ -33,8 +33,8 @@ Test domain: `hq-test-recipes` — a few recipe files, so agent output is easy t
 - [x] F11.1 Starter files, added by `add-domain` to every new repo: `README.md` (what this
       domain is), `CLAUDE.md` (rules for agents here), empty `.claude/agents/`,
       `.claude/skills/` and `workflows/`
-- [ ] F11.2 Create `hq-test-recipes` (asking first) with 3–4 recipe files
-- [ ] ✅ User check: open the repo. Is it clear what it is and where things go?
+- [x] F11.2 Create `hq-test-recipes` (asking first) with 3–4 recipe files
+- [x] ✅ User check: open the repo. Is it clear what it is and where things go?
 
 ## F12: Run an agent on request
 *Goal: `/run <agent> in <repo>` starts that agent on GitHub; the result lands where you
