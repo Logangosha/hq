@@ -56,12 +56,12 @@ else** — it is only reached once this loop ends clean.
 
 ## 5. Start
 
-Build the ask to send:
+Build the ask to send, in this order:
 
-- The user's ask, verbatim, if they gave one.
-- Otherwise, if nothing was required: `No ask given — use your defaults.`
-- Then, one line per answered detail: `Answers:` followed by `- <detail>: <answer>` for
-  each (skip this block if there were none).
+1. The user's ask, verbatim. If they gave none (and nothing required it), exactly
+   `No ask given — use your defaults.`
+2. If they answered anything in step 4: a line `Answers:`, then one line
+   `- <detail>: <answer>` per answer. No answers → no `Answers:` line at all.
 
 ```bash
 printf '%s' "$ASK_TEXT" | bash scripts/run-start.sh <owner/repo> <agent>
@@ -72,5 +72,7 @@ printf '%s' "$ASK_TEXT" | bash scripts/run-start.sh <owner/repo> <agent>
 - Exit 0 → prints `issue=<url>`. Reply with just that link.
 - Exit 5 → prints `run=<url>` (no `issue=`). Reply with the Actions run link and say the
   run Issue wasn't found yet.
+- Exit 1 after dispatch (`Dispatched, but no new run was found`) → say the run was sent
+  but couldn't be found, and link `https://github.com/<owner/repo>/actions/workflows/work-item.yml`.
 
 Nothing else — no recap of the ask, they can open the link.

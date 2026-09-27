@@ -14,11 +14,11 @@ if [ -z "$REPO" ] || [ -z "$AGENT" ]; then
   exit 1
 fi
 
-ASK="$(cat)"
+ASK="$(cat; printf x)"; ASK="${ASK%x}"
 
 BEFORE="$(gh run list -R "$REPO" -w work-item.yml -e workflow_dispatch --json databaseId --jq '.[].databaseId' | sort -u)"
 
-RUN_URL="$(jq -n --arg agent "$AGENT" --arg ask "$ASK" '{agent:$agent,ask:$ask}' \
+RUN_URL="$(jq -nc --arg agent "$AGENT" --arg ask "$ASK" '{agent:$agent,ask:$ask}' \
   | gh workflow run work-item.yml -R "$REPO" --json 2>/dev/null || true)"
 RUN_URL="$(printf '%s' "$RUN_URL" | grep -oE 'https://[^ ]+/actions/runs/[0-9]+' | head -1 || true)"
 
@@ -40,11 +40,15 @@ if [ -z "$RUN_URL" ]; then
 fi
 
 RUN_ID="${RUN_URL##*/}"
+if ! [[ "$RUN_ID" =~ ^[0-9]+$ ]]; then
+  echo "Bad run id from $RUN_URL." >&2
+  exit 1
+fi
 echo "run=$RUN_URL"
 
 for _ in $(seq 1 18); do
   ISSUE_URL="$(gh issue list -R "$REPO" -l run --state all --limit 30 --json url,body \
-    --jq --arg id "$RUN_ID" '.[] | select(.body | contains("/actions/runs/" + $id)) | .url' | head -1)"
+    --jq ".[] | select(.body | test(\"/actions/runs/${RUN_ID}([^0-9]|\$)\")) | .url" | head -1)"
   [ -n "$ISSUE_URL" ] && { echo "issue=$ISSUE_URL"; exit 0; }
   sleep 10
 done

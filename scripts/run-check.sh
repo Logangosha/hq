@@ -32,15 +32,15 @@ fi
 
 echo "repo=$REPO"
 
-WORKFLOW="$(gh api "repos/$REPO/contents/.github/workflows/work-item.yml" --jq '.content' 2>/dev/null | base64 -d 2>/dev/null || true)"
-if [ -z "$WORKFLOW" ] || ! grep -q 'workflow_dispatch' <<<"$WORKFLOW"; then
+# Decide by gh api's exit status: on a 404, --jq prints the raw error JSON to stdout.
+if ! B64="$(gh api "repos/$REPO/contents/.github/workflows/work-item.yml" --jq '.content' 2>/dev/null)" \
+  || ! base64 -d <<<"$B64" 2>/dev/null | grep -q 'workflow_dispatch'; then
   echo "No Work Item workflow with a manual trigger in $REPO." >&2
   exit 4
 fi
 
-AGENT_CONTENT="$(gh api "repos/$REPO/contents/.claude/agents/$AGENT.md" --jq '.content' 2>/dev/null | base64 -d 2>/dev/null || true)"
-if [ -n "$AGENT_CONTENT" ]; then
-  printf '%s\n' "$AGENT_CONTENT"
+if B64="$(gh api "repos/$REPO/contents/.claude/agents/$AGENT.md" --jq '.content' 2>/dev/null)"; then
+  base64 -d <<<"$B64"
   echo "source=repo"
   exit 0
 fi
