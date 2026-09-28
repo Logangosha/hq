@@ -4,6 +4,8 @@
 # Usage: NUM=29 AGENT=builder GITHUB_REPOSITORY=owner/repo bash .hq/scripts/runner/run-pr.sh
 # Needs GH_TOKEN. Run from the domain checkout, after HQ was cloned into .hq and
 # install-agents.sh has installed HQ's agents/hooks.
+# The push authenticates with GH_TOKEN only, ignoring the origin URL and any git
+# credentials an earlier step (e.g. claude-code-action) left behind.
 set -euo pipefail
 
 : "${NUM:?}" "${AGENT:?}" "${GITHUB_REPOSITORY:?}"
@@ -45,7 +47,10 @@ git switch -c "$BRANCH"
 git add -A -- "${CHANGED[@]}"
 git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
   commit -m "Run #$NUM: $AGENT"
-git push origin HEAD
+git -c http.https://github.com/.extraheader= \
+  -c credential.helper= \
+  -c credential.helper='!f() { echo username=x-access-token; echo "password=$GH_TOKEN"; }; f' \
+  push "https://github.com/$GITHUB_REPOSITORY.git" "HEAD:refs/heads/$BRANCH"
 
 gh pr create --repo "$GITHUB_REPOSITORY" --head "$BRANCH" \
   --title "Run #$NUM: $AGENT" \
