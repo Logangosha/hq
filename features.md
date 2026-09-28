@@ -46,9 +46,11 @@ can see it. Parent: #179*
 - [x] F12.3 `/run` skill: asks until nothing required is missing, then starts the run — #182
 - [x] F12.4 `shopping-list` agent in `hq-test-recipes`, written to the standard —
       hq-test-recipes#3
-- [ ] ✅ User check: run it from HQ (and from your phone). Is the result right and easy to find?
+- [x] ✅ User check: run it from HQ (and from your phone). Is the result right and easy to find?
       First try (hq-test-recipes#11): list right; `/run` needs `jq` (missing locally), PR
-      refused (Actions can't create PRs in the repo). Fix, then re-run.
+      refused (Actions can't create PRs in the repo). Fixed (#193, #195). Re-run
+      (hq-test-recipes#12) passed from HQ and phone. Finding: a result is only found by
+      asking Claude or opening GitHub — see Later.
 
 ## F13: A generic agent that works in any domain
 *Goal: one agent in HQ, run in any repo, that learns the repo before it answers.*
@@ -85,3 +87,4 @@ can see it. Parent: #179*
 ## Later
 - Connections (email, accounts) — carried from F10.6–F10.8 in `archive/features-v2.md`
 - Event triggers (email arrives, PR merges)
+- A visual place to see run results (today: ask Claude or open GitHub) — F12 user check
