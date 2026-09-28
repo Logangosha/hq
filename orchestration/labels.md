@@ -35,6 +35,15 @@ A failed QA or a bounce moves the `stage:` label back. See `lifecycle.md`.
 
 The repo already says which domain a Work Item belongs to, so there is no domain label.
 
+## Workflow items
+
+Items of a workflow file (`orchestration/workflows.md`). Created by the runner (F14.2), not by `create-labels.sh`. Never `stage:` — that starts a Work Item agent.
+
+| Label | Meaning |
+|---|---|
+| `flow:<workflow>` | The item belongs to this workflow, e.g. `flow:job-hunt` |
+| `step:<stage>` | The item is at this stage of its workflow, e.g. `step:resume` |
+
 ## Creating these labels in a repo
 
 ```bash
