@@ -3,14 +3,26 @@
 # It hands stage: labels to HQ's runner, and also releases waiting:work Work Items
 # (any repo) the moment one of this repo's Issues closes as merged — see
 # scripts/runner/release-blocked.sh, which is all the logic lives in.
+# A manual run (workflow_dispatch: agent + ask) starts a named agent on a one-off
+# task, outside the lifecycle — see scripts/runner/run-*.sh.
 name: Work Item
 
 on:
   issues:
     types: [labeled, closed]
+  workflow_dispatch:
+    inputs:
+      agent:
+        description: Name of the agent to run (a .claude/agents/<name>.md)
+        required: true
+        type: string
+      ask:
+        description: The task to give it
+        required: true
+        type: string
 
 concurrency:
-  group: work-item-${{ github.event.issue.number }}
+  group: work-item-${{ github.event.issue.number || github.run_id }}
   cancel-in-progress: false
 
 # The most the runner's jobs may use; each job asks for what it needs.
@@ -42,3 +54,76 @@ jobs:
       - run: bash .hq/scripts/runner/release-blocked.sh
         env:
           GH_TOKEN: ${{ secrets.HQ_RELEASE_TOKEN }}
+
+  ask:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch HQ
+        run: git clone --depth 1 https://github.com/Logangosha/hq.git .hq
+
+      - name: Open the run Issue
+        id: issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AGENT: ${{ inputs.agent }}
+          ASK: ${{ inputs.ask }}
+        run: bash .hq/scripts/runner/run-open.sh
+
+      - name: Install HQ's agents
+        run: bash .hq/scripts/runner/install-agents.sh
+
+      - name: The agent's briefing
+        id: prompt
+        env:
+          NUM: ${{ steps.issue.outputs.num }}
+          AGENT: ${{ inputs.agent }}
+          ASK: ${{ inputs.ask }}
+        run: bash .hq/scripts/runner/run-prompt.sh
+
+      - name: The agent's flags
+        id: flags
+        env:
+          NAME: ${{ inputs.agent }}
+          MAX_TURNS: 80
+          DEFAULT_MODEL: sonnet
+          DEFAULT_EFFORT: medium
+        run: bash .hq/scripts/runner/claude-args.sh
+
+      - uses: anthropics/claude-code-action@v1
+        id: run_agent
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_bots: "claude"
+          claude_args: ${{ steps.flags.outputs.args }}
+          prompt: ${{ steps.prompt.outputs.text }}
+
+      - name: Post the agent's result
+        if: steps.run_agent.outcome == 'success'
+        env:
+          NUM: ${{ steps.issue.outputs.num }}
+          EXECUTION_FILE: ${{ steps.run_agent.outputs.execution_file }}
+        run: bash .hq/scripts/runner/run-result.sh
+
+      - name: Open a PR for any file changes
+        if: steps.run_agent.outcome == 'success'
+        env:
+          NUM: ${{ steps.issue.outputs.num }}
+          AGENT: ${{ inputs.agent }}
+        run: bash .hq/scripts/runner/run-pr.sh
+
+      - name: Report a failed agent run
+        if: failure() && steps.issue.outputs.num != '' && steps.prompt.outcome != 'failure'
+        env:
+          NUM: ${{ steps.issue.outputs.num }}
+          AGENT: ${{ inputs.agent }}
+        run: bash .hq/scripts/runner/run-failed.sh
