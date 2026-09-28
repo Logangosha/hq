@@ -37,16 +37,15 @@ Test domain: `hq-test-recipes` — a few recipe files, so agent output is easy t
 - [x] ✅ User check: open the repo. Is it clear what it is and where things go?
 
 ## F12: Run an agent on request
-*Goal: `/run <agent> in <repo>` starts that agent on GitHub; the result lands where you
-can see it.*
+*Goal: `/run <agent> in <repo>: <ask>` starts that agent on GitHub; the result lands where you
+can see it. Parent: #179*
 
-- [x] F12.1 Domain stub gains a request trigger (`workflow_dispatch`: agent + ask); logic
-      in `scripts/runner/`
-- [x] F12.2 A run's result is an Issue labelled `run` in that domain; file changes come as
-      a PR on it
-- [ ] F12.3 `/run` skill in HQ
-- [ ] F12.4 Domain agent `shopping-list` in the test repo: builds a shopping list from
-      chosen recipes, as a PR
+- [x] F12.1 Agent standard: what every agent file holds (`.claude/agents/README.md`) — #180
+- [x] F12.2 Run an agent on GitHub: stub trigger (agent + ask), logic in `scripts/runner/`;
+      result on a `run` Issue, file changes as a PR — #181
+- [ ] F12.3 `/run` skill: asks until nothing required is missing, then starts the run — #182
+- [ ] F12.4 `shopping-list` agent in `hq-test-recipes`, written to the standard —
+      hq-test-recipes#3
 - [ ] ✅ User check: run it from HQ (and from your phone). Is the result right and easy to find?
 
 ## F13: A generic agent that works in any domain
