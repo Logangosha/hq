@@ -38,6 +38,7 @@ Brief, not clipped. Full sentences are fine; padding is not.
 | Build roadmap (check off steps as they finish) | `features.md` — older ones in `archive/` |
 | Big requests: parent Issue and its parts | `scripts/parent.sh` |
 | Lifecycle rules | `orchestration/lifecycle.md` |
+| Workflows (flowcharts HQ runs): the model | `orchestration/workflows.md` |
 | Domain repos (where work goes) | `scripts/list-domains.sh` — why nothing is listed: `registry/domains.md` |
 | Which repo a request goes to | `registry/routing.md` |
 | Turning a request into an Issue | `new-work-item` skill |

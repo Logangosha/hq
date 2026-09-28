@@ -61,12 +61,16 @@ can see it. Parent: #179*
       hq#198. Read-only held (no PR). Nit: stray line above `## Answer` on #16
 - [x] ✅ User check: are both reports useful and grounded in the right repo? Passed
 
-## F14: Workflows — agents in a chain
-*Goal: a file in `workflows/` names its trigger and its agents in order; `/run` starts it.*
+## F14: Workflows — flowcharts HQ runs
+*Goal: a domain describes a flowchart in a file (stages, agents, gates, arrows); HQ runs it
+the way it runs Work Items. Model: `orchestration/workflows.md`.*
 
-- [ ] F14.1 Workflow format: trigger, agents in order, connections, where it reports
-- [ ] F14.2 Test workflow in the test repo: `research` → `shopping-list`
-- [ ] ✅ User check: run it. Did each agent hand off correctly?
+- [ ] F14.1 Workflow format: stages, agents, gates, arrows, items, trigger — documented in HQ
+- [ ] F14.2 Runner: reads a domain's workflow file to move items and start the next agent.
+      The Work Item lifecycle stays hard-coded and untouched
+- [ ] F14.3 Test in `hq-test-recipes`: `research` opens one Issue per recipe idea →
+      `shopping-list` → your approval gate
+- [ ] ✅ User check: run it. Did each item move right, and did the gate wait for you?
 
 ## F15: What can X do, and what did it do?
 *Goal: see each domain's capabilities and its run results without asking Claude or opening
@@ -91,3 +95,5 @@ GitHub (F12 user check).*
 ## Later
 - Connections (email, accounts) — carried from F10.6–F10.8 in `archive/features-v2.md`
 - Event triggers (email arrives, PR merges)
+- The Work Item lifecycle as a workflow file, once the format handles its loops, gates and
+  blockers (`orchestration/workflows.md`)
