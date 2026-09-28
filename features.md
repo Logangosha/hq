@@ -56,7 +56,7 @@ can see it. Parent: #179*
 *Goal: one agent in HQ, run in any repo, that learns the repo before it answers.*
 
 - [ ] F13.1 Generic `research` agent in HQ: reads the domain, searches the web, posts a
-      report with sources. Read-only
+      report with sources. Read-only — #196
 - [ ] F13.2 Run it in the test repo and in `hq` with the same `/run`
 - [ ] ✅ User check: are both reports useful and grounded in the right repo?
 
