@@ -6,6 +6,8 @@
 # install-agents.sh has installed HQ's agents/hooks.
 # The push authenticates with GH_TOKEN only, ignoring the origin URL and any git
 # credentials an earlier step (e.g. claude-code-action) left behind.
+# The PR itself opens as the Claude app, not github-actions (which GitHub blocks
+# from creating PRs by default): needs id-token: write, which the caller grants.
 set -euo pipefail
 
 : "${NUM:?}" "${AGENT:?}" "${GITHUB_REPOSITORY:?}"
@@ -42,6 +44,17 @@ if [ "${#CHANGED[@]}" -eq 0 ]; then
   exit 0
 fi
 
+OIDC=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+  "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=claude-code-github-action" | jq -r .value)
+[ -n "$OIDC" ] && [ "$OIDC" != "null" ] || { echo "Failed to get an OIDC token" >&2; exit 1; }
+
+APP_TOKEN=$(curl -fsS -X POST -H "Authorization: Bearer $OIDC" \
+  https://api.anthropic.com/api/github/github-app-token-exchange | jq -r '.token // .app_token // empty')
+[ -n "$APP_TOKEN" ] || { echo "Failed to exchange for a Claude app token" >&2; exit 1; }
+echo "::add-mask::$APP_TOKEN"
+
+trap 'curl -fsS -X DELETE -H "Authorization: Bearer $APP_TOKEN" https://api.github.com/installation/token >/dev/null || true' EXIT
+
 BRANCH="run/$NUM-$AGENT"
 git switch -c "$BRANCH"
 git add -A -- "${CHANGED[@]}"
@@ -52,6 +65,6 @@ git -c http.https://github.com/.extraheader= \
   -c credential.helper='!f() { echo username=x-access-token; echo "password=$GH_TOKEN"; }; f' \
   push "https://github.com/$GITHUB_REPOSITORY.git" "HEAD:refs/heads/$BRANCH"
 
-gh pr create --repo "$GITHUB_REPOSITORY" --head "$BRANCH" \
+GH_TOKEN="$APP_TOKEN" gh pr create --repo "$GITHUB_REPOSITORY" --head "$BRANCH" \
   --title "Run #$NUM: $AGENT" \
   --body "Closes #$NUM"
