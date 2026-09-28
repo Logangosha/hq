@@ -50,11 +50,13 @@ flow_start_of() {
   flow_rows "$1" Items | awk -F'\t' -v m="$2" '$1 == m { print $2; exit }'
 }
 
-# flow_outcome — stdin: an agent's final message. Prints its last `Outcome: <x>` line's
-# value, or `failed`.
+# flow_outcome — stdin: an agent's final message. Prints `failed` if any line starts
+# `<!-- hq-run` (a runner failure notice); else its last `Outcome: <x>` line's value, or `failed`.
 flow_outcome() {
-  local o
-  o="$(grep -iE '^[*` _]*Outcome:' | tail -1 \
+  local t o
+  t="$(cat)"
+  if grep -q '^<!-- hq-run' <<<"$t"; then printf 'failed\n'; return; fi
+  o="$(grep -iE '^[*` _]*Outcome:' <<<"$t" | tail -1 \
     | sed -E 's/^[*` _]*[Oo][Uu][Tt][Cc][Oo][Mm][Ee]:[*` ]*//; s/[*` .]*$//' \
     | tr 'A-Z' 'a-z' || true)"
   if [[ "$o" =~ ^[a-z][a-z0-9-]*$ ]]; then printf '%s\n' "$o"; else printf 'failed\n'; fi
