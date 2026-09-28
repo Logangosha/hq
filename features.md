@@ -55,9 +55,10 @@ can see it. Parent: #179*
 ## F13: A generic agent that works in any domain
 *Goal: one agent in HQ, run in any repo, that learns the repo before it answers.*
 
-- [ ] F13.1 Generic `research` agent in HQ: reads the domain, searches the web, posts a
+- [x] F13.1 Generic `research` agent in HQ: reads the domain, searches the web, posts a
       report with sources. Read-only — #196
-- [ ] F13.2 Run it in the test repo and in `hq` with the same `/run`
+- [x] F13.2 Run it in the test repo and in `hq` with the same `/run` — hq-test-recipes#16,
+      hq#198. Read-only held (no PR). Nit: stray line above `## Answer` on #16
 - [ ] ✅ User check: are both reports useful and grounded in the right repo?
 
 ## F14: Workflows — agents in a chain
