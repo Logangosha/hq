@@ -18,8 +18,7 @@ ASK="$(cat; printf x)"; ASK="${ASK%x}"
 
 BEFORE="$(gh run list -R "$REPO" -w work-item.yml -e workflow_dispatch --json databaseId --jq '.[].databaseId' | sort -u)"
 
-RUN_URL="$(jq -nc --arg agent "$AGENT" --arg ask "$ASK" '{agent:$agent,ask:$ask}' \
-  | gh workflow run work-item.yml -R "$REPO" --json 2>/dev/null || true)"
+RUN_URL="$(gh workflow run work-item.yml -R "$REPO" -f agent="$AGENT" -f ask="$ASK" 2>/dev/null || true)"
 RUN_URL="$(printf '%s' "$RUN_URL" | grep -oE 'https://[^ ]+/actions/runs/[0-9]+' | head -1 || true)"
 
 if [ -z "$RUN_URL" ]; then
