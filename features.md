@@ -59,7 +59,7 @@ can see it. Parent: #179*
       report with sources. Read-only — #196
 - [x] F13.2 Run it in the test repo and in `hq` with the same `/run` — hq-test-recipes#16,
       hq#198. Read-only held (no PR). Nit: stray line above `## Answer` on #16
-- [ ] ✅ User check: are both reports useful and grounded in the right repo?
+- [x] ✅ User check: are both reports useful and grounded in the right repo? Passed
 
 ## F14: Workflows — agents in a chain
 *Goal: a file in `workflows/` names its trigger and its agents in order; `/run` starts it.*
