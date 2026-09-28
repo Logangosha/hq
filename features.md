@@ -44,9 +44,11 @@ can see it. Parent: #179*
 - [x] F12.2 Run an agent on GitHub: stub trigger (agent + ask), logic in `scripts/runner/`;
       result on a `run` Issue, file changes as a PR — #181
 - [x] F12.3 `/run` skill: asks until nothing required is missing, then starts the run — #182
-- [ ] F12.4 `shopping-list` agent in `hq-test-recipes`, written to the standard —
+- [x] F12.4 `shopping-list` agent in `hq-test-recipes`, written to the standard —
       hq-test-recipes#3
 - [ ] ✅ User check: run it from HQ (and from your phone). Is the result right and easy to find?
+      First try (hq-test-recipes#11): list right; `/run` needs `jq` (missing locally), PR
+      refused (Actions can't create PRs in the repo). Fix, then re-run.
 
 ## F13: A generic agent that works in any domain
 *Goal: one agent in HQ, run in any repo, that learns the repo before it answers.*
