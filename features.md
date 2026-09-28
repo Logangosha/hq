@@ -63,11 +63,11 @@ can see it. Parent: #179*
 
 ## F14: Workflows — flowcharts HQ runs
 *Goal: a domain describes a flowchart in a file (stages, agents, gates, arrows); HQ runs it
-the way it runs Work Items. Model: `orchestration/workflows.md`.*
+the way it runs Work Items. Model: `orchestration/workflows.md`. Parent: #199*
 
-- [ ] F14.1 Workflow format: stages, agents, gates, arrows, items, trigger — documented in HQ
+- [ ] F14.1 Workflow format: stages, agents, gates, arrows, items, trigger, inputs — documented in HQ — #200
 - [ ] F14.2 Runner: reads a domain's workflow file to move items and start the next agent.
-      The Work Item lifecycle stays hard-coded and untouched
+      `/run <workflow>` asks for its inputs. Work Items untouched — #201
 - [ ] F14.3 Test in `hq-test-recipes`: `research` opens one Issue per recipe idea →
       `shopping-list` → your approval gate
 - [ ] ✅ User check: run it. Did each item move right, and did the gate wait for you?
