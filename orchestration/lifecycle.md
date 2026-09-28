@@ -92,7 +92,10 @@ judgment belongs to someone else.
 - **Scan everything, bounce once.** Report every problem in one comment. Don't do your own
   stage's work first — it's wasted if the earlier stage changes.
 - **Three strikes.** If a Work Item reaches the same stage a third time, stop: add
-  `waiting:user` and say what keeps going wrong. Agents never ping-pong.
+  `waiting:user` and say what keeps going wrong. Agents never ping-pong. Only runs since
+  the latest comment by a person count — runs before it don't. To let it continue: 1) a
+  person comments on the Issue (anything, e.g. `go`); 2) remove `waiting:user`; 3) remove
+  the `stage:` label and add it back.
 
 ## When the user is involved
 
