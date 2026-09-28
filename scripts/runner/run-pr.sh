@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Turns a manually-dispatched agent's file changes into one PR, linked to its run
-# Issue. If the agent changed nothing, no branch or commit is made.
+# Issue. If the agent changed nothing, no branch or commit is made — nor if the
+# agent's `tools:` line marks it read-only (hq#196 R16): a read-only agent that
+# still wrote something (e.g. via Bash) doesn't get a PR out of it.
 # Usage: NUM=29 AGENT=builder GITHUB_REPOSITORY=owner/repo bash .hq/scripts/runner/run-pr.sh
 # Needs GH_TOKEN. Run from the domain checkout, after HQ was cloned into .hq and
 # install-agents.sh has installed HQ's agents/hooks.
@@ -41,6 +43,12 @@ done < <(git status --porcelain -z --untracked-files=all)
 
 if [ "${#CHANGED[@]}" -eq 0 ]; then
   echo "No file changes"
+  exit 0
+fi
+
+if bash "$(dirname "${BASH_SOURCE[0]}")/agent-tools.sh" ".claude/agents/$AGENT.md" --read-only; then
+  echo "Read-only agent $AGENT: not turning these changes into a PR:"
+  printf '%s\n' "${CHANGED[@]}"
   exit 0
 fi
 
