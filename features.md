@@ -67,17 +67,20 @@ can see it. Parent: #179*
 - [ ] F14.2 Test workflow in the test repo: `research` → `shopping-list`
 - [ ] ✅ User check: run it. Did each agent hand off correctly?
 
-## F15: Scheduled runs
+## F15: What can X do, and what did it do?
+*Goal: see each domain's capabilities and its run results without asking Claude or opening
+GitHub (F12 user check).*
+
+- [ ] F15.1 `/capabilities <repo>`: its agents, skills and workflows, generic ones included
+- [ ] F15.2 Dashboard, per domain: the same capabilities, plus recent runs and their results
+- [ ] ✅ User check: can you tell at a glance what each domain can do, and find a run's result?
+
+## F16: Scheduled runs
 *Goal: a workflow runs by itself on a schedule.*
 
-- [ ] F15.1 Schedule trigger from the workflow file (GitHub cron)
-- [ ] F15.2 Test: the F14 workflow weekly; its runs show on the dashboard
+- [ ] F16.1 Schedule trigger from the workflow file (GitHub cron)
+- [ ] F16.2 Test: the F14 workflow weekly; its runs show on the dashboard
 - [ ] ✅ User check: did it run with your computer off?
-
-## F16: What can X do?
-- [ ] F16.1 `/capabilities <repo>`: its agents, skills and workflows, generic ones included
-- [ ] F16.2 The same on the dashboard, per domain
-- [ ] ✅ User check: can you tell at a glance what each domain can do?
 
 ## F17: Cross-domain agents
 - [ ] F17.1 A generic workflow in HQ that runs over every domain
@@ -87,4 +90,3 @@ can see it. Parent: #179*
 ## Later
 - Connections (email, accounts) — carried from F10.6–F10.8 in `archive/features-v2.md`
 - Event triggers (email arrives, PR merges)
-- A visual place to see run results (today: ask Claude or open GitHub) — F12 user check
