@@ -83,6 +83,7 @@ jobs:
       - name: The agent's briefing
         id: prompt
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NUM: ${{ steps.issue.outputs.num }}
           AGENT: ${{ inputs.agent }}
           ASK: ${{ inputs.ask }}
@@ -110,6 +111,7 @@ jobs:
       - name: Post the agent's result
         if: steps.run_agent.outcome == 'success'
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NUM: ${{ steps.issue.outputs.num }}
           EXECUTION_FILE: ${{ steps.run_agent.outputs.execution_file }}
         run: bash .hq/scripts/runner/run-result.sh
@@ -117,6 +119,7 @@ jobs:
       - name: Open a PR for any file changes
         if: steps.run_agent.outcome == 'success'
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NUM: ${{ steps.issue.outputs.num }}
           AGENT: ${{ inputs.agent }}
         run: bash .hq/scripts/runner/run-pr.sh
@@ -124,6 +127,7 @@ jobs:
       - name: Report a failed agent run
         if: failure() && steps.issue.outputs.num != '' && steps.prompt.outcome != 'failure'
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NUM: ${{ steps.issue.outputs.num }}
           AGENT: ${{ inputs.agent }}
         run: bash .hq/scripts/runner/run-failed.sh
