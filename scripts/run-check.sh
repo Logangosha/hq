@@ -40,7 +40,7 @@ if ! B64="$(gh api "repos/$REPO/contents/.github/workflows/work-item.yml" --jq '
 fi
 
 if B64="$(gh api "repos/$REPO/contents/.claude/agents/$AGENT.md" --jq '.content' 2>/dev/null)"; then
-  base64 -d <<<"$B64"
+  printf '%s\n' "$(base64 -d <<<"$B64")"
   echo "source=repo"
   exit 0
 fi
