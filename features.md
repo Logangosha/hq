@@ -66,7 +66,7 @@ can see it. Parent: #179*
 the way it runs Work Items. Model: `orchestration/workflows.md`. Parent: #199*
 
 - [x] F14.1 Workflow format: stages, agents, gates, arrows, items, trigger, inputs — documented in HQ — #200
-- [ ] F14.2 Runner: reads a domain's workflow file to move items and start the next agent.
+- [x] F14.2 Runner: reads a domain's workflow file to move items and start the next agent.
       `/run <workflow>` asks for its inputs. Work Items untouched — #201
 - [ ] F14.3 Test in `hq-test-recipes`: `research` opens one Issue per recipe idea →
       `shopping-list` → your approval gate

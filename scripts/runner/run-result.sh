@@ -18,8 +18,22 @@ if [ -z "$FINAL" ]; then
   FINAL="(No final message — the execution file was missing, empty, unreadable or had no result.)"
 fi
 
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=flow-lib.sh
+. "$HERE/flow-lib.sh"
+
 BODY_FILE="$(mktemp)"
-printf '%s' "$FINAL" | cut -c1-65000 > "$BODY_FILE"
+if [ -f "$FLOW_STEP_FILE" ]; then
+  # A workflow stage: head the comment, then move the item by the outcome it ends with.
+  { printf '**`%s`** — %s agent\n\n' "$(sed -n 's/^stage=//p' "$FLOW_STEP_FILE")" "$(sed -n 's/^agent=//p' "$FLOW_STEP_FILE")"
+    printf '%s' "$FINAL" | cut -c1-65000; } > "$BODY_FILE"
+else
+  printf '%s' "$FINAL" | cut -c1-65000 > "$BODY_FILE"
+fi
 
 gh issue comment "$NUM" --repo "${GITHUB_REPOSITORY:?}" --body-file "$BODY_FILE"
 rm -f "$BODY_FILE"
+
+if [ -f "$FLOW_STEP_FILE" ]; then
+  OUTCOME="$(flow_outcome <<<"$FINAL")" bash "$HERE/flow-route.sh"
+fi

@@ -9,12 +9,50 @@ set -euo pipefail
 
 : "${NUM:?}" "${AGENT:?}" "${ASK:?}"
 
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=flow-lib.sh
+. "$HERE/flow-lib.sh"
+
 RUN_URL="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY:?}/actions/runs/${GITHUB_RUN_ID:-}"
 
 if ! [[ "$AGENT" =~ ^[A-Za-z0-9][A-Za-z0-9_-]*$ ]] || [ ! -f ".claude/agents/$AGENT.md" ]; then
   gh issue comment "$NUM" --repo "$GITHUB_REPOSITORY" --body \
     "🛑 No agent named \`$AGENT\` here or in HQ. Run: $RUN_URL"
+  [ -f "$FLOW_STEP_FILE" ] && OUTCOME=failed bash "$HERE/flow-route.sh" || true
   exit 1
+fi
+
+OUT="${GITHUB_OUTPUT:-/dev/stdout}"
+
+# A workflow stage: the item's Issue is the memory, the agent comments on it.
+if [ -f "$FLOW_STEP_FILE" ]; then
+  WF="$(sed -n 's/^wf=//p' "$FLOW_STEP_FILE")"
+  STAGE="$(sed -n 's/^stage=//p' "$FLOW_STEP_FILE")"
+  FILE="$(sed -n 's/^file=//p' "$FLOW_STEP_FILE")"
+  OUTCOMES="$(flow_outcomes "$FILE" "$STAGE")"
+  MAKES=""
+  if [ -n "$(flow_start_of "$FILE" "$STAGE")" ]; then
+    MAKES="
+4. This stage opens new items. Open each with \`bash .hq/scripts/runner/flow-new-item.sh \"<title>\"\`
+   (body on stdin), never \`gh issue create\`."
+  fi
+  DIGEST="$(bash "$HERE/issue-digest.sh" "$GITHUB_REPOSITORY" "$NUM")"
+  BODY="$(printf 'You are the %s agent, running stage `%s` of workflow `%s` on Issue #%s.
+
+1. Read `.claude/agents/%s.md` and do exactly what it says, on this item. The workflow
+   is `%s`.
+2. Do not touch the Issue'"'"'s labels or close it — the runner moves it.
+3. Your final message is posted as your stage comment on #%s. End it with a line
+   `Outcome: <outcome>`, where <outcome> is one of: %s (or `failed`). Leave any file
+   changes uncommitted.%s
+
+The Issue so far (ask, answers, earlier stages, any rejection comment):
+
+%s' "$AGENT" "$STAGE" "$WF" "$NUM" "$AGENT" "$FILE" "$NUM" "${OUTCOMES:-done}" "$MAKES" "$DIGEST")"
+  DELIM="prompt-$(date +%s%N)"
+  while grep -qF "$DELIM" <<<"$BODY"; do DELIM="${DELIM}x"; done
+  printf 'text<<%s\n%s\n%s\n' "$DELIM" "$BODY" "$DELIM" >> "$OUT"
+  exit 0
 fi
 
 DELIM="prompt-$(date +%s%N)"
@@ -33,5 +71,4 @@ Ask:
 
 %s' "$AGENT" "$AGENT" "$NUM" "$ASK")"
 
-OUT="${GITHUB_OUTPUT:-/dev/stdout}"
 printf 'text<<%s\n%s\n%s\n' "$DELIM" "$BODY" "$DELIM" >> "$OUT"

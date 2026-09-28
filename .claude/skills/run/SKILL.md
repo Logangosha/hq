@@ -1,12 +1,14 @@
 ---
 name: run
-description: Start an agent on GitHub for a one-off ask, outside the Work Item lifecycle. Use for "/run <agent> in <repo>: <ask>" (the ": <ask>" part is optional). Never the built-in "run" skill (launching/screenshotting an app) — this one dispatches a GitHub Actions run.
+description: Start an agent — or a workflow — on GitHub for a one-off ask, outside the Work Item lifecycle. Use for "/run <agent|workflow> in <repo>: <ask>" (the ": <ask>" part is optional). Never the built-in "run" skill (launching/screenshotting an app) — this one dispatches a GitHub Actions run.
 ---
 
 # Run an agent on request
 
 Starts a named agent as a one-off GitHub Actions run (`workflow_dispatch`), not a Work
-Item. It never lets a run start while anything required is missing or unclear — asking
+Item. If the name is a **workflow** (`workflows/<name>.md` in the repo, else HQ's — the
+repo's wins, and a workflow wins over an agent of the same name), it opens an item Issue
+and runs the workflow's stages instead (`orchestration/workflows.md`). It never lets a run start while anything required is missing or unclear — asking
 again and again is cheaper than a run with the wrong inputs.
 
 ## 1. Parse
@@ -31,8 +33,13 @@ bash scripts/run-check.sh <repo> <agent>
 - Exit 3 → `<agent>` isn't in `<repo>` or in HQ. Say so and ask for another agent name.
 - Exit 0 → prints `repo=`, the agent file's contents, and `source=repo|hq`. Carry the
   agent file text into step 3.
+- Exit 0 with `kind=workflow` → it printed the workflow file, `source=` and one
+  `required=<input>` per required Input. Carry those into step 3.
 
 ## 3. Needs
+
+**Workflow (`kind=workflow`):** required = every `required=` line the user hasn't
+answered yet. Inputs marked `no` are never asked. The ask itself is optional.
 
 Read the agent file's **Inputs** section (the standard in
 `.claude/agents/README.md`).
@@ -67,7 +74,13 @@ Build the ask to send, in this order:
 printf '%s' "$ASK_TEXT" | bash scripts/run-start.sh <owner/repo> <agent>
 ```
 
+**Workflow:** the same ask text (answers included) goes to
+`printf '%s' "$ASK_TEXT" | bash scripts/flow-start.sh <owner/repo> <workflow>`. It opens
+the item Issue, labelled `flow:<workflow>` and `step:<stage>`, and starts the first stage.
+
 ## 6. Reply
+
+**Workflow:** `flow-start.sh` prints `issue=<url>` — reply with just that link.
 
 - Exit 0 → prints `issue=<url>`. Reply with just that link.
 - Exit 5 → prints `run=<url>` (no `issue=`). Reply with the Actions run link and say the
