@@ -130,6 +130,8 @@ HQ shows no separate ready/running of its own — its items appear in the all-do
 - **Pagination:** any list over 10 entries pages, 10 per page ("1–10 of 128", ‹ ›).
 - **Row actions:** the whole row is the button and shades on hover; the verb and its icon always show on the right. Verbs say what you'll do: **Review** (approve or send back), **Answer** (reply), **Read** (just look — replaces "Open").
 - **Runnable rows split in two** (workflows, agent shortcuts): left part → **Details** (steps, inputs, what it touches, past runs); right part, behind a thin divider → **▶ Start**. Each half shades on its own. Shortcut chips use the same split in small; harmless questions may skip it (open).
+- **Agent input:** + on the left to add files, send (↑) on the right; added files are shown (style being picked: chips above, count on a clip, or chips inside).
+- **Running rows:** spinning loader while working, hourglass while queued — never a play arrow. Verb: **Watch**.
 - **Icons:** use them where they help — a kind icon on each row (review, result, workflow, log, answer, failed).
 - **Navigation (trying):** a drop-down domain list under a top bar instead of a sidebar; it pushes content down. Bar shows the current domain and "N ready in other domains".
 - **Agents:** a domain has several; each gets its own card (shortcuts, input, latest).
