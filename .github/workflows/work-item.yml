@@ -4,7 +4,10 @@
 # (any repo) the moment one of this repo's Issues closes as merged — see
 # scripts/runner/release-blocked.sh, which is all the logic lives in.
 # A manual run (workflow_dispatch: agent + ask) starts a named agent on a one-off
-# task, outside the lifecycle — see scripts/runner/run-*.sh.
+# task, outside the lifecycle — see scripts/runner/run-*.sh. Workflow stages
+# (orchestration/workflows.md) start each other the same way, by dispatch, so the token
+# needs `actions: write`: domains (HQ included) must re-run scripts/enable-agents.sh
+# to get it.
 name: Work Item
 
 on:
@@ -27,11 +30,11 @@ concurrency:
 
 # The most the runner's jobs may use; each job asks for what it needs.
 permissions:
+  actions: write
   contents: write
   issues: write
   pull-requests: write
   id-token: write
-  actions: write
 
 jobs:
   run:
@@ -60,6 +63,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
+      actions: write
       contents: write
       issues: write
       pull-requests: write
@@ -105,7 +109,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          allowed_bots: "claude"
+          allowed_bots: "claude,github-actions"
           claude_args: ${{ steps.flags.outputs.args }}
           prompt: ${{ steps.prompt.outputs.text }}
 
