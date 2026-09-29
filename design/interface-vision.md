@@ -104,6 +104,12 @@ newcomer onboarding · a blueprint gate after Plan in the Work Item lifecycle.
   - **C · Warm** — serif greeting, a color per domain, tinted cards. Personal assistant.
   - Claude's guess: A + B mix (calm by default, stages visible), keep C's domain colors.
     User hasn't picked yet.
+  - Round 2, same layout in six visual styles. **User rules out:** a dark sidebar; hierarchy
+    by big type alone; a color per domain everywhere (color yes, but sparing); rounded
+    everything. Blueprint grid (square corners, visible lines, mono labels) is interesting
+    but too harsh.
+  - Round 3, between soft cards and grid, one accent color only: 7 softened grid ·
+    8 square cards on gray · 9 ledger · 10 quiet frame, one accent. Awaiting reaction.
 - Then sketch: HQ page, a domain page, a detail page → Design System artifact → clickable
   prototype (Design artifact) → build Work Item for `dashboard/`.
 
