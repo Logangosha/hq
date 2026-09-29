@@ -96,7 +96,22 @@ newcomer onboarding · a blueprint gate after Plan in the Work Item lifecycle.
 ## Open
 
 - Job vs Task.
-- Sketches: HQ page, a domain page, a detail page.
+- **Look and feel — next step.** Three directions were shown for the HQ page (same
+  structure, different feel):
+  - **A · Calm** — lots of space, rows with hairlines, almost no color. Quiet notebook.
+  - **B · Dense** — counts strip (needs you, running, failed, cost), rows with domain,
+    title, stage tag, age. Pro tool, like Linear.
+  - **C · Warm** — serif greeting, a color per domain, tinted cards. Personal assistant.
+  - Claude's guess: A + B mix (calm by default, stages visible), keep C's domain colors.
+    User hasn't picked yet.
+- Then sketch: HQ page, a domain page, a detail page → Design System artifact → clickable
+  prototype (Design artifact) → build Work Item for `dashboard/`.
+
+## Working method
+
+Exploration happens in chat with Claude, one step at a time: Claude proposes with a
+recommendation, the user reacts. Visual options are drawn inline in chat. Decisions get
+written here and committed as they're made.
 
 Rich results decided: types are text, stat, table, list, chart, file, change; the
 dashboard renders a fixed set (custom view later). Pinned results: later.
