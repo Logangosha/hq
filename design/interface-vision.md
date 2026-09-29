@@ -136,6 +136,7 @@ Either group can be folded away. Accordion (one section open) works within each 
 - **Runnable rows split in two** (workflows, agent shortcuts): left part → **Details** (steps, inputs, what it touches, past runs); right part, behind a thin divider → **▶ Start**. Each half shades on its own. Shortcut chips use the same split in small; harmless questions may skip it (open).
 - **Agent input:** + on the left adds files; each added file shows as a named chip above the box with × to remove. Send is a plain gray ↑ on the right, no fill — always visible, dimmed until there's text or a file, then full strength.
 - **Running rows:** spinning loader while working, still dashed circle while queued — never a play arrow. Verb: **Watch**.
+- **Workflow icon:** a flow/tree icon (Material `account_tree`, Tabler `hierarchy-2`) — never diverging arrows.
 - **Icons:** use them where they help — a kind icon on each row (review, result, workflow, log, answer, failed).
 - **Navigation (trying):** a drop-down domain list under a top bar instead of a sidebar; it pushes content down. Bar shows the current domain and "N ready in other domains".
 - **Agents:** a domain has several; each gets its own card (shortcuts, input, latest).
