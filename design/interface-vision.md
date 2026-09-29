@@ -124,7 +124,11 @@ newcomer onboarding · a blueprint gate after Plan in the Work Item lifecycle.
 | Domains | HQ only | One line each: waiting, running, failed |
 | Cost | HQ only | This month per domain — agent spend, Actions minutes, vs last month; click through for detail |
 
-HQ shows no separate ready/running of its own — its items appear in the all-domain lists.
+HQ has two collapsible groups, each with a summary line on its header:
+- **Across all domains** — Ready for you, Running, Domains (row verb **Go to**), Cost (header shows the month's total; filter by month; row → Details).
+- **HQ's own** — exactly the same sections as any domain (Ready for you, Agents, Running, Workflows, History), for HQ's own items.
+
+Either group can be folded away. Accordion (one section open) works within each group.
 
 - **Layout:** single column, nothing side by side. Every section collapses; all start collapsed, and opening one closes the others (accordion).
 - **Pagination:** any list over 10 entries pages, 10 per page ("1–10 of 128", ‹ ›).
