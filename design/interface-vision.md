@@ -153,3 +153,16 @@ written here and committed as they're made.
 
 Rich results decided: types are text, stat, table, list, chart, file, change; the
 dashboard renders a fixed set (custom view later). Pinned results: later.
+
+## Detail pages (agreed)
+
+Four patterns; every click from a page lands on one.
+
+| Pattern | Opened from | Main parts | Pinned action bar |
+|---|---|---|---|
+| **About** | Page name (domain guide), agent name, workflow Details, shortcut info | What it does · steps · what it needs from you · what it touches · past runs | What starting means + ▶ Start |
+| **Run** | Watch, failed history item | Status in header · steps (✓ / spinner / dashed) · last thing done · log | Time left + Stop; on failure a plain reason + Retry |
+| **Decision** | Review, Answer | Why it's waiting · the thing · checks | Comment box · Send back · Approve (Answer: reply box) |
+| **Result** | Read, history answer/log, Cost → Details | Headline stats · rich blocks (text, stat, table, list, chart, file, change) | Follow-up input (+ files) · Mark read; logs show a receipt with Undo |
+
+Shared frame: same top bar and drop-down · ← Back · kind icon + label · title · one mono meta line (domain · agent · time · link to what it came from) · collapsible sections · **action bar pinned to the bottom**. Pages link along the chain About → Run → (Decision) → Result.
