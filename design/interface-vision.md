@@ -128,7 +128,8 @@ HQ shows no separate ready/running of its own — its items appear in the all-do
 
 - **Layout:** single column, nothing side by side. Every section collapses; all start collapsed, and opening one closes the others (accordion).
 - **Pagination:** any list over 10 entries pages, 10 per page ("1–10 of 128", ‹ ›).
-- **Row actions:** the whole row is the button; on hover it shades and the verb appears (›). Verbs say what you'll do: **Review** (approve or send back), **Answer** (reply), **Read** (just look — replaces "Open"). Workflow rows: row opens **Details** (steps, inputs, what it touches, past runs), a separate ▶ icon starts it.
+- **Row actions:** the whole row is the button and shades on hover; the verb and its icon always show on the right. Verbs say what you'll do: **Review** (approve or send back), **Answer** (reply), **Read** (just look — replaces "Open").
+- **Runnable rows split in two** (workflows, agent shortcuts): left part → **Details** (steps, inputs, what it touches, past runs); right part, behind a thin divider → **▶ Start**. Each half shades on its own. Shortcut chips use the same split in small; harmless questions may skip it (open).
 - **Icons:** use them where they help — a kind icon on each row (review, result, workflow, log, answer, failed).
 - **Navigation (trying):** a drop-down domain list under a top bar instead of a sidebar; it pushes content down. Bar shows the current domain and "N ready in other domains".
 - **Agents:** a domain has several; each gets its own card (shortcuts, input, latest).
