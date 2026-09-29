@@ -165,4 +165,6 @@ Four patterns; every click from a page lands on one.
 | **Decision** | Review, Answer | Why it's waiting · the thing · checks | Comment box · Send back · Approve (Answer: reply box) |
 | **Result** | Read, history answer/log, Cost → Details | Headline stats · rich blocks (text, stat, table, list, chart, file, change) | Follow-up input (+ files) · Mark read; logs show a receipt with Undo |
 
-Shared frame: same top bar and drop-down · ← Back · kind icon + label · title · one mono meta line (domain · agent · time · link to what it came from) · collapsible sections · **action bar pinned to the bottom**. Pages link along the chain About → Run → (Decision) → Result.
+Shared frame: same top bar and drop-down · ← Back · kind icon + label · title · one mono meta line (domain · agent · time · link to what it came from) · collapsible sections, **all starting collapsed** · **action bar pinned to the bottom**. Pages link along the chain About → Run → (Decision) → Result.
+
+**Blocks** agents fill detail pages with: decided — text, stat (one / row), table, list (bullets / numbered), chart (bar / line), file, change. Proposed — callout, key-value, checks, steps, image, source (quote + where from). Awaiting user's pick.
