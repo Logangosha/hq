@@ -1,0 +1,982 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HQ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap">
+<style>
+  :root {
+    --bg: #f7f7f6; --surface: #ffffff; --text: #1c1c1b; --muted: #6a6a66;
+    --line: #e3e3e0; --hover: #efefed; --chip: #ecece9;
+    --accent: #c2410c; --accent-soft: #fbeae1;
+    --add-bg: #f0f0ee; --del-bg: #e2e2df;
+    --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151514; --surface: #1d1d1b; --text: #ecece8; --muted: #9a9a94;
+      --line: #32322f; --hover: #2a2a27; --chip: #2a2a27;
+      --accent: #fb923c; --accent-soft: #3a2518;
+      --add-bg: #262624; --del-bg: #333331;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 var(--sans); }
+  .ms {
+    font-family: "Material Symbols Outlined"; font-weight: 400; font-style: normal;
+    font-size: 20px; line-height: 1; display: inline-block; width: 1em; height: 1em;
+    overflow: hidden; white-space: nowrap; letter-spacing: normal; text-transform: none;
+    vertical-align: middle; flex: none; user-select: none;
+  }
+  .mono, .meta { font-family: var(--mono); }
+  .muted { color: var(--muted); }
+  a { color: inherit; }
+  button {
+    font: inherit; font-size: 14px; padding: 6px 12px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--surface); color: var(--text);
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  button:hover { background: var(--hover); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+  button.primary:hover { opacity: 0.88; background: var(--text); }
+  button.ghost { border-color: transparent; background: transparent; padding: 4px 6px; }
+  button.ghost:hover { background: var(--hover); }
+
+  /* top bar */
+  #top { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .topbar { max-width: 860px; margin: 0 auto; padding: 10px 16px; display: flex; align-items: center; gap: 10px; }
+  .topbar .name { font-weight: 600; font-size: 17px; padding: 4px 8px; border-color: transparent; background: transparent; }
+  .topbar .name:hover { background: var(--hover); }
+  .topbar .spacer { flex: 1; }
+  .ready { color: var(--accent); }
+  .topbar .switch { font-size: 13px; }
+  .dropdown { max-width: 860px; margin: 0 auto; padding: 0 16px 10px; }
+  .dropdown .opt {
+    display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px;
+    border-radius: 8px; cursor: pointer;
+  }
+  .dropdown .opt:hover { background: var(--hover); }
+  .dropdown .opt .n { margin-left: auto; font-size: 13px; }
+  .dropdown .opt.current { font-weight: 600; }
+
+  main { max-width: 860px; margin: 0 auto; padding: 18px 16px 40px; }
+
+  /* system line */
+  .sys {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-bottom: 16px;
+    font: 12px var(--mono); color: var(--muted);
+  }
+  .sys[hidden] { display: none; }
+  .sys button { font-size: 12px; padding: 2px 8px; }
+
+  /* groups and sections */
+  .grp { margin-bottom: 14px; }
+  .grp-h {
+    display: flex; align-items: center; gap: 8px; padding: 10px 6px; cursor: pointer;
+    font-weight: 600; border-radius: 8px;
+  }
+  .grp-h:hover { background: var(--hover); }
+  .grp-h .sum { margin-left: auto; font-weight: 400; font-size: 13px; color: var(--muted); }
+  .grp-b { display: none; }
+  .grp.open > .grp-b { display: block; }
+  .chev { transition: transform 0.12s; }
+  .open > .grp-h .chev, .open > .sec-h .chev { transform: rotate(180deg); }
+  .sec { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin-bottom: 8px; }
+  .sec-h { display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer; border-radius: 10px; }
+  .sec-h:hover { background: var(--hover); }
+  .sec-h .t { font-weight: 500; }
+  .count { font: 12px var(--mono); padding: 1px 8px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+  .count.ready { background: var(--accent-soft); color: var(--accent); }
+  .sec-h .extra { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .sec-b { display: none; padding: 4px 8px 10px; border-top: 1px solid var(--line); }
+  .sec.open > .sec-b { display: block; }
+  .sec-b pre { margin: 6px 4px; white-space: pre-wrap; font: 13px/1.5 var(--mono); }
+  .viewpanel {
+    display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; padding: 8px 12px;
+    border-top: 1px solid var(--line); font-size: 13px; background: var(--bg);
+  }
+  .viewpanel select {
+    font: inherit; font-size: 13px; padding: 3px 8px; border-radius: 6px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--text);
+  }
+  .empty { color: var(--muted); font-size: 14px; padding: 10px 6px; }
+  .pager { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 8px 6px 0; font: 12px var(--mono); color: var(--muted); }
+
+  /* rows */
+  .row {
+    display: flex; align-items: center; gap: 12px; padding: 10px 8px; border-radius: 8px;
+    cursor: pointer;
+  }
+  .row:hover { background: var(--hover); }
+  .row + .row { border-top: 1px solid var(--line); }
+  .row.part { margin-left: 28px; }
+  .row .lead { color: var(--muted); display: flex; width: 20px; justify-content: center; }
+  .row.isready .lead { color: var(--accent); }
+  .row .mid { flex: 1; min-width: 0; }
+  .row .ttl { font-weight: 500; }
+  .row .tags { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; margin-top: 3px; font: 12px var(--mono); color: var(--muted); }
+  .tag { padding: 0 7px; border-radius: 999px; background: var(--chip); }
+  .row .verb { display: flex; align-items: center; gap: 4px; font-size: 14px; color: var(--muted); white-space: nowrap; }
+  .row.isready .verb { color: var(--accent); font-weight: 500; }
+  .spin { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .dash { width: 16px; height: 16px; border-radius: 50%; border: 2px dashed var(--muted); display: inline-block; }
+
+  /* detail */
+  .back { margin-bottom: 14px; }
+  .kind { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .kind .status { text-transform: none; letter-spacing: 0; margin-left: 8px; }
+  h1 { font-size: 22px; margin: 6px 0 4px; letter-spacing: -0.01em; }
+  .meta { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+  .meta a { text-decoration: underline; }
+  .warn, .error, .refusal, .done {
+    border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px;
+    background: var(--surface); white-space: pre-wrap; font-size: 14px;
+  }
+  .warn, .error, .refusal { border-color: var(--text); }
+  .done { font-weight: 500; }
+  .bar {
+    position: sticky; bottom: 0; margin: 20px -16px -40px; padding: 12px 16px 16px;
+    background: var(--bg); border-top: 1px solid var(--line);
+  }
+  .bar textarea {
+    width: 100%; min-height: 60px; resize: vertical; font: inherit; font-size: 14px;
+    padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--surface); color: var(--text);
+  }
+  .bar select {
+    font: inherit; font-size: 14px; padding: 6px 10px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--text);
+  }
+  .bar .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+  .bar .hint { color: var(--muted); font-size: 13px; margin-right: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 5px 10px 5px 4px; }
+  th { color: var(--muted); font-weight: 500; }
+  .step { display: flex; align-items: center; gap: 10px; padding: 7px 4px; }
+  .step + .step { border-top: 1px solid var(--line); }
+  .step .nm { flex: 1; }
+  .step .det { font: 12px var(--mono); color: var(--muted); }
+  details.file { border: 1px solid var(--line); border-radius: 8px; margin: 6px 0; overflow: hidden; }
+  details.file summary { padding: 6px 10px; cursor: pointer; font: 13px var(--mono); display: flex; gap: 10px; }
+  details.file summary .n { margin-left: auto; color: var(--muted); }
+  .diff { overflow-x: auto; font: 12.5px/1.5 var(--mono); border-top: 1px solid var(--line); }
+  .diff div { white-space: pre; padding: 0 10px; min-width: max-content; }
+  .diff .add { background: var(--add-bg); }
+  .diff .del { background: var(--del-bg); }
+  .diff .hunk { color: var(--muted); }
+  .appbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 6px 4px; }
+  .spinner { color: var(--muted); padding: 24px 0; }
+</style>
+</head>
+<body>
+<div id="top"></div>
+<main>
+  <div id="sys" class="sys" hidden></div>
+  <div id="page"></div>
+</main>
+<script>
+  const pageEl = document.getElementById("page");
+  const topEl = document.getElementById("top");
+  const sysEl = document.getElementById("sys");
+
+  const esc = s => String(s).replace(/[&<>"']/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const icon = (name, cls = "") => `<span class="ms ${cls}">${name}</span>`;
+
+  // Cost/token fields are either a number or a literal "no data"/"unknown" string.
+  const fmt = v => typeof v === "number" ? v.toLocaleString() : v;
+  const costLabel = c => typeof c === "number" ? "$" + c.toFixed(2) : c;
+  function abbrev(v) {
+    if (typeof v !== "number") return v;
+    if (v >= 1e6) return (v / 1e6).toFixed(1) + "M";
+    if (v >= 1e3) return (v / 1e3).toFixed(1) + "K";
+    return String(v);
+  }
+  const short = full => full.split("/").pop();
+  const stageName = s => s.replace(/^\d+ /, "");
+
+  // ---- State ----
+  let domains = [];
+  let totals = [];
+  let loadError = null;   // {refusal: bool, message}
+  let loaded = false;
+  let banner = "";
+  let view = { page: "hq" };  // page: hq | domain | about | review | answer | run | result
+  let current = null;         // {repo, number} for the open detail page's actions
+  let pingTimer = null;
+  let timer = null, idleTimer = null;
+  let paused = null;
+  let statusText = "Loading…";
+  let branch = "";
+  let budgetText = "";
+  let hqOutcome = sessionStorage.getItem("hq-restart-outcome") || "";
+  sessionStorage.removeItem("hq-restart-outcome");
+  const IDLE_MS = 5 * 60 * 1000;
+
+  const openGroups = new Set();          // group ids that are unfolded
+  const openSec = {};                    // list group -> open section id
+  const pageIdx = {};                    // section id -> page number
+  const viewOpts = {};                   // section id -> {domain, sort}
+  const viewOpen = new Set();            // section ids whose view panel is showing
+  let dropOpen = false;
+  const foldedParents = new Set(JSON.parse(localStorage.getItem("hq-v2-folded-parents") || "[]"));
+  const saveFolded = () => localStorage.setItem("hq-v2-folded-parents", JSON.stringify([...foldedParents]));
+
+  async function post(path, body) {
+    const res = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-HQ": "1" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    return data;
+  }
+
+  // ---- Data helpers ----
+  const hqDomain = () => domains.find(d => d.repo === "hq");
+  const hqFull = () => (hqDomain() || {}).full;
+  const nonHq = () => domains.filter(d => d.repo !== "hq");
+
+  // Every non-parent item with the `full`/`repo` it lives in.
+  function allItems() {
+    const all = [];
+    for (const d of domains) {
+      for (const it of d.items) {
+        if (it.parent) all.push(...it.parts);
+        else all.push(Object.assign({}, it, { full: it.full || d.full, repo: it.repo || d.repo }));
+      }
+    }
+    return all;
+  }
+
+  // Top-level rows for the items passing `pred`: standalone items, and parents
+  // carrying only the parts that pass.
+  function entries(pred) {
+    const out = [];
+    for (const d of domains) {
+      for (const it of d.items) {
+        if (it.parent) {
+          const parts = it.parts.filter(pred);
+          if (parts.length) out.push({ parent: it, d, parts, created: parts.map(p => p.created_at || "").sort().pop(), repo: d.repo });
+        } else {
+          const x = Object.assign({}, it, { full: it.full || d.full, repo: it.repo || d.repo });
+          if (pred(x)) out.push({ item: x, created: x.created_at || "", repo: x.repo });
+        }
+      }
+    }
+    return out;
+  }
+  const workCount = es => es.reduce((n, e) => n + (e.item ? 1 : e.parts.length), 0);
+
+  const isReady = x => !!x.needs_you;
+  const isWorking = x => !x.stage.startsWith("6 ") && !x.waiting.includes("waiting:user")
+    && !x.waiting.includes("waiting:work") && !x.waiting.includes("waiting:stopped");
+
+  function verbOf(x) {
+    if (x.stage.startsWith("6 ")) return "Review";
+    if (x.waiting.includes("waiting:user")) return "Answer";
+    if (x.stalled) return "Retry";
+    return "Watch";
+  }
+
+  function applyView(es, id) {
+    const o = viewOpts[id] || {};
+    let out = es;
+    if (o.domain) {
+      out = out.map(e => e.item ? e : Object.assign({}, e, { parts: e.parts.filter(p => p.full === o.domain) }))
+        .filter(e => e.item ? e.item.full === o.domain : e.parts.length);
+    }
+    const sort = o.sort || "newest";
+    const byNew = (a, b) => (a.created < b.created ? 1 : a.created > b.created ? -1 : 0);
+    out = out.slice().sort(sort === "oldest" ? (a, b) => -byNew(a, b)
+      : sort === "domain" ? (a, b) => a.repo.localeCompare(b.repo) || byNew(a, b) : byNew);
+    return out;
+  }
+
+  // ---- Rows ----
+  function leadIcon(x, verb) {
+    if (verb === "Review") return icon("rate_review");
+    if (verb === "Answer") return icon("help");
+    if (verb === "Retry") return icon("error");
+    if (x.waiting.length || x.stage.startsWith("0 ")) return `<span class="dash"></span>`;
+    return isWorking(x) ? icon("progress_activity", "spin") : `<span class="dash"></span>`;
+  }
+
+  function itemRow(x, part) {
+    const verb = verbOf(x);
+    const blocked = x.blocked_by && x.blocked_by.length
+      ? `<span>Waiting on ${x.blocked_by.map(b => esc(`${b.ref} (${b.state})`)).join(", ")}</span>` : "";
+    return `<div class="row ${isReady(x) ? "isready" : ""} ${part ? "part" : ""}" role="button" tabindex="0"
+        data-act="${verb.toLowerCase()}" data-repo="${esc(x.full)}" data-number="${x.number}">
+      <span class="lead">${leadIcon(x, verb)}</span>
+      <span class="mid"><span class="ttl">${esc(x.title)}</span>
+        <span class="tags"><span>${esc(x.repo)}#${x.number}</span><span class="tag">${esc(x.repo)}</span>
+          <span class="tag">${esc(stageName(x.stage))}</span>${x.size === "small" ? `<span class="tag">small</span>` : ""}${blocked}</span></span>
+      <span class="verb">${verb} ${icon("arrow_forward", "")}</span>
+    </div>`;
+  }
+
+  function parentRow(e) {
+    const p = e.parent, key = `${e.d.full}#${p.number}`, folded = foldedParents.has(key);
+    return `<div class="row" role="button" tabindex="0" data-act="parent" data-key="${esc(key)}">
+      <span class="lead">${icon(folded ? "chevron_right" : "expand_more")}</span>
+      <span class="mid"><span class="ttl">${esc(p.title)}</span>
+        <span class="tags"><span>${esc(e.d.repo)}#${p.number}</span><span class="tag">${esc(e.d.repo)}</span>
+        <span class="tag">${esc(p.done)} of ${esc(p.total)} done</span></span></span>
+      <span class="verb">${folded ? "Unfold" : "Fold"}</span>
+    </div>` + (folded ? "" : e.parts.map(x => itemRow(x, true)).join(""));
+  }
+
+  function pager(id, total) {
+    if (total <= 10) return "";
+    const last = Math.ceil(total / 10) - 1;
+    const i = Math.min(pageIdx[id] || 0, last);
+    return `<div class="pager"><span>${i * 10 + 1}–${Math.min(total, i * 10 + 10)} of ${total}</span>
+      <button class="ghost" data-pg="${id}" data-dir="-1" ${i === 0 ? "disabled" : ""}>${icon("chevron_left")}</button>
+      <button class="ghost" data-pg="${id}" data-dir="1" ${i === last ? "disabled" : ""}>${icon("chevron_right")}</button></div>`;
+  }
+
+  function pageSlice(id, list) {
+    const last = Math.max(0, Math.ceil(list.length / 10) - 1);
+    const i = Math.min(pageIdx[id] || 0, last);
+    return list.length > 10 ? list.slice(i * 10, i * 10 + 10) : list;
+  }
+
+  // ---- Sections ----
+  function section(group, id, title, count, body, extra = "", opts = {}) {
+    const open = openSec[group] === id;
+    return `<section class="sec ${open ? "open" : ""}" data-group="${group}" data-id="${id}">
+      <div class="sec-h" role="button" tabindex="0" data-toggle="sec">${icon("expand_more", "chev")}
+        <span class="t">${esc(title)}</span><span class="count ${opts.ready ? "ready" : ""}">${esc(count)}</span>
+        ${extra ? `<span class="extra">${extra}</span>` : ""}</div>
+      ${opts.panel || ""}<div class="sec-b">${body}</div></section>`;
+  }
+
+  // A Ready-for-you / Running section, with its view control.
+  function listSection(group, id, title, pred, ready, withView) {
+    const all = entries(pred);
+    const shown = applyView(all, id);
+    const o = viewOpts[id] || {};
+    const filtered = !!o.domain || (o.sort && o.sort !== "newest");
+    const nShown = workCount(shown), nAll = workCount(all);
+    const count = filtered ? `${nShown} of ${nAll}` : String(nAll);
+    const rows = pageSlice(id, shown).map(e => e.item ? itemRow(e.item) : parentRow(e)).join("");
+    const empty = ready ? "Nothing needs you right now." : "Nothing running.";
+    const btn = withView ? `<button class="ghost" data-viewbtn="${id}" title="View options">${icon("tune")}</button>` : "";
+    const panel = withView && viewOpen.has(id) ? `<div class="viewpanel">
+      <label>Domain <select data-vdomain="${id}"><option value="">All</option>${
+        domains.map(d => `<option value="${esc(d.full)}" ${o.domain === d.full ? "selected" : ""}>${esc(d.repo)}</option>`).join("")}</select></label>
+      <label>Sort <select data-vsort="${id}">${["newest", "oldest", "domain"].map(s =>
+        `<option value="${s}" ${(o.sort || "newest") === s ? "selected" : ""}>${s}</option>`).join("")}</select></label>
+      <button data-vreset="${id}">Reset</button></div>` : "";
+    return section(group, id, title, count,
+      (rows || `<div class="empty">${empty}</div>`) + pager(id, shown.length), btn, { ready, panel });
+  }
+
+  function group(id, title, summary, inner) {
+    return `<div class="grp ${openGroups.has(id) ? "open" : ""}" data-gid="${id}">
+      <div class="grp-h" role="button" tabindex="0" data-toggle="grp">${icon("expand_more", "chev")}
+        <span>${esc(title)}</span><span class="sum">${esc(summary)}</span></div>
+      <div class="grp-b">${inner}</div></div>`;
+  }
+
+  function weeklyCosts() {
+    const weeks = new Map();
+    for (const t of totals) {
+      const w = weeks.get(t.week) || { week: t.week, known: 0, hasKnown: false, unknown: 0 };
+      if (t.cost == null) w.unknown += t.unknown; else { w.known += t.cost; w.hasKnown = true; w.unknown += t.unknown; }
+      weeks.set(t.week, w);
+    }
+    return [...weeks.values()].sort((a, b) => (a.week < b.week ? 1 : -1));
+  }
+  function costText(w) {
+    if (!w.hasKnown) return `unknown (${w.unknown})`;
+    return w.unknown ? `${costLabel(w.known)} + ${w.unknown} unknown` : costLabel(w.known);
+  }
+
+  function costSection() {
+    const weeks = weeklyCosts();
+    const month = new Date().toISOString().slice(0, 7);
+    const inMonth = weeks.filter(w => w.week.startsWith(month));
+    const agg = { known: 0, hasKnown: false, unknown: 0 };
+    inMonth.forEach(w => { agg.known += w.known; agg.hasKnown = agg.hasKnown || w.hasKnown; agg.unknown += w.unknown; });
+    const monthText = inMonth.length ? costText(agg) : "$0.00";
+    const id = "cost";
+    const rows = pageSlice(id, weeks).map(w => `<div class="row" role="button" tabindex="0" data-act="week" data-week="${esc(w.week)}">
+        <span class="lead">${icon("payments")}</span>
+        <span class="mid"><span class="ttl">Week of ${esc(w.week)}</span>
+          <span class="tags"><span>${esc(costText(w))}</span></span></span>
+        <span class="verb">Details ${icon("arrow_forward")}</span></div>`).join("");
+    return section("all", id, "Cost", String(weeks.length),
+      (rows || `<div class="empty">No cost data yet.</div>`) + pager(id, weeks.length),
+      `<span class="mono">${esc(monthText)} this month</span>`);
+  }
+
+  function domainsSection() {
+    const rows = pageSlice("domains", domains).map(d => {
+      const its = allItems().filter(x => x.full === d.full);
+      const needs = its.filter(isReady).length, stalled = its.filter(x => x.stalled).length;
+      const running = its.length - needs;
+      return `<div class="row" role="button" tabindex="0" data-act="goto" data-repo="${esc(d.full)}">
+        <span class="lead">${icon("folder")}</span>
+        <span class="mid"><span class="ttl">${esc(d.repo)}</span>
+          <span class="tags"><span>${needs} need you</span><span>${running} running</span><span>${stalled} stalled</span></span></span>
+        <span class="verb">Go to ${icon("arrow_forward")}</span></div>`;
+    }).join("");
+    return section("all", "domains", "Domains", String(domains.length),
+      (rows || `<div class="empty">No domains yet.</div>`) + pager("domains", domains.length));
+  }
+
+  // ---- Page shell ----
+  const scopeFull = () => view.scope === undefined ? (view.page === "domain" ? view.repo : null) : view.scope;
+  function scopeName() {
+    const s = scopeFull();
+    return s ? short(s) : "HQ";
+  }
+  const scopeIsHq = () => { const s = scopeFull(); return !s || s === hqFull(); };
+  const listView = () => { const s = scopeFull(); return s && s !== hqFull() ? { page: "domain", repo: s } : { page: "hq" }; };
+
+  function renderTop() {
+    const s = scopeFull() || hqFull();
+    const others = allItems().filter(x => isReady(x) && x.full !== s).length;
+    const opts = [`<div class="opt ${scopeIsHq() ? "current" : ""}" role="button" tabindex="0" data-act="goto" data-repo="">${icon("home")} HQ
+        <span class="n mono ${"ready"}">${allItems().filter(x => isReady(x) && x.full === hqFull()).length || ""}</span></div>`]
+      .concat(nonHq().map(d => `<div class="opt ${scopeFull() === d.full ? "current" : ""}" role="button" tabindex="0" data-act="goto" data-repo="${esc(d.full)}">
+        ${icon("folder")} ${esc(d.repo)}
+        <span class="n mono ready">${allItems().filter(x => isReady(x) && x.full === d.full).length || ""}</span></div>`));
+    topEl.innerHTML = `<div class="topbar">
+        <button class="name" data-act="about" title="About this page">${esc(scopeName())}</button>
+        <span class="spacer"></span>
+        <button class="switch ${others ? "ready" : ""}" data-drop="1">${others} ready in other domains ${icon("expand_more")}</button>
+      </div>${dropOpen ? `<div class="dropdown">${opts.join("")}</div>` : ""}`;
+  }
+
+  function updateSys() {
+    const show = view.page === "hq";
+    sysEl.hidden = !show;
+    if (!show) return;
+    sysEl.innerHTML = `<span>${esc(budgetText || "GitHub calls: —")}</span>
+      <span>${esc(branch ? "branch " + branch : "")}</span>
+      <span id="status">${esc(statusText)}</span>
+      ${hqOutcome ? `<span>${esc(hqOutcome)}</span>` : ""}
+      <button id="refresh" type="button">${icon("refresh")} Refresh</button>`;
+  }
+  function setStatus(t) {
+    statusText = t;
+    const el = document.getElementById("status");
+    if (el) el.textContent = t;
+  }
+
+  function renderList() {
+    updateSys();
+    renderTop();
+    const banr = banner ? `<div class="done">${icon("check_circle")} ${esc(banner)}</div>` : "";
+    if (loadError) {
+      pageEl.innerHTML = banr + `<div class="${loadError.refusal ? "refusal" : "error"}">${esc(loadError.message)}</div>`;
+      return;
+    }
+    if (!loaded) { pageEl.innerHTML = `<div class="spinner">Loading…</div>`; return; }
+    if (view.page === "domain") {
+      const full = view.repo;
+      pageEl.innerHTML = banr +
+        listSection("dom", "d-ready", "Ready for you", x => isReady(x) && x.full === full, true, false) +
+        listSection("dom", "d-running", "Running", x => !isReady(x) && x.full === full, false, false);
+      return;
+    }
+    const hq = hqFull();
+    const ready = allItems().filter(isReady), running = allItems().length - ready.length;
+    const own = allItems().filter(x => x.full === hq);
+    const ownReady = own.filter(isReady).length;
+    pageEl.innerHTML = banr +
+      group("all", "Across all domains", `${ready.length} ready · ${running} running · ${domains.length} domains`,
+        listSection("all", "a-ready", "Ready for you", isReady, true, true) +
+        listSection("all", "a-running", "Running", x => !isReady(x), false, true) +
+        domainsSection() + costSection()) +
+      group("own", "HQ's own", `${ownReady} ready · ${own.length - ownReady} running`,
+        listSection("own", "o-ready", "Ready for you", x => isReady(x) && x.full === hq, true, true) +
+        listSection("own", "o-running", "Running", x => !isReady(x) && x.full === hq, false, true));
+  }
+
+  // ---- Navigation ----
+  function go(v) {
+    if (view.page === "review" && current) {  // leaving a review: put the user's copy back
+      clearInterval(pingTimer);
+      post("/api/review/close", current).catch(() => {});
+    }
+    view = v;
+    banner = v.keepBanner ? banner : "";
+    dropOpen = false;
+    if (v.page === "hq" || v.page === "domain") { current = null; renderList(); }
+    else if (v.page === "about") renderAbout();
+    else if (v.page === "review") openReview();
+    else if (v.page === "answer") openAnswer();
+    else if (v.page === "run") renderRun();
+    else if (v.page === "result") renderResult();
+    window.scrollTo(0, 0);
+  }
+
+  function frame(kind, kindIcon, title, meta, sections, bar, back = "← Back") {
+    openSec.detail = null;  // detail sections always start collapsed
+    renderTop();
+    pageEl.innerHTML = `<button class="back" id="back">${esc(back)}</button>
+      <div class="kind">${icon(kindIcon)} ${esc(kind)}<span class="status" id="statusline"></span></div>
+      <h1>${esc(title)}</h1><div class="meta">${meta}</div>
+      <div id="notice"></div>
+      ${sections}
+      <div class="bar" id="bar">${bar}</div>`;
+    document.getElementById("back").addEventListener("click", () => backToList());
+    updateSys();
+  }
+  const dsec = (id, title, count, body) => section("detail", id, title, String(count), body);
+  const lines = t => (t || "").split("\n").filter(l => l.trim()).length;
+  const metaLine = (full, n, link) =>
+    `${esc(short(full))} · #${n}${link ? ` · <a href="${esc(link.url)}" target="_blank" rel="noopener">${esc(link.label)}</a>` : ""}`;
+
+  async function backToList() {
+    const v = view.from || listView();
+    if (view.page === "review") {
+      clearInterval(pingTimer);
+      pageEl.innerHTML = `<div class="spinner">Stopping the app and putting your copy back…</div>`;
+      const r = current; current = null; view = v;
+      try { await post("/api/review/close", r); } catch (e) { /* nothing was checked out */ }
+      await load();
+      return;
+    }
+    go(v);
+  }
+
+  // ---- About ----
+  function renderAbout() {
+    const s = scopeFull();
+    if (scopeIsHq()) {
+      frame("About", "info", "HQ", `HQ · <a href="/v2">dashboard</a>`,
+        dsec("auto", "Auto-refresh", 1, `<p>The page refreshes itself every 5 seconds while an agent is working, otherwise every 30 seconds.
+          It pauses when this tab is hidden or after 5 minutes without activity, and picks up again the moment you come back.
+          A refresh never closes a page you have open or clears what you typed.</p>`) +
+        dsec("restart", "Restart HQ", 1, `<p>Restarts the dashboard server so it picks up the working copy's current state.</p>
+          <div class="appbar"><button id="restart-hq" type="button">▶ Restart HQ</button><span id="hq-status" class="muted"></span></div>`),
+        `<div class="actions"><span class="hint">Nothing here needs a decision.</span></div>`);
+      document.getElementById("restart-hq").addEventListener("click", restartHq);
+    } else {
+      frame("About", "info", short(s), `${esc(s)}`,
+        dsec("repo", "Repository", 1, `<p><a href="https://github.com/${esc(s)}" target="_blank" rel="noopener">https://github.com/${esc(s)}</a></p>`),
+        `<div class="actions"><span class="hint">Nothing here needs a decision.</span></div>`);
+    }
+  }
+
+  // ---- Review ----
+  function renderDiff(diff) {
+    const files = diff.split(/^(?=diff --git )/m).filter(f => f.trim());
+    if (!files.length) return `<div class="empty">No code changes.</div>`;
+    return files.map(f => {
+      const ls = f.split("\n");
+      const name = (ls[0].match(/ b\/(.+)$/) || [, ls[0]])[1];
+      let adds = 0, dels = 0;
+      const body = ls.slice(1)
+        .filter(l => !/^(index |--- |\+\+\+ |new file mode|deleted file mode|similarity|rename )/.test(l))
+        .map(l => {
+          let cls = "";
+          if (l.startsWith("@@")) cls = "hunk";
+          else if (l.startsWith("+")) { cls = "add"; adds++; }
+          else if (l.startsWith("-")) { cls = "del"; dels++; }
+          return `<div class="${cls}">${esc(l) || " "}</div>`;
+        }).join("");
+      return `<details class="file"><summary><span>${esc(name)}</span><span class="n">+${adds} −${dels}</span></summary><div class="diff">${body}</div></details>`;
+    }).join("");
+  }
+  const diffFiles = diff => diff.split(/^(?=diff --git )/m).filter(f => f.trim()).length;
+
+  function appPanel(r) {
+    if (!r.has_app) return `<p class="muted">No app to start for this repo. Ask Claude in the chat if you want to see it running.</p>`;
+    return `<div class="appbar">
+      <button id="app-start">${icon("play_circle")} Start</button>
+      <button id="app-stop" disabled>Stop</button>
+      <button id="app-restart" disabled>Restart</button>
+      <button id="app-open" disabled>Open</button>
+      <span class="tag mono" id="app-status">Stopped</span></div>`;
+  }
+
+  function wireAppPanel() {
+    const start = document.getElementById("app-start"), stop = document.getElementById("app-stop");
+    const restart = document.getElementById("app-restart"), open = document.getElementById("app-open");
+    const status = document.getElementById("app-status");
+    const target = current;
+    function setRunning(running) {
+      start.disabled = running; stop.disabled = !running; restart.disabled = !running; open.disabled = !running;
+      status.textContent = running ? "Running" : "Stopped";
+      clearInterval(pingTimer);
+      if (running) pingTimer = setInterval(() => post("/api/review/app/ping", target).catch(() => {}), 60000);
+    }
+    async function run(path, busy, doneRunning) {
+      status.textContent = busy;
+      [start, stop, restart, open].forEach(b => b.disabled = true);
+      try { await post(path, target); setRunning(doneRunning); }
+      catch (e) { status.textContent = e.message; setRunning(!doneRunning); }
+    }
+    start.addEventListener("click", () => run("/api/review/app/start", "Starting…", true));
+    stop.addEventListener("click", () => run("/api/review/app/stop", "Stopping…", false));
+    restart.addEventListener("click", () => run("/api/review/app/restart", "Restarting…", true));
+    open.addEventListener("click", () => window.open(
+      `/review-window?repo=${encodeURIComponent(target.repo)}&number=${target.number}`, "_blank"));
+  }
+
+  const decisionBar = (placeholder, buttons) => `<textarea id="comment" placeholder="${esc(placeholder)}"></textarea>
+    <div class="actions"><span class="hint" id="hint"></span>${buttons}</div>`;
+
+  async function openReview() {
+    const me = view;
+    current = { repo: me.repo, number: me.number };
+    const it = allItems().find(i => i.full === me.repo && i.number === me.number);
+    frame("Review", "rate_review", it ? it.title : `${short(me.repo)}#${me.number}`,
+      metaLine(me.repo, me.number, it && { url: it.url, label: "Issue" }),
+      `<div class="spinner">Checking out the branch…</div>`, "");
+    try {
+      const r = await post("/api/review", { repo: me.repo, number: me.number });
+      if (view !== me) { post("/api/review/close", { repo: me.repo, number: me.number }).catch(() => {}); return; }
+      renderReview(r);
+    } catch (e) {
+      if (view !== me) return;
+      document.getElementById("notice").innerHTML = `<div class="error">${esc(e.message)}</div>`;
+      pageEl.querySelector(".spinner")?.remove();
+    }
+  }
+
+  function renderReview(r) {
+    const me = view;
+    const warn = r.claude_files.length
+      ? `<div class="warn">${icon("warning")} Changes how agents and Claude behave — look closely:\n${r.claude_files.map(esc).join("\n")}</div>` : "";
+    frame("Review", "rate_review", r.title,
+      `${esc(short(me.repo))} · #${me.number} · <a href="${esc(r.pr_url)}" target="_blank" rel="noopener">Pull request #${esc(r.pr)}</a> · branch ${esc(r.branch)}`,
+      warn +
+      dsec("app", "Try it", r.has_app ? 1 : 0, appPanel(r)) +
+      (r.after_merge ? dsec("after", "After merge — check these", lines(r.after_merge), `<pre>${esc(r.after_merge)}</pre>`) : "") +
+      (r.qa ? dsec("qa", "QA", lines(r.qa), `<pre>${esc(r.qa)}</pre>`)
+        : r.evidence ? dsec("evidence", "Build evidence", lines(r.evidence), `<pre>${esc(r.evidence)}</pre>`) : "") +
+      dsec("diff", "Code changes", diffFiles(r.diff), renderDiff(r.diff)),
+      decisionBar("What do you think? Required to send back — the agents get your words as-is.",
+        `<button id="drop">Drop it</button>
+         <button id="reject" disabled>Send back</button>
+         <button class="primary" id="approve">${icon("check")} Approve &amp; merge</button>`));
+    if (r.has_app) wireAppPanel();
+    const comment = document.getElementById("comment"), reject = document.getElementById("reject");
+    comment.addEventListener("input", () => { reject.disabled = !comment.value.trim(); });
+    armed(reject, "Click again to send back", () => decide("reject", comment.value));
+    armed(document.getElementById("drop"), "Click again to drop it", () => send("/api/drop", { comment: comment.value }, "Dropping…"));
+    armed(document.getElementById("approve"), "Click again to merge", () => decide("approve", comment.value));
+  }
+  const decide = (decision, comment) =>
+    send("/api/review/decide", { decision, comment }, decision === "approve" ? "Merging…" : "Sending back…");
+
+  // ---- Answer ----
+  async function openAnswer() {
+    const me = view;
+    current = { repo: me.repo, number: me.number };
+    const it = allItems().find(i => i.full === me.repo && i.number === me.number);
+    frame("Answer", "help", it ? it.title : `${short(me.repo)}#${me.number}`,
+      metaLine(me.repo, me.number, it && { url: it.url, label: "Issue" }),
+      `<div class="spinner">Reading the Work Item…</div>`, "");
+    try {
+      const s = await post("/api/stopped", current);
+      if (view !== me) return;
+      frame("Answer", "help", s.title, metaLine(me.repo, me.number, { url: s.url, label: "Issue" }),
+        dsec("goal", "Goal", lines(s.goal), `<pre>${esc(s.goal)}</pre>`) +
+        dsec("last", "Where it stopped", lines(s.last), `<pre>${esc(s.last)}</pre>`),
+        decisionBar("Your answer — what should the agents do?",
+          `<button id="drop">Drop it</button><button class="primary" id="resume" disabled>Send answer &amp; restart</button>`));
+      const comment = document.getElementById("comment"), resume = document.getElementById("resume");
+      comment.addEventListener("input", () => { resume.disabled = !comment.value.trim(); });
+      armed(resume, "Click again to restart", () => send("/api/resume", { comment: comment.value }));
+      armed(document.getElementById("drop"), "Click again to drop it", () => send("/api/drop", { comment: comment.value }, "Dropping…"));
+    } catch (e) {
+      if (view !== me) return;
+      document.getElementById("notice").innerHTML = `<div class="error">${esc(e.message)}</div>`;
+      pageEl.querySelector(".spinner")?.remove();
+    }
+  }
+
+  // ---- Run ----
+  function durationLabel(seconds) {
+    if (seconds == null) return "time unknown";
+    const mins = Math.round(seconds / 60);
+    const h = Math.floor(mins / 60), m = mins % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  }
+  function progressCostLabel(seg) {
+    if (seg.cost == null) return "cost unknown";
+    return seg.unknown_runs ? `${costLabel(seg.cost)} + ${seg.unknown_runs} run(s) cost unknown` : costLabel(seg.cost);
+  }
+  function statusOf(x) {
+    if (x.stalled) return "Stalled";
+    if (x.waiting.includes("waiting:stopped")) return "Stopped by you";
+    if (x.waiting.includes("waiting:work")) return "Blocked";
+    if (x.waiting.includes("waiting:user")) return "Waiting for you";
+    if (x.stage.startsWith("6 ")) return "Ready for review";
+    return "Working";
+  }
+
+  function renderRun() {
+    const me = view;
+    current = { repo: me.repo, number: me.number };
+    const it = allItems().find(i => i.full === me.repo && i.number === me.number);
+    if (!it) {
+      frame("Run", "directions_run", `${short(me.repo)}#${me.number}`, metaLine(me.repo, me.number),
+        `<div class="empty">This Work Item is no longer open.</div>`, "");
+      return;
+    }
+    const canStop = it.stage_color && !it.stage.startsWith("6 ") && it.waiting.length === 0;
+    const canResume = it.waiting.includes("waiting:stopped");
+    const steps = (it.progress || []).map(seg => {
+      const lead = seg.state === "done" ? icon("check_circle") : seg.state === "current" ? icon("progress_activity", "spin") : `<span class="dash"></span>`;
+      const det = seg.entered ? `${durationLabel(seg.duration)}${seg.ongoing ? " so far" : ""} · ${progressCostLabel(seg)}` : "not started";
+      return `<div class="step"><span class="lead">${lead}</span><span class="nm">${esc(stageName(seg.name))}</span><span class="det">${esc(det)}</span></div>`;
+    }).join("");
+    const bd = it.breakdown && it.breakdown.length ? `<table>
+      <thead><tr><th>Agent</th><th>Model</th><th>Turns</th><th>Tokens</th><th>Cost</th></tr></thead><tbody>${it.breakdown.map(r =>
+        `<tr><td>${esc(r.agent)}</td><td>${esc(r.model)}</td><td>${esc(fmt(r.turns))}</td><td>${esc(abbrev(r.tokens))}</td><td>${esc(costLabel(r.cost))}</td></tr>`).join("")}</tbody></table>`
+      : `<div class="empty">No agent runs recorded yet.</div>`;
+    const stall = it.stalled ? dsec("stall", "Why it stalled", 1, `<pre>${esc(it.stall_reason || "")}</pre>`) : "";
+    const bar = `<textarea id="reason" placeholder="Why? Required to restart or resume."></textarea>
+      <div class="actions"><span class="hint" id="hint"></span>
+        <select id="target"><option value="">Same stage (${esc(stageName(it.stage))})</option>
+          <option value="scope">1 Scope</option><option value="requirements">1 Requirements</option>
+          <option value="verification">2 Verification</option><option value="plan">3 Plan</option>
+          <option value="build">4 Build</option><option value="qa">5 QA</option></select>
+        ${canStop ? `<button id="stop">${icon("stop_circle")} Stop</button>` : ""}
+        ${canResume ? `<button id="resume" disabled>Resume</button>` : ""}
+        <button class="primary" id="go" disabled>${it.stalled ? "Retry" : "Restart"}</button></div>`;
+    frame("Run", "directions_run", it.title, metaLine(me.repo, it.number, { url: it.url, label: "Issue" }),
+      dsec("steps", "Steps", (it.progress || []).length, steps || `<div class="empty">No steps yet.</div>`) +
+      dsec("agents", "Agents", (it.breakdown || []).length, bd) + stall, bar);
+    document.getElementById("statusline").textContent = statusOf(it);
+    const reason = document.getElementById("reason"), go = document.getElementById("go");
+    const resume = document.getElementById("resume"), target = document.getElementById("target");
+    reason.addEventListener("input", () => { go.disabled = !reason.value.trim(); if (resume) resume.disabled = !reason.value.trim(); });
+    armed(go, "Click again to " + (it.stalled ? "retry" : "restart"),
+      () => send("/api/restart", { reason: reason.value, stage: target.value || null }));
+    if (canStop) armed(document.getElementById("stop"), "Click again to stop", () => send("/api/stop", {}));
+    if (resume) armed(resume, "Click again to resume", () => send("/api/resume-stopped", { reason: reason.value }));
+  }
+
+  // ---- Result (cost week) ----
+  function renderResult() {
+    const rows = totals.filter(t => t.week === view.week);
+    const w = weeklyCosts().find(x => x.week === view.week);
+    const body = rows.length ? `<table><thead><tr><th>Model</th><th>Stage</th><th>Cost</th></tr></thead><tbody>${rows.map(t =>
+      `<tr><td>${esc(t.model)}</td><td>${esc(t.stage)}</td><td>${esc(t.cost == null ? `unknown (${t.unknown})`
+        : t.unknown ? `${costLabel(t.cost)} + ${t.unknown} unknown` : costLabel(t.cost))}</td></tr>`).join("")}</tbody></table>`
+      : `<div class="empty">No cost data for this week.</div>`;
+    frame("Cost", "payments", `Week of ${view.week}`, `HQ · cost · week starting ${esc(view.week)}`,
+      dsec("total", "Total", 1, `<p>${esc(w ? costText(w) : "unknown")}</p>`) +
+      dsec("detail", "By model and stage", rows.length, body),
+      `<div class="actions"><span class="hint">Cost by model and stage for this week.</span></div>`);
+  }
+
+  // ---- Actions ----
+  // Two clicks instead of confirm(): dialogs are blocked in some panes.
+  function armed(button, prompt, action) {
+    const label = button.innerHTML;
+    let t = null;
+    button.addEventListener("click", () => {
+      if (t) { clearTimeout(t); t = null; button.innerHTML = label; return action(); }
+      button.textContent = prompt;
+      t = setTimeout(() => { t = null; button.innerHTML = label; }, 4000);
+    });
+  }
+
+  async function send(path, extra, working = "Working…") {
+    clearInterval(pingTimer);
+    const hint = document.getElementById("hint");
+    const lock = on => document.querySelectorAll("#bar button, #bar textarea, #bar select, #back").forEach(el => { el.disabled = on; });
+    if (hint) hint.textContent = working;
+    lock(true);
+    const from = view.from || listView();
+    try {
+      const { message } = await post(path, { ...current, ...extra });
+      current = null;
+      view = from;
+      banner = message;
+      pageEl.innerHTML = `<div class="spinner">Refreshing…</div>`;
+      await load();
+    } catch (e) {
+      if (hint) hint.textContent = e.message;
+      lock(false);
+      const text = (document.getElementById("comment") || document.getElementById("reason") || {}).value || "";
+      for (const id of ["reject", "resume", "go"]) {
+        const b = document.getElementById(id);
+        if (b) b.disabled = !text.trim();
+      }
+    }
+  }
+
+  // ---- Restart HQ ----
+  async function restartHq() {
+    const btn = document.getElementById("restart-hq");
+    const setMsg = t => { const el = document.getElementById("hq-status"); if (el) el.textContent = t; };
+    btn.disabled = true;
+    clearTimeout(timer);
+    setMsg("Restarting HQ…");
+    let bootAtPost;
+    try {
+      ({ boot: bootAtPost } = await post("/api/hq/restart", {}));
+    } catch (e) {
+      setMsg(e.message); btn.disabled = false; scheduleRefresh(); return;
+    }
+    const deadline = Date.now() + 60000;
+    const poll = setInterval(async () => {
+      let status;
+      try { status = await fetch("/api/hq/restart").then(r => r.json()); } catch (e) { status = null; }
+      if (status && status.boot !== bootAtPost) {
+        clearInterval(poll);
+        if (status.outcome) sessionStorage.setItem("hq-restart-outcome", status.outcome);
+        location.reload();
+        return;
+      }
+      if (status && status.boot === bootAtPost && status.outcome) {
+        clearInterval(poll); setMsg(status.outcome); btn.disabled = false; scheduleRefresh(); return;
+      }
+      if (Date.now() > deadline) {
+        clearInterval(poll);
+        setMsg("Restart failed — HQ didn't come back within 60s." + (status && status.outcome ? ` (${status.outcome})` : ""));
+        btn.disabled = false; scheduleRefresh();
+      }
+    }, 1000);
+  }
+
+  // ---- Refresh ----
+  function showBudget(header) {
+    if (!header) return;
+    const [remaining, limit, reset] = header.split(",").map(Number);
+    const mins = Math.max(0, Math.round((reset * 1000 - Date.now()) / 60000));
+    budgetText = `GitHub calls ${(limit - remaining).toLocaleString()}/${limit.toLocaleString()} · resets in ${mins}m`;
+  }
+
+  function nextDelay() { return allItems().some(isWorking) ? 5000 : 30000; }
+  function scheduleRefresh() {
+    clearTimeout(timer);
+    if (paused) return;
+    timer = setTimeout(() => load(true), nextDelay());
+  }
+  function setPaused(reason) {
+    paused = reason;
+    clearTimeout(timer);
+    setStatus(reason === "hidden" ? "Paused — tab hidden" : "Paused — idle");
+  }
+  function resetIdleTimer() {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => { if (!document.hidden && !paused) setPaused("idle"); }, IDLE_MS);
+  }
+  function onActivity() {
+    resetIdleTimer();
+    if (paused === "idle") load();
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) setPaused("hidden");
+    else { resetIdleTimer(); load(); }
+  });
+  ["click", "keydown", "scroll", "pointermove"].forEach(evt => document.addEventListener(evt, onActivity, { passive: true }));
+
+  // Detail pages are never re-rendered here, so typed text and open sections survive.
+  async function load(auto = false) {
+    const btn = document.getElementById("refresh");
+    if (!auto) { setStatus("Loading…"); if (btn) btn.disabled = true; }
+    try {
+      const res = await fetch("/api/items");
+      showBudget(res.headers.get("X-HQ-Rate"));
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || res.statusText);
+      if (data.refusal) {
+        loadError = { refusal: true, message: "GitHub isn't answering — " + data.refusal.message };
+        setStatus("");
+      } else {
+        domains = data.domains; totals = data.totals; loadError = null; loaded = true;
+        setStatus("Updated " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" }));
+      }
+    } catch (e) {
+      loadError = { refusal: false, message: "Couldn't load Work Items.\n" + e.message };
+      setStatus(auto ? "Update failed" : "");
+    } finally {
+      paused = null;
+      if (view.page === "hq" || view.page === "domain") renderList();
+      else { renderTop(); updateSys(); }
+      scheduleRefresh();
+    }
+  }
+
+  // ---- Events ----
+  function activate(t) {
+    const drop = t.closest("[data-drop]");
+    if (drop) { dropOpen = !dropOpen; return renderTop(); }
+    const pg = t.closest("[data-pg]");
+    if (pg) { pageIdx[pg.dataset.pg] = Math.max(0, (pageIdx[pg.dataset.pg] || 0) + Number(pg.dataset.dir)); return renderList(); }
+    const vb = t.closest("[data-viewbtn]");
+    if (vb) { const id = vb.dataset.viewbtn; viewOpen.has(id) ? viewOpen.delete(id) : viewOpen.add(id); return renderList(); }
+    const vr = t.closest("[data-vreset]");
+    if (vr) { delete viewOpts[vr.dataset.vreset]; pageIdx[vr.dataset.vreset] = 0; return renderList(); }
+    if (t.closest("select, .viewpanel")) return;
+    const tog = t.closest("[data-toggle]");
+    if (tog) {
+      const el = tog.parentElement;
+      if (tog.dataset.toggle === "grp") {
+        const id = el.dataset.gid;
+        openGroups.has(id) ? openGroups.delete(id) : openGroups.add(id);
+        el.classList.toggle("open");
+      } else {
+        const opening = !el.classList.contains("open");
+        const grp = el.dataset.group;
+        el.parentElement.querySelectorAll(`.sec[data-group="${grp}"]`).forEach(s => s.classList.remove("open"));
+        pageEl.querySelectorAll(`.sec[data-group="${grp}"]`).forEach(s => s.classList.remove("open"));
+        if (opening) el.classList.add("open");
+        openSec[grp] = opening ? el.dataset.id : null;
+      }
+      return;
+    }
+    const a = t.closest("[data-act]");
+    if (!a) return;
+    const d = a.dataset, listFrom = listView();
+    switch (d.act) {
+      case "review": return go({ page: "review", repo: d.repo, number: Number(d.number), scope: scopeFull(), from: listFrom });
+      case "answer": return go({ page: "answer", repo: d.repo, number: Number(d.number), scope: scopeFull(), from: listFrom });
+      case "watch": case "retry": return go({ page: "run", repo: d.repo, number: Number(d.number), scope: scopeFull(), from: listFrom });
+      case "week": return go({ page: "result", week: d.week, scope: scopeFull(), from: listFrom });
+      case "parent": {
+        d.key && (foldedParents.has(d.key) ? foldedParents.delete(d.key) : foldedParents.add(d.key));
+        saveFolded();
+        return renderList();
+      }
+      case "goto": return go(d.repo && d.repo !== hqFull() ? { page: "domain", repo: d.repo } : { page: "hq" });
+      case "about": return go({ page: "about", scope: scopeFull(), from: view.page === "about" ? view.from : (["hq", "domain"].includes(view.page) ? listFrom : view.from || listFrom) });
+    }
+  }
+  document.addEventListener("click", e => {
+    if (e.target.closest("#refresh")) return load();
+    if (e.target.closest("#bar, .appbar, .back, a, details, #restart-hq, .detail-inert")) {
+      if (!e.target.closest("[data-toggle]")) return;
+    }
+    activate(e.target);
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const t = e.target.closest("[role=button]");
+    if (t && t.tagName !== "BUTTON") { e.preventDefault(); activate(t); }
+  });
+  document.addEventListener("change", e => {
+    const d = e.target.closest("[data-vdomain]"), s = e.target.closest("[data-vsort]");
+    if (d) { (viewOpts[d.dataset.vdomain] ||= {}).domain = d.value; pageIdx[d.dataset.vdomain] = 0; renderList(); }
+    if (s) { (viewOpts[s.dataset.vsort] ||= {}).sort = s.value; pageIdx[s.dataset.vsort] = 0; renderList(); }
+  });
+
+  fetch("/api/branch").then(r => r.json()).then(d => { if (d.branch) { branch = d.branch; updateSys(); } }).catch(() => {});
+  resetIdleTimer();
+  renderList();
+  load();
+</script>
+</body>
+</html>

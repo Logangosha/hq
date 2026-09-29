@@ -24,12 +24,15 @@ import ghcache
 
 HQ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PAGE = os.path.join(HQ, "dashboard", "index.html")
+PAGE_V2 = os.path.join(HQ, "dashboard", "v2.html")
 PORT = int(os.environ.get("PORT", "8765"))
 # Backstop only (R8): long enough that a 60s ping from an open tab never trips it.
 APP_IDLE_TIMEOUT = 300
 # Read once: reviewing HQ itself checks out other branches under this server.
 with open(PAGE, encoding="utf-8") as fh:
     PAGE_HTML = fh.read()
+with open(PAGE_V2, encoding="utf-8") as fh:
+    PAGE_V2_HTML = fh.read()
 
 STAGE_NAMES = {
     "stage:scope": "1 Scope",
@@ -1014,6 +1017,8 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path in ("/", "/index.html"):
             self.send(200, PAGE_HTML, "text/html; charset=utf-8")
+        elif parsed.path == "/v2":
+            self.send(200, PAGE_V2_HTML, "text/html; charset=utf-8")
         elif parsed.path == "/api/items":
             try:
                 # The budget rides along as a header: GitHub reports it on every
