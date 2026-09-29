@@ -151,7 +151,7 @@ Exploration happens in chat with Claude, one step at a time: Claude proposes wit
 recommendation, the user reacts. Visual options are drawn inline in chat. Decisions get
 written here and committed as they're made.
 
-Rich results decided: types are text, stat, table, list, chart, file, change; the
+Rich results decided: types are listed under Detail pages → Blocks; the
 dashboard renders a fixed set (custom view later). Pinned results: later.
 
 ## Detail pages (agreed)
@@ -167,4 +167,7 @@ Four patterns; every click from a page lands on one.
 
 Shared frame: same top bar and drop-down · ← Back · kind icon + label · title · one mono meta line (domain · agent · time · link to what it came from) · collapsible sections, **all starting collapsed** · **action bar pinned to the bottom**. Pages link along the chain About → Run → (Decision) → Result.
 
-**Blocks** agents fill detail pages with: decided — text, stat (one / row), table, list (bullets / numbered), chart (bar / line), file, change. Proposed — callout, key-value, checks, steps, image, source (quote + where from). Awaiting user's pick.
+**Blocks** agents fill detail pages with (all agreed): text, stat (one / row), table, list (bullets / numbered), chart (bar / line), file, change, callout, key-value, checks, steps, image, source (quote + where from).
+- Agents need a short guide with an example of each and when to use which (list = ideas, checks = pass/fail; table = many items, key-value = facts about one).
+- The dashboard validates each block and falls back to plain text if one is malformed.
+- Frame, run steps, QA checks and chain links come from HQ's own data, not the agent.
