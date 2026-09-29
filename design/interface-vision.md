@@ -126,7 +126,10 @@ newcomer onboarding · a blueprint gate after Plan in the Work Item lifecycle.
 
 HQ shows no separate ready/running of its own — its items appear in the all-domain lists.
 
-- **Layout:** single column, nothing side by side. Every section collapses.
+- **Layout:** single column, nothing side by side. Every section collapses; all start collapsed, and opening one closes the others (accordion).
+- **Pagination:** any list over 10 entries pages, 10 per page ("1–10 of 128", ‹ ›).
+- **Row actions:** the whole row is the button; on hover it shades and the verb appears (›). Verbs say what you'll do: **Review** (approve or send back), **Answer** (reply), **Read** (just look — replaces "Open"). Workflow rows: row opens **Details** (steps, inputs, what it touches, past runs), a separate ▶ icon starts it.
+- **Icons:** use them where they help — a kind icon on each row (review, result, workflow, log, answer, failed).
 - **Navigation (trying):** a drop-down domain list under a top bar instead of a sidebar; it pushes content down. Bar shows the current domain and "N ready in other domains".
 - **Agents:** a domain has several; each gets its own card (shortcuts, input, latest).
 - **Filters and sort:** in the section header, the count then one view icon (adjustments). Gray, no background, when nothing is applied. When a filter or non-default sort is on, count and icon share one light gray background and the count reads "2 of 5". No outline, no dot, no color. Click opens a small panel of plain text options (Domain · Show · Sort · Reset) that pushes rows down.
