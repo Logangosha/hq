@@ -178,3 +178,7 @@ Shared frame: same top bar and drop-down · ← Back · kind icon + label · tit
 Built: https://claude.ai/artifact/A3SMgTBteNhqsjTfbupLm3 — tokens (light/dark neutrals, one accent for "ready"), IBM Plex Sans + Mono, Material Symbols icons, brand book, and live components (TopBar, PageHeader, GroupLabel, Section, ViewPanel, Row, SplitRow, AgentCard, Composer, Pagination, DetailPage, Blocks). 
 
 Clickable prototype: https://claude.ai/artifact/MZxbB124Phf1zBaTMuBycM — HQ, every domain, all four detail patterns, with sample data. Next: user review → build Work Item for `dashboard/`.
+
+## Carried over from today's dashboard (in the prototype)
+
+App controls while reviewing (Try it: Start/Open/Restart/Stop) · review extras (QA checks, After merge, Build evidence, agent-file warning) · Restart at a stage with a required reason · Stopped items (Goal, Where it stopped, Resume) · Drop it with confirm and reason · parent Work Items with folding parts · blocked parts ("waiting on repo#N") · `small` size tag · cost by stage per Work Item, cost by week on HQ · system line on HQ (GitHub calls, served branch, last refresh, Refresh) · Restart dashboard as an HQ workflow · auto-refresh (noted in HQ's About).
