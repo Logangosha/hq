@@ -68,8 +68,12 @@ the way it runs Work Items. Model: `orchestration/workflows.md`. Parent: #199*
 - [x] F14.1 Workflow format: stages, agents, gates, arrows, items, trigger, inputs — documented in HQ — #200
 - [x] F14.2 Runner: reads a domain's workflow file to move items and start the next agent.
       `/run <workflow>` asks for its inputs. Work Items untouched — #201
-- [ ] F14.3 Test in `hq-test-recipes`: `research` opens one Issue per recipe idea →
-      `shopping-list` → your approval gate
+- [ ] F14.3a Test way 1 (one Issue through every step) in `hq-test-recipes`: `pantry-check` —
+      HQ's `research` → `shopping-list` (only what's missing) → your approval gate —
+      Logangosha/hq-test-recipes#17
+- [ ] F14.3b Test way 2 (one Issue per thing found) in `hq-test-recipes`: `new-recipes` —
+      opens one Issue per recipe idea → writes the recipe → your approval gate, per Issue —
+      Logangosha/hq-test-recipes#18
 - [ ] ✅ User check: run it. Did each item move right, and did the gate wait for you?
 
 ## F15: What can X do, and what did it do?
