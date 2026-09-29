@@ -126,8 +126,10 @@ newcomer onboarding · a blueprint gate after Plan in the Work Item lifecycle.
 
 HQ shows no separate ready/running of its own — its items appear in the all-domain lists.
 
-- **Layout:** single column, nothing side by side. Every section collapses. Sidebar collapses to icons.
+- **Layout:** single column, nothing side by side. Every section collapses.
+- **Navigation (trying):** a drop-down domain list under a top bar instead of a sidebar; it pushes content down. Bar shows the current domain and "N ready in other domains".
 - **Agents:** a domain has several; each gets its own card (shortcuts, input, latest).
+- **Filters and sort:** in the section header, the count then one view icon (adjustments). Gray when nothing is applied; blue with a dot when a filter or non-default sort is on. Click opens a small panel of plain text options (Domain · Show · Sort · Reset) that pushes rows down.
 - **HQ filters:** Ready for you and Running filter by domain (and act/read) and sort (newest, oldest, by domain).
 - **HQ's own**, below the all-domain sections: generic agents (e.g. Claude, Researcher, Writer, Builder), HQ workflows (setup check, weekly review, add a domain), HQ history.
 - Then sketch: HQ page, a domain page, a detail page → Design System artifact → clickable
