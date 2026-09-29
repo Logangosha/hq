@@ -175,4 +175,6 @@ Shared frame: same top bar and drop-down · ← Back · kind icon + label · tit
 
 ## Design System
 
-Built: https://claude.ai/artifact/A3SMgTBteNhqsjTfbupLm3 — tokens (light/dark neutrals, one accent for "ready"), IBM Plex Sans + Mono, Material Symbols icons, brand book, and live components (TopBar, PageHeader, GroupLabel, Section, ViewPanel, Row, SplitRow, AgentCard, Composer, Pagination, DetailPage, Blocks). Next: clickable prototype → build Work Item for `dashboard/`.
+Built: https://claude.ai/artifact/A3SMgTBteNhqsjTfbupLm3 — tokens (light/dark neutrals, one accent for "ready"), IBM Plex Sans + Mono, Material Symbols icons, brand book, and live components (TopBar, PageHeader, GroupLabel, Section, ViewPanel, Row, SplitRow, AgentCard, Composer, Pagination, DetailPage, Blocks). 
+
+Clickable prototype: https://claude.ai/artifact/MZxbB124Phf1zBaTMuBycM — HQ, every domain, all four detail patterns, with sample data. Next: user review → build Work Item for `dashboard/`.
