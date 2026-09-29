@@ -110,6 +110,21 @@ newcomer onboarding · a blueprint gate after Plan in the Work Item lifecycle.
     but too harsh.
   - Round 3, between soft cards and grid, one accent color only: 7 softened grid ·
     8 square cards on gray · 9 ledger · 10 quiet frame, one accent. Awaiting reaction.
+
+## Page sections (agreed, naming nearly final)
+
+| Section | On | Scope |
+|---|---|---|
+| *Waiting section* (name open: Waiting on you, Your turn, Inbox, To do, Up next, Desk) | Every page | Two groups — **to act on** (review, decide, answer) and **to read** (report ready, job finished). Leaves once acted on or opened. On HQ: all domains, tagged by domain |
+| Agents | Every page | Shortcuts, input box, latest result. HQ's are the generic ones |
+| Running | Every page | Live Jobs and workflow runs. On HQ: all domains |
+| Workflows | Every page | Flows you can **Start**, with each one's last run |
+| History | Every page | Everything finished: answers, logs, results, failures. Searchable and sortable (newest, oldest, by agent, by kind) |
+| About | Every page (button by the name) | Full-page guide: what the domain is, what belongs, its agents, workflows, what you can ask |
+| Domains | HQ only | One line each: waiting, running, failed |
+| Cost | HQ only | This month per domain — agent spend, Actions minutes, vs last month; click through for detail |
+
+HQ shows no separate waiting/running of its own — its items appear in the all-domain lists.
 - Then sketch: HQ page, a domain page, a detail page → Design System artifact → clickable
   prototype (Design artifact) → build Work Item for `dashboard/`.
 
