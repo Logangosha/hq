@@ -171,3 +171,7 @@ Shared frame: same top bar and drop-down · ← Back · kind icon + label · tit
 - Agents need a short guide with an example of each and when to use which (list = ideas, checks = pass/fail; table = many items, key-value = facts about one).
 - The dashboard validates each block and falls back to plain text if one is malformed.
 - Frame, run steps, QA checks and chain links come from HQ's own data, not the agent.
+
+## Design System
+
+Built: https://claude.ai/artifact/A3SMgTBteNhqsjTfbupLm3 — tokens (light/dark neutrals, one accent for "ready"), IBM Plex Sans + Mono, Material Symbols icons, brand book, and live components (TopBar, PageHeader, GroupLabel, Section, ViewPanel, Row, SplitRow, AgentCard, Composer, Pagination, DetailPage, Blocks). Next: clickable prototype → build Work Item for `dashboard/`.
