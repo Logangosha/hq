@@ -33,7 +33,7 @@ same engine run it. Roadmap: F14 in `features.md`. The file format is below.
 | Create a workflow | Describe it in chat → a Work Item; an agent writes the file |
 | Start it | `/run <workflow> in <repo>`, or its schedule |
 | See what's happening | Dashboard: each workflow as a board, items in their stages (F15) |
-| Decide | Items at a gate show as "needs you"; approve or reject there or with `/review` |
+| Decide | Items at a gate show as "needs you"; approve or reject with `/review` |
 | Change it | Say what to change → a Work Item |
 
 ## Rules
@@ -98,8 +98,8 @@ One row per arrow, so a stage can have many, to different stages.
 
 | Stage | Signal |
 |---|---|
-| Agent | Its stage comment ends with a line `Outcome: <outcome>`. A crash, or no such line, is `failed`. |
-| Gate | A user comment starting `/approve`, or merging a PR that says `Closes #<n>`, is `approved`. Any other user comment is `rejected`. |
+| Agent | Its final message is posted as its stage comment and ends with a line `Outcome: <outcome>`. A crash, a missing agent file, or no such line is `failed`. |
+| Gate | Only `/review <repo>#<n>` decides: approve posts `/approve` and follows `approved`; reject posts the user's words and follows `rejected`. A comment typed on GitHub, or a merged PR, does not move a gate. |
 
 **A rejection's comment** reaches the next agent through the Issue digest
 (`scripts/runner/issue-digest.sh`), which always includes every human comment; the
@@ -121,6 +121,19 @@ Never `stage:` (the runner starts an agent on it), and not `waiting:*` or `workf
 
 Where a run's output is reported. Default: every stage comments on its own item's Issue,
 and a `trigger` item's Issue also gets the run summary.
+
+### How it runs on GitHub
+
+- `/run <workflow> in <repo>` (`scripts/flow-start.sh`) opens the item Issue and starts the
+  first stage. Every stage start is a `workflow_dispatch` of the domain's `work-item.yml`
+  (agent = the stage's Agent, ask = `hq-step <n> <stage>`); the runner reuses the item's
+  Issue and gives the agent the Issue digest (ask, answers, rejection comments).
+- After a stage, `scripts/runner/flow-route.sh` follows the arrow: swaps `step:`, starts the
+  next agent, closes the Issue at `end`, or at a gate comments the Ask and assigns the
+  owner. No matching arrow → `waiting:user`.
+- A stage listed in Items opens its new items with `flow-new-item.sh`, so its agent needs Bash.
+- Stages start each other, so the stub needs `actions: write`: **every domain, HQ included,
+  must re-run `scripts/enable-agents.sh`** to get it.
 
 ### Reading it with a script
 

@@ -11,3 +11,11 @@ RUN_URL="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY}/actions/r
 
 gh issue comment "$NUM" --repo "$GITHUB_REPOSITORY" --body \
   "🛑 The **$AGENT** agent run failed to complete (crash, timeout, or hit its turn limit). Run: $RUN_URL"
+
+# A workflow stage that failed still moves its item, by its `failed` arrow.
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=flow-lib.sh
+. "$HERE/flow-lib.sh"
+if [ -f "$FLOW_STEP_FILE" ]; then
+  OUTCOME=failed bash "$HERE/flow-route.sh"
+fi

@@ -64,6 +64,13 @@ echo "::add-mask::$APP_TOKEN"
 trap 'curl -fsS -X DELETE -H "Authorization: Bearer $APP_TOKEN" https://api.github.com/installation/token >/dev/null || true' EXIT
 
 BRANCH="run/$NUM-$AGENT"
+BODY="Closes #$NUM"
+# A workflow item's PR must not close it mid-flow, and repeat runs (a rejection loop)
+# must not collide on the branch name.
+if [ -f "${RUNNER_TEMP:-/tmp}/hq-flow-step" ]; then
+  BRANCH="run/$NUM-$AGENT-${GITHUB_RUN_ID:-$(date +%s)}"
+  BODY="Refs #$NUM"
+fi
 git switch -c "$BRANCH"
 git add -A -- "${CHANGED[@]}"
 git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
@@ -75,4 +82,4 @@ git -c http.https://github.com/.extraheader= \
 
 GH_TOKEN="$APP_TOKEN" gh pr create --repo "$GITHUB_REPOSITORY" --head "$BRANCH" \
   --title "Run #$NUM: $AGENT" \
-  --body "Closes #$NUM"
+  --body "$BODY"

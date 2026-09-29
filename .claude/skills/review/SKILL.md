@@ -1,6 +1,6 @@
 ---
 name: review
-description: Let the user look at a finished Work Item on their own computer, then approve (merge) or reject it (back to Requirements, or to Scope for a small item, with their comments). Use when a Work Item is at stage:review and the user says "review <repo>#<n>", "let me see it", "show me the app", or "/review".
+description: Let the user look at a finished Work Item (or decide at a workflow gate) on their own computer, then approve (merge) or reject it (back to Requirements, or to Scope for a small item, with their comments). Use when a Work Item is at stage:review and the user says "review <repo>#<n>", "let me see it", "show me the app", or "/review".
 ---
 
 # Review
@@ -11,7 +11,8 @@ Stage 6. The user looks; you do every git and GitHub step. They never check out 
 
 `<repo>#<n>` from the user. No number → list the domain's `stage:review` Issues and ask
 which. It must be a domain (same check as `new-work-item`) and at `stage:review`; if not,
-say where it is in one line and stop.
+say where it is in one line and stop. An Issue labelled `flow:<workflow>` is a workflow
+item: use "Gate items" below instead of steps 2–5.
 
 ## 2. Check out
 
@@ -77,3 +78,24 @@ git -C "<path>" checkout <default> && git -C "<path>" pull --quiet
 ```
 
 One line: what happened, and the Issue link.
+
+## Gate items
+
+A workflow item (`flow:` label) waiting at a gate — `orchestration/workflows.md`. No
+checkout, no merge.
+
+```bash
+bash scripts/flow-gate.sh <repo> <n>
+```
+
+Exit 3 → it isn't at a gate; say where it is (the output) in one line and stop. Exit 0 →
+prints `workflow=`, `step=`, `ask=`. Show the ask and the latest agent comment on the Issue
+(`gh issue view <n> --comments`), then ask: **approve**, or what's wrong?
+
+- **Approve:** `bash scripts/flow-gate.sh <repo> <n> approve` — posts `/approve` and follows
+  the `approved` arrow.
+- **Anything else:** `printf '%s' "<their words>" | bash scripts/flow-gate.sh <repo> <n> reject`
+  — their words go on the Issue verbatim and the item follows the `rejected` arrow; the
+  next agent is given the comment.
+
+Both take the owner off the Issue's assignees. One line: what happened, and the Issue link.
