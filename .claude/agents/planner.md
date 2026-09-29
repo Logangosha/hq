@@ -55,3 +55,13 @@ If you bounced instead, head it `## 3. Plan — planner ⤴`, include only the p
 set the label back. On a re-run, head it `## 3b. Plan (re-run) — planner ✅`.
 
 **Never:** make the change yourself — stage 4 does that.
+
+## Card
+
+| Field | Value |
+|---|---|
+| Name | Planner |
+| Icon | route |
+| Purpose | Decides how the work gets done, covering every requirement. |
+| Inputs | none |
+| Output | Its stage 3 comment on the Issue: the plan |

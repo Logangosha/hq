@@ -54,6 +54,58 @@ with the agent: there's no fixed number of parts or length, just cover what the 
 - **Boundaries** — what it must never do.
 - **Done check** — how it knows its work is finished *and* correct, not just finished.
 - **Evals** — 2–3 test asks, each paired with what a good result looks like.
+- **Card** — how the dashboard draws the agent; see below.
+
+## Self-description (card)
+
+An agent describes itself in a `## Card` section at the **end** of its own `.md` file, as
+Markdown tables. It sits in the body, not the frontmatter, so the runner and Claude Code
+never see it. `python3 scripts/agent-cards.py <dir or file>...` reads the cards and prints
+JSON for the dashboard.
+
+| Field | Required? | Allowed values |
+|---|---|---|
+| `Name` | required | Display name, one line. |
+| `Icon` | required | A [Material Symbols](https://fonts.google.com/icons) icon name (lowercase, digits, `_`), e.g. `route`. |
+| `Purpose` | required | One line. |
+| `Inputs` | required | `text`, `files`, `text, files` or `none`. `none` = the dashboard shows no input box. |
+| `Output` | required | One line: what it produces, e.g. "an answer comment" or "a PR". |
+
+Optional `### Shortcuts` table, `| Label | Kind | Ask | Needs |`:
+
+| Column | Required? | Allowed values |
+|---|---|---|
+| `Label` | required | Button text. |
+| `Kind` | required | `question`, `log` or `job` — nothing else. |
+| `Ask` | required | The ask it sends the agent. |
+| `Needs` | optional | What the user must fill in. Blank = nothing. |
+
+No `|` inside a cell. No shortcuts section = zero shortcuts; a stage agent (one started by
+a `stage:` label, not by the user) may have none.
+
+**Domain agents** (a domain repo's `.claude/agents/`) use the same format; it is optional
+for them. A file with no card still shows, using `name` and `description`.
+
+Example:
+
+```markdown
+## Card
+
+| Field | Value |
+|---|---|
+| Name | Finance |
+| Icon | account_balance |
+| Purpose | Answers questions about the budget and logs spending. |
+| Inputs | text, files |
+| Output | An answer comment on the run Issue |
+
+### Shortcuts
+
+| Label | Kind | Ask | Needs |
+|---|---|---|---|
+| Monthly summary | question | Summarise this month's spending by category. | |
+| Log a purchase | log | Record this purchase in the ledger. | Amount, date and shop |
+```
 
 ## Writing an agent file
 

@@ -69,3 +69,13 @@ head your comment `## 2b. Verification (re-run) — verification ✅`.
 
 **Never:** do the work, run the checks (stage 5 runs them), or soften a requirement to
 make it easier to check.
+
+## Card
+
+| Field | Value |
+|---|---|
+| Name | Verification |
+| Icon | fact_check |
+| Purpose | Turns requirements into a checklist where every check can fail. |
+| Inputs | none |
+| Output | Its stage 2 comment on the Issue: the checklist |
