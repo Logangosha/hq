@@ -115,16 +115,21 @@ newcomer onboarding · a blueprint gate after Plan in the Work Item lifecycle.
 
 | Section | On | Scope |
 |---|---|---|
-| *Waiting section* (name open: Waiting on you, Your turn, Inbox, To do, Up next, Desk) | Every page | Two groups — **to act on** (review, decide, answer) and **to read** (report ready, job finished). Leaves once acted on or opened. On HQ: all domains, tagged by domain |
+| **Ready for you** | Every page | Two groups — **to act on** (review, decide, answer) and **to read** (report ready, job finished). Leaves once acted on or opened. On HQ: all domains, tagged by domain |
 | Agents | Every page | Shortcuts, input box, latest result. HQ's are the generic ones |
 | Running | Every page | Live Jobs and workflow runs. On HQ: all domains |
 | Workflows | Every page | Flows you can **Start**, with each one's last run |
 | History | Every page | Everything finished: answers, logs, results, failures. Searchable and sortable (newest, oldest, by agent, by kind) |
-| About | Every page (button by the name) | Full-page guide: what the domain is, what belongs, its agents, workflows, what you can ask |
+| About | Click the page's name/description area | Details page, a guide: what the domain is, what belongs, its agents, workflows, what you can ask |
 | Domains | HQ only | One line each: waiting, running, failed |
 | Cost | HQ only | This month per domain — agent spend, Actions minutes, vs last month; click through for detail |
 
-HQ shows no separate waiting/running of its own — its items appear in the all-domain lists.
+HQ shows no separate ready/running of its own — its items appear in the all-domain lists.
+
+- **Layout:** single column, nothing side by side. Every section collapses. Sidebar collapses to icons.
+- **Agents:** a domain has several; each gets its own card (shortcuts, input, latest).
+- **HQ filters:** Ready for you and Running filter by domain (and act/read) and sort (newest, oldest, by domain).
+- **HQ's own**, below the all-domain sections: generic agents (e.g. Claude, Researcher, Writer, Builder), HQ workflows (setup check, weekly review, add a domain), HQ history.
 - Then sketch: HQ page, a domain page, a detail page → Design System artifact → clickable
   prototype (Design artifact) → build Work Item for `dashboard/`.
 
