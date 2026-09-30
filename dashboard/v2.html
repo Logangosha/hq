@@ -958,7 +958,7 @@
   }
 
   function updateSys() {
-    const show = view.page === "hq";
+    const show = isList();
     sysEl.hidden = !show;
     if (!show) return;
     sysEl.innerHTML = `<span>${esc(budgetText || "GitHub calls: —")}</span>
