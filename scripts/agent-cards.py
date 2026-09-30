@@ -40,7 +40,7 @@ def card_section(text):
 
 
 def parse(path):
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
     fm = frontmatter(text)
     name = fm.get("name") or path.stem
     entry = {"file": str(path), "name": name, "display_name": name,
