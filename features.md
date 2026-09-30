@@ -81,7 +81,7 @@ the way it runs Work Items. Model: `orchestration/workflows.md`. Parent: #199*
 GitHub (F12 user check).*
 
 - [ ] F15.1 `/capabilities <repo>`: its agents, skills and workflows, generic ones included
-- [ ] F15.2 Dashboard, per domain: the same capabilities, plus recent runs and their results
+- [x] F15.2 Dashboard, per domain: the same capabilities, plus recent runs and their results
 - [ ] ✅ User check: can you tell at a glance what each domain can do, and find a run's result?
 
 ## F16: Scheduled runs

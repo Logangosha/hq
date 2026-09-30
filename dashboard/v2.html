@@ -207,6 +207,37 @@
   .blk-image img { max-width: 100%; height: auto; border-radius: 6px; display: block; }
   .blk-source blockquote { margin: 0; padding-left: 12px; border-left: 3px solid var(--line); }
   .blk-source .from { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  /* agents, workflows, history */
+  .card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 8px 4px; background: var(--surface); }
+  .card-h { display: flex; align-items: center; gap: 8px; }
+  .card .cname { font-weight: 600; padding: 2px 6px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
+  .chip { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .chip button, .split .half { border: 0; border-radius: 0; background: transparent; }
+  .chip button { padding: 3px 10px; font-size: 13px; }
+  .chip button.r { border-left: 1px solid var(--line); }
+  .fchip { display: inline-flex; align-items: center; gap: 4px; padding: 0 4px 0 8px; border-radius: 999px; background: var(--chip); font-size: 13px; }
+  .askbox { margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 6px; background: var(--bg); }
+  .askbox .chips { margin: 0 0 6px; }
+  .askrow { display: flex; align-items: flex-end; gap: 6px; }
+  .askrow textarea, .needs input, .viewpanel input[type=search], .bar .barin {
+    font: inherit; font-size: 14px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--surface); color: var(--text); }
+  .askrow textarea { flex: 1; resize: vertical; min-height: 34px; }
+  .askrow .send { border-radius: 50%; padding: 6px; }
+  .berr { color: var(--accent); font-size: 13px; padding: 4px 6px; white-space: pre-wrap; }
+  .needs { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin: 8px 0 2px; }
+  .needs label { display: flex; flex-direction: column; font-size: 12px; color: var(--muted); gap: 2px; }
+  .wrow { padding: 4px 4px; }
+  .wrow + .wrow { border-top: 1px solid var(--line); }
+  .split { display: flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .split .half { padding: 8px 12px; }
+  .split .half.l { flex: 1; text-align: left; gap: 10px; }
+  .split .half.r { border-left: 1px solid var(--line); }
+  .split .mid { display: flex; flex-direction: column; flex: 1; }
+  .werr { padding: 4px 6px; }
+  .bar .barin { min-width: 160px; }
+  .viewpanel input[type=search] { min-width: 180px; }
   .blk-raw { margin: 6px 4px; white-space: pre-wrap; font: 13px/1.5 var(--mono); }
 </style>
 </head>
@@ -281,9 +312,21 @@
   const nonHq = () => domains.filter(d => d.repo !== "hq");
 
   // Every non-parent item with the `full`/`repo` it lives in.
-  function allItems() {
+  // Flow items and agent runs not yet in History, as rows like Work Items. Runs only on their own page.
+  function extraRows(d, withRuns) {
+    const base = x => ({ full: d.full, repo: d.repo, number: x.number, title: x.title, url: x.url,
+      created_at: x.created_at, blocked_by: [], needs_you: x.state === "ready" });
+    const out = (d.flows || []).filter(f => f.state !== "history").map(f => Object.assign(base(f),
+      { kind: "flow", stage: f.step || "flow", waiting: f.waiting, workflow: f.workflow, step: f.step, gate: f.gate }));
+    if (withRuns) out.push(...(d.runs || []).filter(r => r.state !== "history").map(r => Object.assign(base(r),
+      { kind: "run", stage: "Run", waiting: [], agent: r.agent, failed: r.failed })));
+    return out;
+  }
+
+  function allItems(withRuns = false) {
     const all = [];
     for (const d of domains) {
+      all.push(...extraRows(d, withRuns));
       for (const it of d.items) {
         if (it.parent) all.push(...it.parts);
         else all.push(Object.assign({}, it, { full: it.full || d.full, repo: it.repo || d.repo }));
@@ -294,9 +337,10 @@
 
   // Top-level rows for the items passing `pred`: standalone items, and parents
   // carrying only the parts that pass.
-  function entries(pred) {
+  function entries(pred, withRuns = false) {
     const out = [];
     for (const d of domains) {
+      for (const x of extraRows(d, withRuns)) if (pred(x)) out.push({ item: x, created: x.created_at || "", repo: x.repo });
       for (const it of d.items) {
         if (it.parent) {
           const parts = it.parts.filter(pred);
@@ -312,10 +356,12 @@
   const workCount = es => es.reduce((n, e) => n + (e.item ? 1 : e.parts.length), 0);
 
   const isReady = x => !!x.needs_you;
-  const isWorking = x => !x.stage.startsWith("6 ") && !x.waiting.includes("waiting:user")
+  const isWorking = x => x.kind ? !x.needs_you : !x.stage.startsWith("6 ") && !x.waiting.includes("waiting:user")
     && !x.waiting.includes("waiting:work") && !x.waiting.includes("waiting:stopped");
 
   function verbOf(x) {
+    if (x.kind === "run") return x.needs_you ? "Read" : "Watch";
+    if (x.kind === "flow") return x.needs_you ? "Decide" : "Watch";
     if (x.stage.startsWith("6 ")) return "Review";
     if (x.waiting.includes("waiting:user")) return "Answer";
     if (x.stalled) return "Retry";
@@ -338,6 +384,8 @@
 
   // ---- Rows ----
   function leadIcon(x, verb) {
+    if (verb === "Read") return icon(x.failed ? "error" : "description");
+    if (verb === "Decide") return icon("rate_review");
     if (verb === "Review") return icon("rate_review");
     if (verb === "Answer") return icon("help");
     if (verb === "Retry") return icon("error");
@@ -350,11 +398,13 @@
     const blocked = x.blocked_by && x.blocked_by.length
       ? `<span>Waiting on ${x.blocked_by.map(b => esc(`${b.ref} (${b.state})`)).join(", ")}</span>` : "";
     return `<div class="row ${isReady(x) ? "isready" : ""} ${part ? "part" : ""}" role="button" tabindex="0"
-        data-act="${verb.toLowerCase()}" data-repo="${esc(x.full)}" data-number="${x.number}">
+        data-act="${x.kind ? x.kind + "item" : verb.toLowerCase()}" data-repo="${esc(x.full)}" data-number="${x.number}">
       <span class="lead">${leadIcon(x, verb)}</span>
       <span class="mid"><span class="ttl">${esc(x.title)}</span>
         <span class="tags"><span>${esc(x.repo)}#${x.number}</span><span class="tag">${esc(x.repo)}</span>
-          <span class="tag">${esc(stageName(x.stage))}</span>${x.size === "small" ? `<span class="tag">small</span>` : ""}${blocked}</span></span>
+          ${x.kind === "run" ? `<span class="tag">${esc(x.agent)}</span>${x.failed ? `<span class="tag">failed</span>` : ""}`
+            : x.kind === "flow" ? `<span class="tag">${esc(x.workflow)}</span><span class="tag">${esc(x.step)}</span>`
+            : `<span class="tag">${esc(stageName(x.stage))}</span>${x.size === "small" ? `<span class="tag">small</span>` : ""}`}${blocked}</span></span>
       <span class="verb">${verb} ${icon("arrow_forward", "")}</span>
     </div>`;
   }
@@ -396,8 +446,8 @@
   }
 
   // A Ready-for-you / Running section, with its view control.
-  function listSection(group, id, title, pred, ready, withView) {
-    const all = entries(pred);
+  function listSection(group, id, title, pred, ready, withView, runs = false) {
+    const all = entries(pred, runs);
     const shown = applyView(all, id);
     const o = viewOpts[id] || {};
     const filtered = !!o.domain || (o.sort && o.sort !== "newest");
@@ -470,6 +520,343 @@
       (rows || `<div class="empty">No domains yet.</div>`) + pager("domains", domains.length));
   }
 
+  // ---- Agents, workflows and history of a page ----
+  const catalogs = {};       // full -> {agents, workflows, description, url, private} | {error}
+  const catBusy = new Set();
+  const boxes = {};          // "full|agent" -> {text, files: [{name, content}], error, busy}
+  const starts = {};         // prompt key -> {spec, labels, values, error, busy}
+  const hist = {};           // full -> {q, agent, sort}
+  let notice = "";
+
+  const isList = () => view.page === "hq" || view.page === "domain";
+  const rerender = () => { if (isList()) renderList(); };
+  const typing = () => !!(document.activeElement && document.activeElement.closest && document.activeElement.closest(".keepfocus"));
+  const backTo = () => isList() ? listView() : view;
+  const hintBar = t => `<div class="actions"><span class="hint">${t}</span></div>`;
+
+  async function loadCatalog(full) {
+    if (!full || catBusy.has(full)) return;
+    catBusy.add(full);
+    const first = !catalogs[full];
+    try {
+      const res = await fetch("/api/catalog?repo=" + encodeURIComponent(full));
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || res.statusText);
+      if (data.refusal) throw new Error(data.refusal.message);
+      catalogs[full] = data;
+    } catch (e) {
+      if (!catalogs[full] || catalogs[full].error) catalogs[full] = { error: e.message };
+    } finally {
+      catBusy.delete(full);
+      if (isList()) { if (!typing()) renderList(); }
+      else if (first && view.repo === full && ["about", "agent", "workflow", "shortcut"].includes(view.page)) go(view);
+    }
+  }
+  const ensureCatalog = full => { if (full && !catalogs[full] && !catBusy.has(full)) loadCatalog(full); };
+  const agentOf = (full, id) => ((catalogs[full] || {}).agents || []).find(a => a.id === id);
+  const workflowOf = (full, id) => ((catalogs[full] || {}).workflows || []).find(w => w.id === id);
+
+  function catSection(group, id, title, full, items, render) {
+    const cat = catalogs[full];
+    if (!cat) return section(group, id, title, "…", `<div class="empty">Loading…</div>`);
+    if (cat.error) return section(group, id, title, "!", `<div class="error">${esc(cat.error)}</div>`);
+    const list = items(cat);
+    return section(group, id, title, String(list.length),
+      pageSlice(id, list).map(x => render(x, cat)).join("") + pager(id, list.length));
+  }
+
+  // -- Agents
+  const scKey = (full, agent, i) => ["sc", full, agent, i].join("|");
+  const wfKey = (full, name) => ["wf", full, name].join("|");
+
+  function promptHtml(key) {
+    const st = starts[key];
+    if (!st) return "";
+    const ok = st.labels.every((_, i) => (st.values[i] || "").trim());
+    return `<div class="needs keepfocus">${st.labels.map((l, i) => `<label>${esc(l)}
+        <input data-pv="${esc(key)}" data-pi="${i}" value="${esc(st.values[i] || "")}"></label>`).join("")}
+      <button class="primary" data-act="pgo" data-key="${esc(key)}" ${ok && !st.busy ? "" : "disabled"}>▶ Start</button>
+      ${st.error ? `<div class="berr">${esc(st.error)}</div>` : ""}</div>`;
+  }
+
+  function chipHtml(full, a, i) {
+    const at = `data-repo="${esc(full)}" data-agent="${esc(a.id)}" data-i="${i}"`;
+    return `<span class="chip"><button class="l" data-act="shortcut" ${at} title="About this shortcut">${esc(a.shortcuts[i].label)}</button><button class="r" data-act="scstart" ${at} title="Start">▶</button></span>`;
+  }
+
+  function askBox(full, a, cat) {
+    const k = full + "|" + a.id, b = boxes[k] || { text: "", files: [] };
+    const can = !!(b.text.trim() || b.files.length) && !b.busy;
+    return `<div class="askbox keepfocus">
+      ${b.files.length ? `<div class="chips">${b.files.map((f, i) => `<span class="fchip">${icon("description")}${esc(f.name)}
+        <button class="ghost" data-act="rmfile" data-box="${esc(k)}" data-i="${i}" title="Remove">×</button></span>`).join("")}</div>` : ""}
+      <div class="askrow">
+        ${cat.private ? `<button class="ghost" data-act="addfile" data-box="${esc(k)}" title="Add files">${icon("add")}</button>
+          <input type="file" multiple hidden data-fileinput="${esc(k)}">` : ""}
+        <textarea rows="1" data-box-text="${esc(k)}" placeholder="Ask ${esc(a.display_name)}…">${esc(b.text)}</textarea>
+        <button class="send primary" data-act="send" data-box="${esc(k)}" ${can ? "" : "disabled"} title="Send">${icon("arrow_upward")}</button>
+      </div>${b.error ? `<div class="berr">${esc(b.error)}</div>` : ""}</div>`;
+  }
+
+  function agentCard(full, a, cat) {
+    return `<div class="card" data-agent="${esc(a.id)}">
+      <div class="card-h">${icon(a.icon || "smart_toy")}<button class="ghost cname" data-act="agent" data-repo="${esc(full)}" data-agent="${esc(a.id)}">${esc(a.display_name)}</button></div>
+      <div class="muted">${esc(a.purpose || "")}</div>
+      ${a.shortcuts.length ? `<div class="chips">${a.shortcuts.map((_, i) => chipHtml(full, a, i)).join("")}</div>` : ""}
+      ${a.shortcuts.map((_, i) => promptHtml(scKey(full, a.id, i))).join("")}
+      ${a.inputs && a.inputs.length === 0 ? "" : askBox(full, a, cat)}</div>`;
+  }
+
+  const agentsSection = (group, id, full) => catSection(group, id, "Agents", full, c => c.agents, (a, c) => agentCard(full, a, c));
+
+  const readFile = f => new Promise((ok, bad) => {
+    const r = new FileReader();
+    r.onload = () => ok({ name: f.name, content: String(r.result).split(",")[1] || "" });
+    r.onerror = () => bad(r.error);
+    r.readAsDataURL(f);
+  });
+  async function addFiles(k, files) {
+    const b = boxes[k] ||= { text: "", files: [] };
+    try { b.files.push(...await Promise.all([...files].map(readFile))); b.error = ""; }
+    catch (e) { b.error = "Couldn't read that file."; }
+    rerender();
+  }
+
+  function afterStart(message) {
+    banner = message;
+    if (isList()) renderList(); else go({ ...listView(), keepBanner: true });
+    load(true);
+  }
+  async function sendBox(k) {
+    const b = boxes[k];
+    if (!b || b.busy || !(b.text.trim() || b.files.length)) return;
+    const [full, agent] = k.split("|");
+    b.busy = true; b.error = "";
+    rerender();
+    try {
+      const { message } = await post("/api/ask", { repo: full, agent, text: b.text, files: b.files });
+      delete boxes[k];
+      afterStart(message);
+    } catch (e) { b.busy = false; b.error = e.message; rerender(); }
+  }
+
+  // -- Starting a shortcut or a workflow
+  function labelsOf(spec) {
+    if (spec.type === "sc") { const s = agentOf(spec.full, spec.agent).shortcuts[spec.i]; return s.needs ? [s.needs] : []; }
+    return workflowOf(spec.full, spec.name).inputs.filter(i => i.required).map(i => i.name);
+  }
+  function launch(spec, values) {
+    if (spec.type === "sc") {
+      const s = agentOf(spec.full, spec.agent).shortcuts[spec.i];
+      const text = s.needs ? `${s.ask}\n\nAnswers:\n- ${s.needs}: ${values[0].trim()}` : s.ask;
+      return post("/api/ask", { repo: spec.full, agent: spec.agent, text, files: [] });
+    }
+    const req = workflowOf(spec.full, spec.name).inputs.filter(i => i.required);
+    const text = req.length ? "No ask given — use your defaults.\n\nAnswers:\n"
+      + req.map((inp, i) => `- ${inp.name}: ${values[i].trim()}`).join("\n") : "";
+    return post("/api/flow/start", { repo: spec.full, workflow: spec.name, text });
+  }
+  function showError(msg) {
+    if (isList()) { notice = msg; renderList(); }
+    else { const n = document.getElementById("notice"); if (n) n.innerHTML = `<div class="error">${esc(msg)}</div>`; }
+  }
+  async function beginStart(spec) {
+    const labels = labelsOf(spec);
+    if (labels.length) {
+      if (!isList()) return go({ page: "shortcut", repo: spec.full, id: spec.agent, idx: spec.i, scope: scopeFull(), from: view });
+      const key = spec.type === "sc" ? scKey(spec.full, spec.agent, spec.i) : wfKey(spec.full, spec.name);
+      if (starts[key]) delete starts[key]; else starts[key] = { spec, labels, values: [], error: "" };
+      return renderList();
+    }
+    try { afterStart((await launch(spec, [])).message); } catch (e) { showError(e.message); }
+  }
+  async function promptGo(key) {
+    const st = starts[key];
+    if (!st || st.busy) return;
+    st.busy = true; st.error = "";
+    rerender();
+    try { const { message } = await launch(st.spec, st.values); delete starts[key]; afterStart(message); }
+    catch (e) { st.busy = false; st.error = e.message; rerender(); }
+  }
+  // The ▶ Start bar of a detail page: one field per need, dim until all are filled.
+  const startBar = (labels, hint) => `<div class="actions"><span class="hint">${hint}</span>
+    ${labels.map((l, i) => `<input class="barin" data-bi="${i}" placeholder="${esc(l)}" aria-label="${esc(l)}">`).join("")}
+    <button class="primary" id="startbtn" ${labels.length ? "disabled" : ""}>▶ Start</button></div>`;
+  function wireStartBar(spec) {
+    const inputs = [...document.querySelectorAll("#bar .barin")], btn = document.getElementById("startbtn");
+    const sync = () => { btn.disabled = !inputs.every(i => i.value.trim()); };
+    inputs.forEach(i => i.addEventListener("input", sync));
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      try { afterStart((await launch(spec, inputs.map(i => i.value))).message); }
+      catch (e) { showError(e.message); sync(); }
+    });
+  }
+
+  // -- Workflows
+  function workflowRow(full, w) {
+    const at = `data-repo="${esc(full)}" data-wf="${esc(w.id)}"`;
+    return `<div class="wrow"><div class="split">
+        <button class="half l" data-act="workflow" ${at}>${icon("account_tree")}<span class="mid"><span class="ttl">${esc(w.name)}</span>
+          <span class="muted">${esc(w.purpose)}</span></span><span class="verb">Details</span></button>
+        ${w.can_start ? `<button class="half r" data-act="wfstart" ${at} title="Start">▶ Start</button>` : ""}</div>
+      ${w.error ? `<div class="empty werr">Can't run: ${esc(w.error)}</div>` : ""}${promptHtml(wfKey(full, w.id))}</div>`;
+  }
+  function workflowsSection(group, id, full) {
+    const cat = catalogs[full];
+    if (cat && !cat.error && !cat.workflows.length)
+      return section(group, id, "Workflows", "0", `<div class="empty">No workflows here yet.</div>`);
+    return catSection(group, id, "Workflows", full, c => c.workflows, w => workflowRow(full, w));
+  }
+
+  // -- History
+  const histState = full => hist[full] ||= { q: "", agent: "", sort: "newest" };
+  function histItems(d) {
+    const one = (kind, x, who, ask, failed) => ({ kind, full: d.full, repo: d.repo, number: x.number, title: x.title,
+      created_at: x.created_at, who, ask, failed });
+    return (d.runs || []).filter(r => r.state === "history").map(r => one("run", r, r.agent, r.ask, r.failed))
+      .concat((d.flows || []).filter(f => f.state === "history").map(f => one("flow", f, f.workflow, "", false)));
+  }
+  function histShown(full) {
+    const d = domains.find(x => x.full === full) || {}, st = histState(full), q = st.q.trim().toLowerCase();
+    const all = histItems(d);
+    let out = all.filter(x => (!st.agent || x.who === st.agent)
+      && (!q || [x.title, x.ask, x.who].some(t => (t || "").toLowerCase().includes(q))));
+    const newest = (a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0);
+    out.sort(st.sort === "oldest" ? (a, b) => -newest(a, b)
+      : st.sort === "agent" ? (a, b) => a.who.localeCompare(b.who) || newest(a, b) : newest);
+    return { all, out };
+  }
+  function histRows(full, id) {
+    const { out } = histShown(full);
+    const rows = pageSlice(id, out).map(x => `<div class="row" role="button" tabindex="0" data-act="${x.kind}item" data-repo="${esc(full)}" data-number="${x.number}">
+        <span class="lead">${icon(x.failed ? "error" : x.kind === "run" ? "description" : "account_tree")}</span>
+        <span class="mid"><span class="ttl">${esc(x.title)}</span><span class="tags"><span>${esc(x.repo)}#${x.number}</span>
+          <span class="tag">${esc(x.who)}</span><span>${esc(x.created_at.slice(0, 10))}</span></span></span>
+        <span class="verb">Open ${icon("arrow_forward")}</span></div>`).join("");
+    return (rows || `<div class="empty">Nothing here yet.</div>`) + pager(id, out.length);
+  }
+  const histId = full => (full === hqFull() ? "o-history" : "d-history");
+  function historySection(group, id, full) {
+    const st = histState(full), { all, out } = histShown(full);
+    const who = [...new Set(all.map(x => x.who))].sort();
+    const panel = `<div class="viewpanel keepfocus">
+      <input type="search" placeholder="Search" aria-label="Search history" data-hq="q" data-full="${esc(full)}" value="${esc(st.q)}">
+      <label>Agent <select data-hagent data-full="${esc(full)}"><option value="">All</option>${who.map(w =>
+        `<option ${st.agent === w ? "selected" : ""}>${esc(w)}</option>`).join("")}</select></label>
+      <label>Sort <select data-hsort data-full="${esc(full)}">${["newest", "oldest", "agent"].map(o =>
+        `<option ${st.sort === o ? "selected" : ""}>${o}</option>`).join("")}</select></label></div>`;
+    const filtered = out.length !== all.length;
+    return section(group, id, "History", filtered ? `${out.length} of ${all.length}` : String(all.length),
+      `${panel}<div class="hist-list">${histRows(full, id)}</div>`);
+  }
+  function refreshHistory(full) {
+    const id = histId(full);
+    pageIdx[id] = 0;
+    const sec = pageEl.querySelector(`.sec[data-id="${id}"]`);
+    if (!sec) return;
+    const { all, out } = histShown(full);
+    sec.querySelector(".hist-list").innerHTML = histRows(full, id);
+    sec.querySelector(".count").textContent = out.length !== all.length ? `${out.length} of ${all.length}` : String(all.length);
+  }
+
+  // -- Run result and workflow item pages
+  async function openRunResult() {
+    const me = view;
+    current = { repo: me.repo, number: me.number };
+    frame("Agent run", "smart_toy", `${short(me.repo)}#${me.number}`, metaLine(me.repo, me.number),
+      `<div class="spinner">Reading the run…</div>`, hintBar("Nothing here needs a decision."));
+    try {
+      const r = await post("/api/run/read", current);
+      if (view !== me) return;
+      frame("Agent run", r.failed ? "error" : "smart_toy", r.title, metaLine(me.repo, me.number, { url: r.url, label: "Issue" }) + ` · ${esc(r.agent)}`,
+        dsec("ask", "Ask", lines(r.ask), `<pre>${esc(r.ask)}</pre>`) +
+        (r.finished ? dsec("result", r.failed ? "Why it failed" : "Result", lines(r.result), blocks(r.result))
+          : dsec("status", "Status", 1, `<p>Still running — the result shows up here when it finishes.</p>`)),
+        hintBar("Nothing here needs a decision."));
+      if (r.finished) load(true);
+    } catch (e) {
+      if (view !== me) return;
+      document.getElementById("notice").innerHTML = `<div class="error">${esc(e.message)}</div>`;
+      pageEl.querySelector(".spinner")?.remove();
+    }
+  }
+
+  function renderFlowItem() {
+    const me = view, d = domains.find(x => x.full === me.repo) || {};
+    const f = (d.flows || []).find(x => x.number === me.number);
+    if (!f) {
+      return frame("Workflow item", "account_tree", `${short(me.repo)}#${me.number}`, metaLine(me.repo, me.number),
+        `<div class="empty">This item isn't listed any more.</div>`, hintBar("Nothing here needs a decision."));
+    }
+    const where = f.state === "history" ? "Finished" : f.gate ? "Waiting at a gate" : f.waiting.includes("waiting:user") ? "Waiting for you" : "An agent is working";
+    frame("Workflow item", "account_tree", f.title, metaLine(me.repo, f.number, { url: f.url, label: "Issue" }),
+      dsec("where", "Where it is", 1, `<table><tr><td class="k">Workflow</td><td>${esc(f.workflow)}</td></tr>
+        ${f.step ? `<tr><td class="k">Step</td><td>${esc(f.step)}</td></tr>` : ""}<tr><td class="k">Status</td><td>${esc(where)}</td></tr></table>`) +
+      (f.gate ? dsec("question", "The question", 1, `<p>${esc(f.question)}</p>`) : ""),
+      hintBar(f.state === "ready" ? `Decide it with /review ${esc(d.repo)}#${f.number}` : "Nothing here needs a decision."));
+  }
+
+  // -- About pages
+  const aboutRow = (act, at, ic, title, sub) => `<div class="row" role="button" tabindex="0" data-act="${act}" ${at}>
+    <span class="lead">${icon(ic)}</span><span class="mid"><span class="ttl">${esc(title)}</span>
+    <span class="tags"><span>${esc(sub || "")}</span></span></span><span class="verb">Details ${icon("arrow_forward")}</span></div>`;
+  function aboutLists(full) {
+    const cat = catalogs[full];
+    if (!cat) { ensureCatalog(full); return dsec("agents", "Agents", "…", `<div class="empty">Loading…</div>`); }
+    if (cat.error) return dsec("agents", "Agents", "!", `<div class="error">${esc(cat.error)}</div>`);
+    return dsec("agents", "Agents", cat.agents.length, cat.agents.map(a =>
+        aboutRow("agent", `data-repo="${esc(full)}" data-agent="${esc(a.id)}"`, a.icon || "smart_toy", a.display_name, a.purpose)).join("")
+      || `<div class="empty">No agents.</div>`) +
+      dsec("workflows", "Workflows", cat.workflows.length, cat.workflows.map(w =>
+        aboutRow("workflow", `data-repo="${esc(full)}" data-wf="${esc(w.id)}"`, "account_tree", w.name, w.error ? `Can't run: ${w.error}` : w.purpose)).join("")
+      || `<div class="empty">No workflows here yet.</div>`);
+  }
+
+  function renderAgentAbout() {
+    const full = view.repo, a = agentOf(full, view.id);
+    if (!a) return frame("Agent", "smart_toy", view.id, esc(short(full)), `<div class="empty">Loading…</div>`, hintBar("Nothing here needs a decision."));
+    const inputs = a.inputs == null ? "not stated" : a.inputs.length ? a.inputs.join(", ") : "none";
+    frame("Agent", a.icon || "smart_toy", a.display_name, `${esc(short(full))} · ${esc(a.id)}`,
+      dsec("purpose", "Purpose", 1, `<p>${esc(a.purpose || "")}</p>`) +
+      dsec("inputs", "Inputs", 1, `<p>${esc(inputs)}</p>`) +
+      dsec("output", "Output", 1, `<p>${esc(a.output || "not stated")}</p>`) +
+      dsec("shortcuts", "Shortcuts", a.shortcuts.length, a.shortcuts.length
+        ? `<div class="chips">${a.shortcuts.map((_, i) => chipHtml(full, a, i)).join("")}</div>` : `<div class="empty">No shortcuts.</div>`),
+      hintBar("Nothing here needs a decision."));
+  }
+
+  function renderWorkflowAbout() {
+    const full = view.repo, w = workflowOf(full, view.id);
+    if (!w) return frame("Workflow", "account_tree", view.id, esc(short(full)), `<div class="empty">Loading…</div>`, hintBar("Nothing here needs a decision."));
+    const spec = { type: "wf", full, name: w.id }, labels = w.can_start ? labelsOf(spec) : [];
+    frame("Workflow", "account_tree", w.name, `${esc(short(full))} · ${esc(w.purpose)}`,
+      (w.error ? `<div class="error">Can't run: ${esc(w.error)}</div>` : "") +
+      dsec("triggers", "Triggers", w.triggers.length, w.triggers.length ? `<table>${w.triggers.map(t =>
+        `<tr><td class="k">${esc(t.kind)}</td><td>${esc(t.value)}</td></tr>`).join("")}</table>` : `<div class="empty">None.</div>`) +
+      dsec("inputs", "Inputs", w.inputs.length, w.inputs.length ? `<table><thead><tr><th>Input</th><th>Required</th><th>Default</th><th>Meaning</th></tr></thead><tbody>${w.inputs.map(i =>
+        `<tr><td>${esc(i.name)}</td><td>${i.required ? "yes" : "no"}</td><td>${esc(i.default)}</td><td>${esc(i.meaning)}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">None.</div>`) +
+      dsec("stages", "Stages", w.stages.length, w.stages.map(s => `<div class="step"><span class="lead">${icon(s.kind === "gate" ? "help" : "smart_toy")}</span>
+        <span class="nm">${esc(s.stage)}</span><span class="det">${s.kind === "gate" ? `gate — ${esc(s.ask)}` : `${esc(s.kind)} — ${esc(s.agent)}`}</span></div>`).join("")
+        || `<div class="empty">None.</div>`),
+      w.can_start ? startBar(labels, "") : hintBar("Nothing here needs a decision."));
+    if (w.can_start) wireStartBar(spec);
+  }
+
+  function renderShortcutAbout() {
+    const full = view.repo, a = agentOf(full, view.id), s = a && a.shortcuts[view.idx];
+    if (!s) return frame("Shortcut", "bolt", "Shortcut", esc(short(full)), `<div class="empty">Loading…</div>`, hintBar("Nothing here needs a decision."));
+    const spec = { type: "sc", full, agent: a.id, i: view.idx };
+    frame("Shortcut", "bolt", s.label, `${esc(short(full))} · ${esc(a.display_name)}`,
+      dsec("what", "What it does", 1, `<table>
+        <tr><td class="k">Agent</td><td>${esc(a.display_name)}</td></tr>
+        <tr><td class="k">Kind</td><td>${esc(s.kind)}</td></tr>
+        <tr><td class="k">Ask</td><td>${esc(s.ask)}</td></tr>
+        <tr><td class="k">Needs</td><td>${esc(s.needs || "nothing")}</td></tr></table>`),
+      startBar(s.needs ? [s.needs] : [], ""));
+    wireStartBar(spec);
+  }
+
   // ---- Page shell ----
   const scopeFull = () => view.scope === undefined ? (view.page === "domain" ? view.repo : null) : view.scope;
   function scopeName() {
@@ -519,25 +906,32 @@
       return;
     }
     if (!loaded) { pageEl.innerHTML = `<div class="spinner">Loading…</div>`; return; }
+    const note = notice ? `<div class="error">${esc(notice)}</div>` : "";
     if (view.page === "domain") {
       const full = view.repo;
-      pageEl.innerHTML = banr +
-        listSection("dom", "d-ready", "Ready for you", x => isReady(x) && x.full === full, true, false) +
-        listSection("dom", "d-running", "Running", x => !isReady(x) && x.full === full, false, false);
+      ensureCatalog(full);
+      pageEl.innerHTML = banr + note +
+        listSection("dom", "d-ready", "Ready for you", x => isReady(x) && x.full === full, true, false, true) +
+        listSection("dom", "d-running", "Running", x => !isReady(x) && x.full === full, false, false, true) +
+        agentsSection("dom", "d-agents", full) + workflowsSection("dom", "d-workflows", full) +
+        historySection("dom", "d-history", full);
       return;
     }
     const hq = hqFull();
     const ready = allItems().filter(isReady), running = allItems().length - ready.length;
-    const own = allItems().filter(x => x.full === hq);
+    ensureCatalog(hq);
+    const own = allItems(true).filter(x => x.full === hq);
     const ownReady = own.filter(isReady).length;
-    pageEl.innerHTML = banr +
+    pageEl.innerHTML = banr + note +
       group("all", "Across all domains", `${ready.length} ready · ${running} running · ${domains.length} domains`,
         listSection("all", "a-ready", "Ready for you", isReady, true, true) +
         listSection("all", "a-running", "Running", x => !isReady(x), false, true) +
         domainsSection() + costSection()) +
       group("own", "HQ's own", `${ownReady} ready · ${own.length - ownReady} running`,
-        listSection("own", "o-ready", "Ready for you", x => isReady(x) && x.full === hq, true, true) +
-        listSection("own", "o-running", "Running", x => !isReady(x) && x.full === hq, false, true));
+        listSection("own", "o-ready", "Ready for you", x => isReady(x) && x.full === hq, true, true, true) +
+        listSection("own", "o-running", "Running", x => !isReady(x) && x.full === hq, false, true, true) +
+        agentsSection("own", "o-agents", hq) + workflowsSection("own", "o-workflows", hq) +
+        historySection("own", "o-history", hq));
   }
 
   // ---- Navigation ----
@@ -548,13 +942,21 @@
     }
     view = v;
     banner = v.keepBanner ? banner : "";
+    notice = "";
     dropOpen = false;
-    if (v.page === "hq" || v.page === "domain") { current = null; renderList(); }
+    if (v.page === "hq" || v.page === "domain") {
+      current = null; renderList(); loadCatalog(v.page === "domain" ? v.repo : hqFull());
+    }
     else if (v.page === "about") renderAbout();
     else if (v.page === "review") openReview();
     else if (v.page === "answer") openAnswer();
     else if (v.page === "run") renderRun();
     else if (v.page === "result") renderResult();
+    else if (v.page === "runitem") openRunResult();
+    else if (v.page === "flowitem") renderFlowItem();
+    else if (v.page === "agent") renderAgentAbout();
+    else if (v.page === "workflow") renderWorkflowAbout();
+    else if (v.page === "shortcut") renderShortcutAbout();
     window.scrollTo(0, 0);
   }
 
@@ -592,18 +994,21 @@
   // ---- About ----
   function renderAbout() {
     const s = scopeFull();
+    const lists = aboutLists(s || hqFull());
     if (scopeIsHq()) {
       frame("About", "info", "HQ", `HQ · <a href="/">dashboard</a>`,
         dsec("auto", "Auto-refresh", 1, `<p>The page refreshes itself every 5 seconds while an agent is working, otherwise every 30 seconds.
           It pauses when this tab is hidden or after 5 minutes without activity, and picks up again the moment you come back.
           A refresh never closes a page you have open or clears what you typed.</p>`) +
         dsec("restart", "Restart HQ", 1, `<p>Restarts the dashboard server so it picks up the working copy's current state.</p>
-          <div class="appbar"><button id="restart-hq" type="button">▶ Restart HQ</button><span id="hq-status" class="muted"></span></div>`),
+          <div class="appbar"><button id="restart-hq" type="button">▶ Restart HQ</button><span id="hq-status" class="muted"></span></div>`) + lists,
         `<div class="actions"><span class="hint">Nothing here needs a decision.</span></div>`);
       document.getElementById("restart-hq").addEventListener("click", restartHq);
     } else {
+      const d = domains.find(x => x.full === s) || {}, desc = d.description || (catalogs[s] || {}).description;
       frame("About", "info", short(s), `${esc(s)}`,
-        dsec("repo", "Repository", 1, `<p><a href="https://github.com/${esc(s)}" target="_blank" rel="noopener">https://github.com/${esc(s)}</a></p>`),
+        dsec("repo", "Repository", 1, `<p>${desc ? esc(desc) : `<span class="muted">No description.</span>`}</p>
+          <p><a href="https://github.com/${esc(s)}" target="_blank" rel="noopener">https://github.com/${esc(s)}</a></p>`) + lists,
         `<div class="actions"><span class="hint">Nothing here needs a decision.</span></div>`);
     }
   }
@@ -1007,7 +1412,7 @@
     budgetText = `GitHub calls ${(limit - remaining).toLocaleString()}/${limit.toLocaleString()} · resets in ${mins}m`;
   }
 
-  function nextDelay() { return allItems().some(isWorking) ? 5000 : 30000; }
+  function nextDelay() { return allItems(true).some(isWorking) ? 5000 : 30000; }
   function scheduleRefresh() {
     clearTimeout(timer);
     if (paused) return;
@@ -1053,7 +1458,7 @@
       setStatus(auto ? "Update failed" : "");
     } finally {
       paused = null;
-      if (view.page === "hq" || view.page === "domain") renderList();
+      if ((view.page === "hq" || view.page === "domain") && !typing()) renderList();
       else { renderTop(); updateSys(); }
       scheduleRefresh();
     }
@@ -1100,6 +1505,17 @@
         saveFolded();
         return renderList();
       }
+      case "runitem": return go({ page: "runitem", repo: d.repo, number: Number(d.number), scope: scopeFull(), from: backTo() });
+      case "flowitem": return go({ page: "flowitem", repo: d.repo, number: Number(d.number), scope: scopeFull(), from: backTo() });
+      case "agent": return go({ page: "agent", repo: d.repo, id: d.agent, scope: scopeFull(), from: backTo() });
+      case "workflow": return go({ page: "workflow", repo: d.repo, id: d.wf, scope: scopeFull(), from: backTo() });
+      case "shortcut": return go({ page: "shortcut", repo: d.repo, id: d.agent, idx: Number(d.i), scope: scopeFull(), from: backTo() });
+      case "scstart": return beginStart({ type: "sc", full: d.repo, agent: d.agent, i: Number(d.i) });
+      case "wfstart": return beginStart({ type: "wf", full: d.repo, name: d.wf });
+      case "pgo": return promptGo(d.key);
+      case "send": return sendBox(d.box);
+      case "addfile": return document.querySelector(`[data-fileinput="${CSS.escape(d.box)}"]`).click();
+      case "rmfile": { boxes[d.box].files.splice(Number(d.i), 1); return rerender(); }
       case "goto": return go(d.repo && d.repo !== hqFull() ? { page: "domain", repo: d.repo } : { page: "hq" });
       case "about": return go({ page: "about", scope: scopeFull(), from: view.page === "about" ? view.from : (["hq", "domain"].includes(view.page) ? listFrom : view.from || listFrom) });
     }
@@ -1116,7 +1532,25 @@
     const t = e.target.closest("[role=button]");
     if (t && t.tagName !== "BUTTON") { e.preventDefault(); activate(t); }
   });
+  document.addEventListener("input", e => {
+    const t = e.target;
+    if (t.dataset.boxText !== undefined) {
+      (boxes[t.dataset.boxText] ||= { text: "", files: [] }).text = t.value;
+      const b = boxes[t.dataset.boxText];
+      t.closest(".askbox").querySelector(".send").disabled = !(b.text.trim() || b.files.length) || !!b.busy;
+    } else if (t.dataset.pv !== undefined) {
+      const st = starts[t.dataset.pv];
+      st.values[Number(t.dataset.pi)] = t.value;
+      t.closest(".needs").querySelector("[data-act=pgo]").disabled = !st.labels.every((_, i) => (st.values[i] || "").trim());
+    } else if (t.dataset.hq !== undefined) {
+      histState(t.dataset.full).q = t.value; refreshHistory(t.dataset.full);
+    }
+  });
   document.addEventListener("change", e => {
+    const t = e.target;
+    if (t.dataset.fileinput !== undefined) return addFiles(t.dataset.fileinput, t.files);
+    if (t.dataset.hagent !== undefined) { histState(t.dataset.full).agent = t.value; return refreshHistory(t.dataset.full); }
+    if (t.dataset.hsort !== undefined) { histState(t.dataset.full).sort = t.value; return refreshHistory(t.dataset.full); }
     const d = e.target.closest("[data-vdomain]"), s = e.target.closest("[data-vsort]");
     if (d) { (viewOpts[d.dataset.vdomain] ||= {}).domain = d.value; pageIdx[d.dataset.vdomain] = 0; renderList(); }
     if (s) { (viewOpts[s.dataset.vsort] ||= {}).sort = s.value; pageIdx[s.dataset.vsort] = 0; renderList(); }

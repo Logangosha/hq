@@ -19,6 +19,9 @@ from html import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+import base64
+
+import catalog
 import ctl
 import ghcache
 
@@ -69,6 +72,7 @@ BASH = find_bash()
 # app/port/url/heartbeat/watchdog are None until Start.
 reviews = {}
 known = set()  # owner/repo of every domain, from the last listing
+domain_info = {}  # owner/repo -> {"description", "private"}, from the last listing
 
 
 # The server runs detached, so it has no console of its own: without this, Windows gives
@@ -76,8 +80,8 @@ known = set()  # owner/repo of every domain, from the last listing
 NO_WINDOW = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
 
 
-def run(args, cwd=HQ, check=True):
-    return subprocess.run(args, cwd=cwd, capture_output=True, text=True,
+def run(args, cwd=HQ, check=True, input=None):
+    return subprocess.run(args, cwd=cwd, capture_output=True, text=True, input=input,
                           encoding="utf-8", check=check, **NO_WINDOW)
 
 
@@ -134,6 +138,20 @@ def owner():
             raise _refusal(*ghcache.classify(res.stderr))
         _owner = res.stdout.strip()
     return _owner
+
+
+_hq_full = None
+
+
+def hq_full():
+    """owner/repo of this HQ checkout, fetched once."""
+    global _hq_full
+    if _hq_full is None:
+        res = run(["gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"], check=False)
+        if res.returncode != 0:
+            raise _refusal(*ghcache.classify(res.stderr))
+        _hq_full = res.stdout.strip()
+    return _hq_full
 
 
 # Stage display name (from STAGE_NAMES above) -> its stage: label / agent name (from
@@ -511,6 +529,71 @@ def _totals_over_time(comments_by_number, totals):
                 bucket["known"] += 1
 
 
+HQ_RUN_COMMENT = "<!-- hq-run"
+
+
+def runs_url(full):
+    return f"repos/{full}/issues?state=all&labels=run&per_page=100"
+
+
+def _end_comments(comments):
+    """A run Issue's result/failure comments: everything but the `<!-- hq-run` cost blocks."""
+    return [c for c in comments if not c["body"].startswith(HQ_RUN_COMMENT)]
+
+
+def _run_fields(issue):
+    body = issue.get("body") or ""
+    agent = re.search(r"^Agent: (.+)$", body, re.M)
+    ask = re.search(r"Ask:\n\n(.*?)(?:\n\n---\nStarted from|\Z)", body, re.S)
+    return (agent.group(1).strip() if agent else "unknown"), (ask.group(1) if ask else "")
+
+
+def agent_runs(full, comments_by_number):
+    """Every agent run (Issue labelled `run`) of the repo, with where it is: running until
+    its result or failure comment, ready until it is read (which closes it), then history."""
+    out = []
+    for issue in ghcache.fetch_all(runs_url(full), run):
+        if "pull_request" in issue:
+            continue
+        agent, ask = _run_fields(issue)
+        end = _end_comments(comments_by_number.get(issue["number"], []))
+        state = "history" if issue["state"] == "closed" else "ready" if end else "running"
+        out.append({"number": issue["number"], "title": issue["title"], "url": issue["html_url"],
+                    "created_at": issue["created_at"], "agent": agent, "ask": ask, "state": state,
+                    "failed": bool(end) and end[-1]["body"].startswith("🛑")})
+    return out
+
+
+def workflow_items(full, open_flows, repo_labels):
+    """Workflow items (Issues labelled `flow:<wf>`): open ones by where they wait, closed ones as history."""
+    out = []
+    flow_cache = {}
+    for issue in open_flows:
+        labels = [l["name"] for l in issue["labels"]]
+        wf = next(l[5:] for l in labels if l.startswith("flow:"))
+        step = next((l[5:] for l in labels if l.startswith("step:")), "")
+        waiting = [l for l in labels if l.startswith("waiting:")]
+        if wf not in flow_cache:
+            try:
+                flow_cache[wf] = catalog.workflow(full, hq_full(), wf, run)
+            except RuntimeError:
+                flow_cache[wf] = None  # unreadable workflow file: the item still shows
+        stage = next((s for s in (flow_cache[wf] or {}).get("stages", []) if s["stage"] == step), None)
+        gate = bool(stage) and stage["kind"] == "gate"
+        out.append({"number": issue["number"], "title": issue["title"], "url": issue["html_url"],
+                    "created_at": issue["created_at"], "workflow": wf, "step": step, "gate": gate,
+                    "question": stage["ask"] if gate else "", "waiting": waiting,
+                    "state": "ready" if gate or "waiting:user" in waiting else "running"})
+    for label in (l["name"] for l in repo_labels if l["name"].startswith("flow:")):
+        for issue in ghcache.fetch_all(f"repos/{full}/issues?state=closed&labels={label}&per_page=100", run):
+            if "pull_request" in issue:
+                continue
+            out.append({"number": issue["number"], "title": issue["title"], "url": issue["html_url"],
+                        "created_at": issue["created_at"], "workflow": label[5:], "step": "",
+                        "gate": False, "question": "", "waiting": [], "state": "history"})
+    return out
+
+
 def work_items():
     """Every domain (repos of OWNER's tagged `hq-domain`) with its open Work Items, and
     the cost totals-over-time across all of them: {domains: [{repo, full, items: [...]}],
@@ -530,9 +613,16 @@ def work_items():
             known.add(full)
             items = []
             parents = []
+            open_flows = []
             issues = ghcache.fetch_all(f"repos/{full}/issues?state=open&per_page=100", run)
             for issue in issues:
                 if "pull_request" in issue:
+                    continue
+                issue_labels = [l["name"] for l in issue["labels"]]
+                if "run" in issue_labels:
+                    continue  # an agent run, listed from runs_url() below
+                if any(l.startswith("flow:") for l in issue_labels):
+                    open_flows.append(issue)  # a workflow item, not a Work Item
                     continue
                 # A parent (F9) has no stage label — it's found by its sub-issues
                 # instead, before the "not a Work Item" check below would drop it.
@@ -604,7 +694,12 @@ def work_items():
                         it["waiting"].append("waiting:user")
             for it in blocked:
                 reconcile_blockers(full, it, comments_by_number.get(it["number"], []))
-            domains.append({"full": full, "repo": repo["name"], "items": items, "parents": parents})
+            runs = agent_runs(full, comments_by_number)
+            flows = workflow_items(full, open_flows, repo_labels)
+            domain_info[full] = {"description": repo.get("description"), "private": bool(repo.get("private"))}
+            domains.append({"full": full, "repo": repo["name"], "items": items, "parents": parents,
+                            "runs": runs, "flows": flows, "description": repo.get("description"),
+                            "private": bool(repo.get("private"))})
     except ghcache.GhRefusal as e:
         raise _refusal(e.kind, e.detail)
     nest_parts(domains)
@@ -975,6 +1070,83 @@ def drop(full, number, reason):
     return {"message": "Dropped." + (f" PR #{pr[0]} closed and its branch deleted." if pr else "")}
 
 
+def run_read(full, number):
+    """Open a run: its result (or why it failed). Reading a finished run closes its Issue as
+    "not planned" — that is what moves it to History, and it survives a restart. ("completed"
+    would start the stub's release job.) Reopening the Issue undoes it."""
+    data = json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
+                           "--json", "title,url,body,state,labels,comments"]).stdout)
+    if "run" not in [l["name"] for l in data["labels"]]:
+        raise UserError("That isn't an agent run.")
+    agent, ask = _run_fields(data)
+    end = _end_comments([{"body": c["body"]} for c in data["comments"]])
+    if end and data["state"] == "OPEN":
+        run(["gh", "issue", "close", str(number), "--repo", full, "--reason", "not planned"])
+        ghcache.invalidate(runs_url(full))
+    return {"title": data["title"], "url": data["url"], "agent": agent, "ask": ask,
+            "finished": bool(end), "failed": bool(end) and end[-1]["body"].startswith("🛑"),
+            "result": "\n\n".join(c["body"] for c in end)}
+
+
+def _is_domain(full):
+    return full in known or full in {d["full"] for d in work_items()["domains"]}
+
+
+def ask(full, agent, text, files):
+    """Start `agent` on `text` through the stub's manual trigger, like /run. Files are
+    committed under inbox/ first, and only in a private repo (HQ is public, and holds no
+    personal data); if anything fails nothing is started."""
+    if agent not in {a["id"] for a in catalog.agents(full, hq_full(), run)}:
+        raise UserError(f"{full} has no agent named {agent}.")
+    text = (text or "").strip()
+    if re.match(r"hq-step \d+ ", text):
+        raise UserError("That ask would be read as a workflow step.")
+    if files and not domain_info.get(full, {}).get("private"):
+        raise UserError(f"{short_name(full)} is a public repo — files are never saved to one.")
+    stamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    paths = []
+    for f in files:
+        name = re.sub(r"[^A-Za-z0-9._-]", "_", os.path.basename(str(f.get("name", "")))).lstrip(".") or "file"
+        path = f"inbox/{stamp}-{name}"
+        try:
+            content = base64.b64encode(base64.b64decode(f["content"], validate=True)).decode()
+        except (KeyError, ValueError):
+            raise UserError(f"Couldn't read the file {name}.")
+        payload = json.dumps({"message": f"Add {path} for {agent}", "content": content})
+        res = run(["gh", "api", "-X", "PUT", f"repos/{full}/contents/{path}", "--input", "-"],
+                  check=False, input=payload)
+        if res.returncode != 0:
+            raise UserError(f"Couldn't save {name}: {(res.stderr or res.stdout).strip()}")
+        paths.append(path)
+    message = text or "No ask given — use your defaults."
+    if paths:
+        message += "\n\nFiles:\n" + "\n".join(f"- {p}" for p in paths)
+    res = run(["gh", "workflow", "run", "work-item.yml", "-R", full, "-f", f"agent={agent}",
+               "-f", f"ask={message}"], check=False)
+    if res.returncode != 0:
+        raise UserError(f"Couldn't start {agent}: {(res.stderr or res.stdout).strip()}")
+    return {"message": f"Started {agent} in {short_name(full)}."}
+
+
+def short_name(full):
+    return full.split("/")[-1]
+
+
+def flow_start(full, name, text):
+    """Start a workflow the way `/run <workflow> in <repo>` does."""
+    wf = catalog.workflow(full, hq_full(), name, run)
+    if not wf:
+        raise UserError(f"{short_name(full)} has no workflow named {name}.")
+    if not wf["can_start"]:
+        raise UserError(wf["error"] or f"{name} can't be started by hand.")
+    res = run([BASH, "scripts/flow-start.sh", full, name], check=False,
+              input=(text or "").strip() or "No ask given — use your defaults.")
+    if res.returncode != 0:
+        raise UserError(res.stderr.strip() or "Couldn't start the workflow.")
+    ghcache.invalidate(f"repos/{full}/issues?state=open&per_page=100")
+    return {"message": f"Started {name} in {short_name(full)}."}
+
+
 def restart_hq():
     """Same as `python dashboard/ctl.py restart`, but from inside a request: refuses at
     once (R3/R9) if the working copy is dirty, otherwise hands off to a detached `ctl.py
@@ -1037,6 +1209,20 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200, {"refusal": {"kind": e.kind, "message": e.message}})
             except (subprocess.CalledProcessError, RuntimeError) as e:
                 self.send(500, {"error": (getattr(e, "stderr", None) or str(e)).strip()})
+        elif parsed.path == "/api/catalog":
+            full = (parse_qs(parsed.query).get("repo") or [""])[0]
+            try:
+                if not _is_domain(full):
+                    return self.send(400, {"error": f"{full} isn't one of your domains."})
+                info = domain_info.get(full, {})
+                self.send(200, {"agents": catalog.agents(full, hq_full(), run),
+                                "workflows": catalog.workflows(full, hq_full(), run),
+                                "description": info.get("description"), "url": f"https://github.com/{full}",
+                                "private": bool(info.get("private"))})
+            except ghcache.GhRefusal as e:
+                self.send(200, {"refusal": {"kind": e.kind, "message": _refusal(e.kind, e.detail).message}})
+            except (subprocess.CalledProcessError, RuntimeError, RefusalError) as e:
+                self.send(500, {"error": (getattr(e, "stderr", None) or str(e)).strip()})
         elif parsed.path == "/api/branch":
             # This process's own checkout — never cached, so a review instance
             # (its own process, its own HQ constant) reports its own branch (R5).
@@ -1077,8 +1263,15 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(400, {"error": str(e)})
         try:
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+            if self.path in ("/api/ask", "/api/flow/start"):
+                full = body["repo"]
+                if not _is_domain(full):
+                    raise UserError(f"{full} isn't one of your domains.")
+                if self.path == "/api/ask":
+                    return self.send(200, ask(full, body["agent"], body.get("text", ""), body.get("files") or []))
+                return self.send(200, flow_start(full, body["workflow"], body.get("text", "")))
             full, number = body["repo"], int(body["number"])
-            if full not in known and full not in {d["full"] for d in work_items()["domains"]}:
+            if not _is_domain(full):
                 raise UserError(f"{full} isn't one of your domains.")
             key = f"{full.split('/')[-1]}#{number}"
             if self.path == "/api/review":
@@ -1098,6 +1291,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200, {"ok": True})
             elif self.path == "/api/drop":
                 self.send(200, drop(full, number, body.get("comment", "")))
+            elif self.path == "/api/run/read":
+                self.send(200, run_read(full, number))
             elif self.path == "/api/stopped":
                 self.send(200, stopped(full, number))
             elif self.path == "/api/resume":
