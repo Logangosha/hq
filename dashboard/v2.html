@@ -211,6 +211,7 @@
   /* agents, workflows, history */
   .card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 8px 4px; background: var(--surface); }
   .card-h { display: flex; align-items: center; gap: 8px; }
+  .card-h .tag { margin-left: auto; color: var(--muted); font-size: 12px; }
   .card .cname { font-weight: 600; padding: 2px 6px; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
   .chip { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
@@ -652,7 +653,7 @@
   function agentCard(full, a, cat) {
     const st = stateOf(full, a.id);
     return `<div class="card" data-agent="${esc(a.id)}">
-      <div class="card-h"><span class="itile">${icon(a.icon || "smart_toy")}</span><button class="ghost cname" data-act="cabout" data-repo="${esc(full)}" data-agent="${esc(a.id)}">${esc(a.display_name)}</button></div>
+      <div class="card-h"><span class="itile">${icon(a.icon || "smart_toy")}</span><button class="ghost cname" data-act="cabout" data-repo="${esc(full)}" data-agent="${esc(a.id)}">${esc(a.display_name)}</button>${a.general ? `<span class="tag">General · from HQ</span>` : ""}</div>
       <div class="muted">${esc(a.purpose || "")}</div>
       ${st.about ? detailsHtml(a) : ""}
       ${a.shortcuts.length ? `<div class="chips">${a.shortcuts.map((_, i) => pillHtml(full, a, i)).join("")}</div>` : ""}
@@ -666,7 +667,7 @@
     const open = soloOpen.has(full);
     return `<button class="solo-h ${open ? "open" : ""}" data-act="solo" data-repo="${esc(full)}">${icon("chevron_right", "chev")}Runs on its own (${list.length})</button>`
       + (open ? list.map(a => `<div class="srow" role="button" tabindex="0" data-act="cabout" data-repo="${esc(full)}" data-agent="${esc(a.id)}">
-          ${icon(a.icon || "smart_toy")}<span>${esc(a.display_name)}</span><span class="tag">${esc(soloTag(a))}</span></div>`
+          ${icon(a.icon || "smart_toy")}<span>${esc(a.display_name)}</span><span class="tag">${a.general ? "General · from HQ" : esc(soloTag(a))}</span></div>`
         + (stateOf(full, a.id).about ? detailsHtml(a) : "")).join("") : "");
   }
 
@@ -903,7 +904,7 @@
     if (!cat) { ensureCatalog(full); return dsec("agents", "Agents", "…", `<div class="empty">Loading…</div>`); }
     if (cat.error) return dsec("agents", "Agents", "!", `<div class="error">${esc(cat.error)}</div>`);
     return dsec("agents", "Agents", cat.agents.length, cat.agents.map(a =>
-        aboutRow("agent", `data-repo="${esc(full)}" data-agent="${esc(a.id)}"`, a.icon || "smart_toy", a.display_name, a.purpose)).join("")
+        aboutRow("agent", `data-repo="${esc(full)}" data-agent="${esc(a.id)}"`, a.icon || "smart_toy", a.display_name, a.general ? "General · from HQ — " + a.purpose : a.purpose)).join("")
       || `<div class="empty">No agents.</div>`) +
       dsec("skills", "Skills", cat.skills.length, cat.skills.map(skillRow).join("")
       || `<div class="empty">No skills.</div>`) +

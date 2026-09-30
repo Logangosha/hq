@@ -1,6 +1,7 @@
 ---
 name: work-items
 description: Show every domain as a folder with its open Work Items nested beneath it, each with its stage. Use when the user asks "show my work items", "work item tree", "what's the status across domains", or "/work-items".
+dashboard-hidden: true
 ---
 
 # Work Items

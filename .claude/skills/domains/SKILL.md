@@ -1,6 +1,7 @@
 ---
 name: domains
 description: Show the user's list of domains — the repos HQ can send Work Items to — with what belongs in each. Use when the user asks "what are my domains", "list my repos", "where can I send work", or "/domains".
+hq-only: true
 ---
 
 # Domains

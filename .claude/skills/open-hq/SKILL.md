@@ -1,6 +1,7 @@
 ---
 name: open-hq
 description: Open the review dashboard in the browser, starting it first if it isn't running. Use when the user says "open the dashboard", "open hq", or "/open-hq".
+hq-only: true
 ---
 
 # /open-hq

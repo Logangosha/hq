@@ -1,7 +1,9 @@
 """What a page can do: its agents, skills and workflows (HQ's plus the domain's own, the
 domain's winning on a name clash), read from files — HQ's from this checkout, a domain's
-from GitHub. A skill with `hq-only: true` in its frontmatter stays on HQ's page. Formats:
-.claude/agents/README.md (agent cards, skills), orchestration/workflows.md."""
+from GitHub. On a domain page HQ's stage agents are left out and HQ's general ones carry
+`general`. A skill with `hq-only: true` in its frontmatter stays on HQ's page; one with
+`dashboard-hidden: true` shows on no page. Formats: .claude/agents/README.md (agent cards,
+skills), orchestration/workflows.md."""
 import base64
 import importlib.util
 import os
@@ -80,17 +82,29 @@ def _card(stem, text):
 
 
 def agents(full, hq_full, run):
-    """Cards for the agents of page `full`, sorted by id."""
-    files = _files(full, hq_full, ".claude/agents", run)
-    return [_card(stem, files[stem]) for stem in sorted(files)]
+    """Cards for the agents of page `full`, sorted by id. On a domain's page, HQ's stage
+    agents are left out and HQ's general ones are marked `general` (the domain's own win)."""
+    if full == hq_full:
+        files = _files(full, hq_full, ".claude/agents", run)
+        return [_card(stem, files[stem]) for stem in sorted(files)]
+    stage = stage_agents()
+    cards = {s: dict(_card(s, t), general=True) for s, t in _local(".claude/agents") if s not in stage}
+    cards.update({s: _card(s, t) for s, t in _remote(full, ".claude/agents", run)})
+    return [cards[s] for s in sorted(cards)]
 
 
 def skills(full, hq_full, run):
-    """Skills of page `full`, sorted by name: HQ's (minus `hq-only: true` ones on a domain page),
-    then the domain's own over them; `replaces` marks one that displaces an HQ skill."""
+    """Skills of page `full`, sorted by name: HQ's (minus `dashboard-hidden: true` ones, and minus
+    `hq-only: true` ones on a domain page), then the domain's own over them (never filtered);
+    `replaces` marks one that displaces an HQ skill."""
     hq = dict(_local_skills())
-    found = {k: t for k, t in hq.items()
-             if full == hq_full or agent_cards.frontmatter(t).get("hq-only", "").lower() != "true"}
+    found = {}
+    for k, t in hq.items():
+        fm = agent_cards.frontmatter(t)
+        if fm.get("dashboard-hidden", "").lower() == "true":
+            continue
+        if full == hq_full or fm.get("hq-only", "").lower() != "true":
+            found[k] = t
     own = {}
     if full != hq_full:
         own = dict(_remote_skills(full, run))
@@ -108,6 +122,18 @@ def _rows(section):
     out = [[c.strip().replace("`", "") for c in l.strip().strip("|").split("|")]
            for l in section.splitlines() if l.strip().startswith("|")]
     return out[0] if out else [], out[2:]
+
+
+def stage_agents():
+    """Names of HQ's stage agents: the Agent column of the `Stage | Agent` table in
+    .claude/agents/README.md."""
+    f = Path(HQ) / ".claude" / "agents" / "README.md"
+    text = f.read_text(encoding="utf-8") if f.is_file() else ""
+    for block in re.split(r"\n\s*\n", text):
+        head, rows = _rows(block)
+        if head == ["Stage", "Agent"]:
+            return {r[1][:-3] if r[1].endswith(".md") else r[1] for r in rows if len(r) > 1}
+    return set()
 
 
 def _sections(text):
