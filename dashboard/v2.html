@@ -178,6 +178,36 @@
   .diff .hunk { color: var(--muted); }
   .appbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 6px 4px; }
   .spinner { color: var(--muted); padding: 24px 0; }
+  /* result blocks (orchestration/blocks.md) */
+  .blk { margin: 8px 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--text); font-size: 14px; }
+  .blk-ttl { font-weight: 600; margin-bottom: 6px; }
+  .blk-note { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .blk p { margin: 0; white-space: pre-wrap; }
+  .blk ul, .blk ol { margin: 0; padding-left: 22px; }
+  .blk-stats { display: flex; flex-wrap: wrap; gap: 8px 28px; }
+  .blk-stat .v { font-size: 26px; font-weight: 600; line-height: 1.2; }
+  .blk-stat .u { font-size: 14px; color: var(--muted); margin-left: 4px; }
+  .blk-stat .l { font-size: 13px; color: var(--muted); }
+  .blk table { font-size: 13px; }
+  .blk tr + tr td { border-top: 1px solid var(--line); }
+  .blk td.k { color: var(--muted); padding-right: 16px; white-space: nowrap; }
+  .blk-svg { display: block; width: 100%; max-width: 480px; height: auto; }
+  .blk-svg .mk { fill: var(--accent); }
+  .blk-svg .ln { fill: none; stroke: var(--accent); stroke-width: 2; }
+  .blk-svg .ax { stroke: var(--muted); stroke-width: 1; }
+  .blk-svg text { fill: var(--muted); font: 11px var(--sans); text-anchor: middle; }
+  .blk-svg text.val { fill: var(--text); }
+  .blk-file .p { font: 13px var(--mono); }
+  .blk-callout { border-left: 4px solid var(--muted); }
+  .blk-callout.warning { border-left-color: var(--accent); }
+  .blk-item { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+  .blk-item .st { font: 12px var(--mono); color: var(--muted); }
+  .blk-item .fail { font-weight: 600; color: var(--accent); }
+  .blk-item.todo { color: var(--muted); }
+  .blk-image img { max-width: 100%; height: auto; border-radius: 6px; display: block; }
+  .blk-source blockquote { margin: 0; padding-left: 12px; border-left: 3px solid var(--line); }
+  .blk-source .from { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .blk-raw { margin: 6px 4px; white-space: pre-wrap; font: 13px/1.5 var(--mono); }
 </style>
 </head>
 <body>
@@ -579,6 +609,7 @@
   }
 
   // ---- Review ----
+  const diffCls = l => l.startsWith("@@") ? "hunk" : l.startsWith("+") ? "add" : l.startsWith("-") ? "del" : "";
   function renderDiff(diff) {
     const files = diff.split(/^(?=diff --git )/m).filter(f => f.trim());
     if (!files.length) return `<div class="empty">No code changes.</div>`;
@@ -589,16 +620,128 @@
       const body = ls.slice(1)
         .filter(l => !/^(index |--- |\+\+\+ |new file mode|deleted file mode|similarity|rename )/.test(l))
         .map(l => {
-          let cls = "";
-          if (l.startsWith("@@")) cls = "hunk";
-          else if (l.startsWith("+")) { cls = "add"; adds++; }
-          else if (l.startsWith("-")) { cls = "del"; dels++; }
+          const cls = diffCls(l);
+          if (cls === "add") adds++;
+          else if (cls === "del") dels++;
           return `<div class="${cls}">${esc(l) || " "}</div>`;
         }).join("");
       return `<details class="file"><summary><span>${esc(name)}</span><span class="n">+${adds} −${dels}</span></summary><div class="diff">${body}</div></details>`;
     }).join("");
   }
   const diffFiles = diff => diff.split(/^(?=diff --git )/m).filter(f => f.trim()).length;
+
+  // ---- Blocks (format: orchestration/blocks.md) ----
+  const isStr = v => typeof v === "string";
+  const isNum = v => typeof v === "number" && isFinite(v);
+  const isUrl = v => isStr(v) && /^https?:\/\/\S+$/i.test(v);
+  const isArr = v => Array.isArray(v);
+  const isObj = v => v !== null && typeof v === "object" && !isArr(v);
+  const listOf = (v, fn) => isArr(v) && v.length > 0 && v.every(fn);
+  // A field spec: [check, required]. Object items are checked by fields().
+  function fields(o, spec) {
+    if (!isObj(o)) return false;
+    for (const k of Object.keys(o)) if (!(k in spec)) return false;
+    return Object.keys(spec).every(k => k in o ? spec[k][0](o[k]) : !spec[k][1]);
+  }
+  const req = f => [f, true], opt = f => [f, false];
+  const oneOf = (...vs) => v => vs.includes(v);
+  const itemsOf = spec => v => listOf(v, o => fields(o, spec));
+  const BLOCK_SPEC = {
+    text: { text: req(isStr) },
+    stat: b => "items" in b
+      ? { items: req(itemsOf({ label: req(isStr), value: req(isNum), unit: opt(isStr) })) }
+      : { label: req(isStr), value: req(isNum), unit: opt(isStr), note: opt(isStr) },
+    table: { columns: req(v => listOf(v, isStr)), rows: req(v => isArr(v) && v.every(r => isArr(r) && r.every(c => isStr(c) || isNum(c)))), title: opt(isStr) },
+    list: { items: req(v => listOf(v, isStr)), numbered: opt(v => typeof v === "boolean") },
+    chart: { kind: req(oneOf("bar", "line")), labels: req(v => listOf(v, isStr)), values: req(v => listOf(v, x => isNum(x) && x >= 0)), title: opt(isStr), unit: opt(isStr) },
+    file: { path: req(isStr), url: opt(isUrl), note: opt(isStr) },
+    change: { file: req(isStr), diff: req(isStr), note: opt(isStr) },
+    callout: { text: req(isStr), title: opt(isStr), tone: opt(oneOf("info", "warning")) },
+    "key-value": { items: req(itemsOf({ key: req(isStr), value: req(v => isStr(v) || isNum(v)) })) },
+    checks: { items: req(itemsOf({ name: req(isStr), pass: req(v => typeof v === "boolean"), note: opt(isStr) })) },
+    steps: { items: req(itemsOf({ name: req(isStr), state: req(oneOf("done", "doing", "todo")) })) },
+    image: { url: req(isUrl), alt: req(isStr), caption: opt(isStr) },
+    source: { quote: req(isStr), from: req(isStr), url: opt(isUrl) },
+  };
+  function validBlock(b) {
+    if (!isObj(b) || !Object.prototype.hasOwnProperty.call(BLOCK_SPEC, b.type)) return false;
+    let spec = BLOCK_SPEC[b.type];
+    if (typeof spec === "function") spec = spec(b);
+    const { type, ...rest } = b;
+    if (b.type === "chart" && isArr(b.labels) && isArr(b.values) && b.labels.length !== b.values.length) return false;
+    if (b.type === "table" && isArr(b.columns) && isArr(b.rows) && b.rows.some(r => r.length !== b.columns.length)) return false;
+    return fields(rest, spec);
+  }
+  // Text -> [{block: false, text}, {block: true, text}] ; text keeps every character except
+  // the newlines next to a fence.
+  function splitBlocks(text) {
+    const ls = String(text).split("\n"), out = [];
+    let buf = [], i = 0;
+    const flush = () => { if (buf.length) out.push({ block: false, text: buf.join("\n") }); buf = []; };
+    while (i < ls.length) {
+      if (ls[i] === "```hq-block") {
+        let j = i + 1;
+        while (j < ls.length && ls[j] !== "```") j++;
+        flush();
+        if (j >= ls.length) { out.push({ block: true, text: ls.slice(i).join("\n"), open: true }); break; }
+        out.push({ block: true, text: ls.slice(i, j + 1).join("\n"), body: ls.slice(i + 1, j).join("\n") });
+        i = j + 1;
+      } else buf.push(ls[i++]);
+    }
+    flush();
+    return out;
+  }
+  const blk = (kind, cls, inner) => `<div class="blk ${cls || ""}" data-block="${kind}">${inner}</div>`;
+  const bTitle = t => t ? `<div class="blk-ttl">${esc(t)}</div>` : "";
+  const bNote = t => t ? `<div class="blk-note">${esc(t)}</div>` : "";
+  const bStat = s => `<div class="blk-stat"><div class="v">${esc(s.value)}${s.unit ? `<span class="u">${esc(s.unit)}</span>` : ""}</div><div class="l">${esc(s.label)}</div></div>`;
+  function bChart(b) {
+    const n = b.values.length, max = Math.max(...b.values), W = Math.max(240, n * 56), H = 150, top = 20, base = 120;
+    const h = v => max > 0 ? (v / max) * (base - top) : 0;
+    const val = v => esc(v) + (b.unit ? " " + esc(b.unit) : "");
+    const slot = W / n, cx = i => slot * i + slot / 2;
+    let g = "";
+    if (b.kind === "bar") {
+      g = b.values.map((v, i) => `<rect class="mk" x="${cx(i) - 16}" y="${base - h(v)}" width="32" height="${h(v)}"></rect><text class="val" x="${cx(i)}" y="${base - h(v) - 4}">${val(v)}</text>`).join("");
+    } else {
+      const pts = b.values.map((v, i) => `${cx(i)},${base - h(v)}`);
+      g = `<polyline class="ln" points="${pts.join(" ")}"></polyline>` +
+        b.values.map((v, i) => `<circle class="mk" cx="${cx(i)}" cy="${base - h(v)}" r="4"></circle><text class="val" x="${cx(i)}" y="${base - h(v) - 9}">${val(v)}</text>`).join("");
+    }
+    const lab = b.labels.map((l, i) => `<text x="${cx(i)}" y="${base + 16}">${esc(l)}</text>`).join("");
+    return `${bTitle(b.title)}<svg class="blk-svg" viewBox="0 0 ${W} ${H}" role="img"><line class="ax" x1="0" y1="${base}" x2="${W}" y2="${base}"></line>${g}${lab}</svg>`;
+  }
+  const BLOCK_RENDER = {
+    text: b => blk("text", "", `<p>${esc(b.text)}</p>`),
+    stat: b => "items" in b
+      ? blk("stat-row", "", `<div class="blk-stats">${b.items.map(bStat).join("")}</div>`)
+      : blk("stat-one", "", `<div class="blk-stats">${bStat(b)}</div>${bNote(b.note)}`),
+    table: b => blk("table", "", `${bTitle(b.title)}<table><thead><tr>${b.columns.map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${b.rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`),
+    list: b => {
+      const tag = b.numbered ? "ol" : "ul";
+      return blk(b.numbered ? "list-numbered" : "list-bullets", "", `<${tag}>${b.items.map(i => `<li>${esc(i)}</li>`).join("")}</${tag}>`);
+    },
+    chart: b => blk(b.kind === "bar" ? "chart-bar" : "chart-line", "", bChart(b)),
+    file: b => blk("file", "blk-file", `${icon("description")} ${b.url ? `<a class="p" href="${esc(b.url)}" target="_blank" rel="noopener">${esc(b.path)}</a>` : `<span class="p">${esc(b.path)}</span>`}${bNote(b.note)}`),
+    change: b => blk("change", "", `<div class="mono">${esc(b.file)}</div><div class="diff">${b.diff.split("\n").map(l => `<div class="${diffCls(l)}">${esc(l) || " "}</div>`).join("")}</div>${bNote(b.note)}`),
+    callout: b => blk("callout", "blk-callout " + (b.tone === "warning" ? "warning" : "info"), `${icon(b.tone === "warning" ? "warning" : "info")}${bTitle(b.title)}<p>${esc(b.text)}</p>`),
+    "key-value": b => blk("key-value", "", `<table>${b.items.map(i => `<tr><td class="k">${esc(i.key)}</td><td>${esc(i.value)}</td></tr>`).join("")}</table>`),
+    checks: b => blk("checks", "", b.items.map(i => `<div class="blk-item">${icon(i.pass ? "check_circle" : "cancel")}<span class="${i.pass ? "" : "fail"}">${esc(i.name)}</span><span class="st ${i.pass ? "" : "fail"}">${i.pass ? "pass" : "fail"}</span>${i.note ? `<span class="blk-note">${esc(i.note)}</span>` : ""}</div>`).join("")),
+    steps: b => blk("steps", "", b.items.map(i => `<div class="blk-item ${esc(i.state)}">${icon(i.state === "done" ? "check_circle" : i.state === "doing" ? "pending" : "radio_button_unchecked")}<span>${esc(i.name)}</span><span class="st">${esc(i.state)}</span></div>`).join("")),
+    image: b => blk("image", "blk-image", `<img src="${esc(b.url)}" alt="${esc(b.alt)}" loading="lazy">${bNote(b.caption)}`),
+    source: b => blk("source", "blk-source", `<blockquote>${esc(b.quote)}</blockquote><div class="from">${b.url ? `<a href="${esc(b.url)}" target="_blank" rel="noopener">${esc(b.from)}</a>` : esc(b.from)}</div>`),
+  };
+  const rawBlock = t => `<pre class="blk-raw" data-block-fallback>${esc(t)}</pre>`;
+  function blocks(text) {
+    return splitBlocks(text).map(s => {
+      if (!s.block) return `<pre>${esc(s.text)}</pre>`;
+      try {
+        if (s.open) return rawBlock(s.text);
+        const b = JSON.parse(s.body);
+        return validBlock(b) ? BLOCK_RENDER[b.type](b) : rawBlock(s.text);
+      } catch (e) { return rawBlock(s.text); }
+    }).join("");
+  }
 
   function appPanel(r) {
     if (!r.has_app) return `<p class="muted">No app to start for this repo. Ask Claude in the chat if you want to see it running.</p>`;
@@ -663,9 +806,9 @@
       `${esc(short(me.repo))} · #${me.number} · <a href="${esc(r.pr_url)}" target="_blank" rel="noopener">Pull request #${esc(r.pr)}</a> · branch ${esc(r.branch)}`,
       warn +
       dsec("app", "Try it", r.has_app ? 1 : 0, appPanel(r)) +
-      (r.after_merge ? dsec("after", "After merge — check these", lines(r.after_merge), `<pre>${esc(r.after_merge)}</pre>`) : "") +
-      (r.qa ? dsec("qa", "QA", lines(r.qa), `<pre>${esc(r.qa)}</pre>`)
-        : r.evidence ? dsec("evidence", "Build evidence", lines(r.evidence), `<pre>${esc(r.evidence)}</pre>`) : "") +
+      (r.after_merge ? dsec("after", "After merge — check these", lines(r.after_merge), blocks(r.after_merge)) : "") +
+      (r.qa ? dsec("qa", "QA", lines(r.qa), blocks(r.qa))
+        : r.evidence ? dsec("evidence", "Build evidence", lines(r.evidence), blocks(r.evidence)) : "") +
       dsec("diff", "Code changes", diffFiles(r.diff), renderDiff(r.diff)),
       decisionBar("What do you think? Required to send back — the agents get your words as-is.",
         `<button id="drop">Drop it</button>
@@ -694,7 +837,7 @@
       if (view !== me) return;
       frame("Answer", "help", s.title, metaLine(me.repo, me.number, { url: s.url, label: "Issue" }),
         dsec("goal", "Goal", lines(s.goal), `<pre>${esc(s.goal)}</pre>`) +
-        dsec("last", "Where it stopped", lines(s.last), `<pre>${esc(s.last)}</pre>`),
+        dsec("last", "Where it stopped", lines(s.last), blocks(s.last)),
         decisionBar("Your answer — what should the agents do?",
           `<button id="drop">Drop it</button><button class="primary" id="resume" disabled>Send answer &amp; restart</button>`));
       const comment = document.getElementById("comment"), resume = document.getElementById("resume");
