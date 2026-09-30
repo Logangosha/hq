@@ -99,11 +99,12 @@ def invalidate(url):
         _save(cache)
 
 
-def fetch(url, run):
+def fetch(url, run, missing_ok=False):
     """Return (body_json, link_header) for a GitHub REST GET, using the shared cache.
 
     `run` is server.py's subprocess runner: run(args, check=False) -> CompletedProcess.
     Raises GhRefusal, not RuntimeError, for a rate limit, bad/expired token, or no network.
+    missing_ok: a 404 returns (None, None), uncached, instead of raising.
     """
     cache = _load()
     entry = cache.get(url)
@@ -135,6 +136,8 @@ def fetch(url, run):
     if status in (403, 429) and headers.get("x-ratelimit-remaining") == "0":
         raise GhRefusal("rate_limit", headers.get("x-ratelimit-reset", ""))
 
+    if status == 404 and missing_ok:
+        return None, None
     if status != 200:
         raise RuntimeError(f"GitHub API error for {url}: {status} {body[:200]}")
 
