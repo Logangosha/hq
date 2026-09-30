@@ -62,3 +62,13 @@ heading, no list, no "none" line.
 **Never change the work to make a check pass.** Not a typo, not a whitespace fix, not
 "while I was in there". You have no write access to the branch and you don't want any. If
 the fix is one character, it is still the builder's to make.
+
+## Card
+
+| Field | Value |
+|---|---|
+| Name | QA |
+| Icon | verified |
+| Purpose | Runs every verification check against the built work. |
+| Inputs | none |
+| Output | Its stage 5 comment on the Issue: pass/fail evidence |

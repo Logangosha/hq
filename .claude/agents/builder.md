@@ -64,3 +64,13 @@ before you push is fine — reporting a verdict on it is not. The `### Evidence`
 `size:small` item is the one exception: there, the user's review at stage 6 replaces QA.
 Normal items are unchanged.
 
+
+## Card
+
+| Field | Value |
+|---|---|
+| Name | Builder |
+| Icon | construction |
+| Purpose | Does the work in a PR, following the plan and requirements. |
+| Inputs | none |
+| Output | A PR that closes the Work Item |

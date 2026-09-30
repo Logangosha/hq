@@ -97,3 +97,13 @@ Evidence point has a `path:line` or URL; if the budget was hit, that's named und
    retries out of the box?") — a good result checks the repo first (e.g. the dependency
    manifest, any wrapper code), then uses the web for the library's own behavior, citing
    the source URL.
+
+## Card
+
+| Field | Value |
+|---|---|
+| Name | Research |
+| Icon | travel_explore |
+| Purpose | Answers a question about the repo it runs in, read-only. |
+| Inputs | text |
+| Output | An answer comment on the run Issue |

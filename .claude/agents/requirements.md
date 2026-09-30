@@ -32,3 +32,13 @@ verification. On a re-run, head it `## 1b. Requirements (re-run) — requirement
 the time after, and so on) and post the **full** list again, not just the changed lines.
 
 **Never:** write checks (that's stage 2), write a plan, or change code.
+
+## Card
+
+| Field | Value |
+|---|---|
+| Name | Requirements |
+| Icon | checklist |
+| Purpose | Turns a Work Item's goal into numbered requirements. |
+| Inputs | none |
+| Output | Its stage 1 comment on the Issue: numbered requirements |

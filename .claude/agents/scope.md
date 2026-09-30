@@ -50,3 +50,13 @@ On a re-run, head it `## 1b. Scope (re-run) — scope ✅` (`1c` the next time, 
 
 **Never:** build anything, write a separate verification checklist, or post more than one
 forward-moving comment.
+
+## Card
+
+| Field | Value |
+|---|---|
+| Name | Scope |
+| Icon | target |
+| Purpose | Writes requirements and the plan for a small Work Item in one comment. |
+| Inputs | none |
+| Output | Its scope comment on the Issue: requirements and plan |
