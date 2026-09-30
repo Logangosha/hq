@@ -1,6 +1,7 @@
 ---
 name: add-domain
 description: Add a new domain repo to HQ so Work Items can run in it — repo (created if missing, after asking), description, starter files, workflow, labels and the Claude token. Use when the user says "add a repo", "add a domain", "start using HQ in <repo>", or a Work Item is wanted in a repo that has no Work Item workflow yet.
+hq-only: true
 ---
 
 # Add a domain

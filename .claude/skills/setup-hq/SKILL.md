@@ -1,6 +1,7 @@
 ---
 name: setup-hq
 description: Set up a fresh copy of HQ for a new user — their GitHub owner, their domain repos, the workflow, labels, Claude app and token — then prove it with a test Work Item. Use when someone has just copied HQ, says "set up HQ", or check-setup.sh reports problems.
+hq-only: true
 ---
 
 # Set up HQ

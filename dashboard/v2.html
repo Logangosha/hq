@@ -550,7 +550,7 @@
   }
 
   // ---- Agents, workflows and history of a page ----
-  const catalogs = {};       // full -> {agents, workflows, description, url, private} | {error}
+  const catalogs = {};       // full -> {agents, skills, workflows, description, url, private} | {error}
   const catBusy = new Set();
   const boxes = {};          // "full|agent" -> {text, files: [{name, content}], error, busy}
   const starts = {};         // prompt key -> {spec, labels, values, error, busy}
@@ -785,6 +785,18 @@
     return catSection(group, id, "Workflows", full, c => c.workflows, w => workflowRow(full, w));
   }
 
+  function skillRow(s) {
+    const tags = (s.replaces ? `<span class="tag">Replaces HQ's ${esc(s.id)}</span>` : "")
+      + (s.hq_only ? `<span class="tag">HQ only</span>` : "");
+    return `<div class="row">${icon("bolt")}<span>${esc(s.name)}</span><span class="muted">${esc(s.description)}</span>${tags}</div>`;
+  }
+  function skillsSection(group, id, full) {
+    const cat = catalogs[full];
+    if (cat && !cat.error && !cat.skills.length)
+      return section(group, id, "Skills", "0", `<div class="empty">No skills.</div>`);
+    return catSection(group, id, "Skills", full, c => c.skills, skillRow);
+  }
+
   // -- History
   const histState = full => hist[full] ||= { q: "", agent: "", sort: "newest" };
   function histItems(d) {
@@ -893,6 +905,8 @@
     return dsec("agents", "Agents", cat.agents.length, cat.agents.map(a =>
         aboutRow("agent", `data-repo="${esc(full)}" data-agent="${esc(a.id)}"`, a.icon || "smart_toy", a.display_name, a.purpose)).join("")
       || `<div class="empty">No agents.</div>`) +
+      dsec("skills", "Skills", cat.skills.length, cat.skills.map(skillRow).join("")
+      || `<div class="empty">No skills.</div>`) +
       dsec("workflows", "Workflows", cat.workflows.length, cat.workflows.map(w =>
         aboutRow("workflow", `data-repo="${esc(full)}" data-wf="${esc(w.id)}"`, "account_tree", w.name, w.error ? `Can't run: ${w.error}` : w.purpose)).join("")
       || `<div class="empty">No workflows here yet.</div>`);
@@ -1008,7 +1022,7 @@
       pageEl.innerHTML = banr + note +
         listSection("dom", "d-ready", "Ready for you", x => isReady(x) && x.full === full, true, false, true) +
         listSection("dom", "d-running", "Running", x => !isReady(x) && x.full === full, false, false, true) +
-        agentsSection("dom", "d-agents", full) + workflowsSection("dom", "d-workflows", full) +
+        agentsSection("dom", "d-agents", full) + skillsSection("dom", "d-skills", full) + workflowsSection("dom", "d-workflows", full) +
         historySection("dom", "d-history", full);
       return;
     }
@@ -1025,7 +1039,7 @@
       group("own", "HQ's own", `${ownReady} ready · ${own.length - ownReady} running`,
         listSection("own", "o-ready", "Ready for you", x => isReady(x) && x.full === hq, true, true, true) +
         listSection("own", "o-running", "Running", x => !isReady(x) && x.full === hq, false, true, true) +
-        agentsSection("own", "o-agents", hq) + workflowsSection("own", "o-workflows", hq) +
+        agentsSection("own", "o-agents", hq) + skillsSection("own", "o-skills", hq) + workflowsSection("own", "o-workflows", hq) +
         historySection("own", "o-history", hq));
   }
 
