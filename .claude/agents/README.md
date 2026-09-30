@@ -20,6 +20,8 @@ outside the lifecycle:
 
 ## What belongs here, and what doesn't
 
+Skill, agent or workflow — which shape a capability takes: `orchestration/workflows.md`.
+
 **HQ holds generic capabilities only** — things that work across many repos, domains and
 kinds of work. The agents above are generic: they know the lifecycle, not the subject.
 
