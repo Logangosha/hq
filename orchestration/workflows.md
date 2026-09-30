@@ -17,6 +17,20 @@ same engine run it. Roadmap: F14 in `archive/features-v3.md`. The file format is
 | **Trigger** | What starts the workflow | `/run`, a schedule, an event |
 | **Runner** | HQ's engine on GitHub: moves items along arrows, starts the next agent | the Work Item runner, generalised |
 
+## Skill, agent or workflow?
+
+Pick the smallest shape that fits:
+
+| If it… | It's a… |
+|---|---|
+| runs once and finishes, no judgment | **skill** |
+| needs judgment or several steps, but one role can do it | **agent** |
+| needs more than one role, or a user decision part-way | **workflow** (the decision is a gate) |
+| needs more than one workflow | out of scope for now |
+
+So "propose, then yes/no, then act" is never a conversational skill: it's a workflow
+with a gate. Each shape can then assume the one below it is simple.
+
 ## How it runs (job hunt)
 
 1. Trigger: each morning the listing agent opens one Issue per new job.
