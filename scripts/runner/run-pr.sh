@@ -4,6 +4,7 @@
 # agent's `tools:` line marks it read-only (hq#196 R16): a read-only agent that
 # still wrote something (e.g. via Bash) doesn't get a PR out of it.
 # Usage: NUM=29 AGENT=builder GITHUB_REPOSITORY=owner/repo bash .hq/scripts/runner/run-pr.sh
+# A plain run also gets a comment on its Issue naming the PR.
 # Needs GH_TOKEN. Run from the domain checkout, after HQ was cloned into .hq and
 # install-agents.sh has installed HQ's agents/hooks.
 # The push authenticates with GH_TOKEN only, ignoring the origin URL and any git
@@ -65,11 +66,13 @@ trap 'curl -fsS -X DELETE -H "Authorization: Bearer $APP_TOKEN" https://api.gith
 
 BRANCH="run/$NUM-$AGENT"
 BODY="Closes #$NUM"
+FLOW=
 # A workflow item's PR must not close it mid-flow, and repeat runs (a rejection loop)
 # must not collide on the branch name.
 if [ -f "${RUNNER_TEMP:-/tmp}/hq-flow-step" ]; then
   BRANCH="run/$NUM-$AGENT-${GITHUB_RUN_ID:-$(date +%s)}"
   BODY="Refs #$NUM"
+  FLOW=1
 fi
 git switch -c "$BRANCH"
 git add -A -- "${CHANGED[@]}"
@@ -80,6 +83,13 @@ git -c http.https://github.com/.extraheader= \
   -c credential.helper='!f() { echo username=x-access-token; echo "password=$GH_TOKEN"; }; f' \
   push "https://github.com/$GITHUB_REPOSITORY.git" "HEAD:refs/heads/$BRANCH"
 
-GH_TOKEN="$APP_TOKEN" gh pr create --repo "$GITHUB_REPOSITORY" --head "$BRANCH" \
+PR_URL=$(GH_TOKEN="$APP_TOKEN" gh pr create --repo "$GITHUB_REPOSITORY" --head "$BRANCH" \
   --title "Run #$NUM: $AGENT" \
-  --body "$BODY"
+  --body "$BODY")
+echo "$PR_URL"
+
+# Name the PR on the run Issue so its result says where the changes went.
+if [ -z "$FLOW" ]; then
+  gh issue comment "$NUM" --repo "$GITHUB_REPOSITORY" \
+    --body "Opened PR #${PR_URL##*/} with these changes: $PR_URL"
+fi
