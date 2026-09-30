@@ -55,7 +55,7 @@ def _card(stem, text):
     if e["errors"] or e["fallback"]:
         # A missing or malformed card falls back whole: name and description only.
         e.update(display_name=e["name"], icon="smart_toy", inputs=None, output=None, shortcuts=[])
-        e["purpose"] = e["purpose"] or ""
+        e["purpose"] = agent_cards.frontmatter(text).get("description") or ""
     return e
 
 
