@@ -180,6 +180,8 @@ Each agent file adds only what's specific to its stage. These apply to all of th
 - **Never soften a requirement or a check** to match what was built or to make it pass.
 - **Record every judgment call** under `Decisions`: the choice, then the reason, one line
   each. These become workflows later (see below).
+- **Write results as blocks** where they fit (stats, tables, checks, diffs…) — the
+  dashboard draws them. Format and guide: [blocks.md](blocks.md).
 - **End by setting the `stage:` label** — forward when done, back when bouncing.
 
 ### Keep it brief

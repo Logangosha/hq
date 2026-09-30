@@ -50,7 +50,7 @@ with the agent: there's no fixed number of parts or length, just cover what the 
 
 - **Purpose** — what the agent is for, and when to use it.
 - **Inputs** — what it needs from the ask, each detail marked required or given a default.
-- **Output** — what it hands back, a report or changed files, and where that lands.
+- **Output** — what it hands back, a report or changed files, and where that lands. Write results as blocks where they fit: [blocks.md](../../orchestration/blocks.md).
 - **Boundaries** — what it must never do.
 - **Done check** — how it knows its work is finished *and* correct, not just finished.
 - **Evals** — 2–3 test asks, each paired with what a good result looks like.
