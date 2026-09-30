@@ -39,7 +39,7 @@ inheritance as agents:
 - A domain page shows HQ's shared skills plus the domain's own `.claude/skills/`.
 - Same name: the domain's skill wins, and its entry says it replaces HQ's.
 - `hq-only: true` in a skill's frontmatter keeps it on HQ's page only; domains don't inherit it.
-- `dashboard-hidden: true` shows it on no page (HQ's file only; a domain's own skill of that name still shows).
+- `dashboard-hidden: true` shows it on no page (HQ's file only; a domain's own skill of that name still shows). Use it for a skill that duplicates something the dashboard already does (e.g. `review`, `run`, `work-items`); any such skill can have it.
 - No field = shared.
 
 ## The agent-file standard
