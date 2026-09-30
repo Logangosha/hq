@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 FIELDS = {"Name", "Icon", "Purpose", "Inputs", "Output"}
+OPTIONAL = {"Hint"}
 KINDS = {"question", "log", "job"}
 INPUTS = {"text", "files", "text, files", "none"}
 SHORTCUT_COLS = ["Label", "Kind", "Ask", "Needs"]
@@ -45,7 +46,7 @@ def parse(path):
     name = fm.get("name") or path.stem
     entry = {"file": str(path), "name": name, "display_name": name,
              "icon": None, "purpose": fm.get("description"), "inputs": None,
-             "output": None, "shortcuts": [], "fallback": False, "errors": []}
+             "output": None, "hint": None, "shortcuts": [], "fallback": False, "errors": []}
     err = lambda f, p: entry["errors"].append({"field": f, "problem": p})
     card = card_section(text)
     if card is None:
@@ -56,7 +57,7 @@ def parse(path):
     for r in rows(main.splitlines()):
         if len(r) != 2:
             err("Card", f"row has {len(r)} cells, want 2: {'|'.join(r)}")
-        elif r[0] not in FIELDS:
+        elif r[0] not in FIELDS | OPTIONAL:
             err(r[0], "unknown field")
         else:
             values[r[0]] = r[1]
@@ -69,6 +70,8 @@ def parse(path):
         entry["purpose"] = values["Purpose"]
     if values.get("Output"):
         entry["output"] = values["Output"]
+    if values.get("Hint"):
+        entry["hint"] = values["Hint"]
     icon = values.get("Icon")
     if icon:
         if re.fullmatch(r"[a-z0-9_]+", icon):

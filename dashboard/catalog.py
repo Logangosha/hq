@@ -121,7 +121,8 @@ def skills(full, hq_full, run):
                     "file": f".claude/skills/{k}/SKILL.md", "replaces": k in own and k in hq,
                     "hq_only": fm.get("hq-only", "").lower() == "true",
                     "display_name": card["display_name"], "icon": card["icon"],
-                    "purpose": card["purpose"], "inputs": card["inputs"]})
+                    "purpose": card["purpose"], "inputs": card["inputs"],
+                    "hint": card["hint"]})
     return out
 
 

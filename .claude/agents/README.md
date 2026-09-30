@@ -37,8 +37,8 @@ Planned (F7.5): a project agent will override the HQ one of the same name in tha
 
 A skill is `.claude/skills/<name>/SKILL.md`. It shows on a page only if the file ends with
 a valid `## Card` ([card format](#self-description-card)). No card, or a malformed one,
-means hidden. The card's `Inputs` sets the form: `none` is a play button; `text` adds a
-text box; `files` a file picker; `text, files` both. Skills use no Shortcuts. The Skills list follows the same
+means hidden. The card's `Inputs` sets the form: `none` is just a play button on the row, no box; `text` adds a
+text box; `files` a file picker; `text, files` both. `Hint` sets the box's hint text. Skills use no Shortcuts. The Skills list follows the same
 inheritance as agents:
 
 - A domain page shows HQ's shared skills plus the domain's own `.claude/skills/`.
@@ -85,6 +85,7 @@ JSON for the dashboard.
 | `Purpose` | required | One line. |
 | `Inputs` | required | `text`, `files`, `text, files` or `none`. `none` = the dashboard shows no input box. |
 | `Output` | required | One line: what it produces, e.g. "an answer comment" or "a PR". |
+| `Hint` | optional | One line: what the user should enter. The dashboard shows it as a skill's input hint; blank = a default hint. |
 
 Optional `### Shortcuts` table, `| Label | Kind | Ask | Needs |`:
 
