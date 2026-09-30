@@ -347,7 +347,7 @@
       { kind: "flow", stage: f.step || "flow", waiting: f.waiting, workflow: f.workflow, step: f.step, gate: f.gate }));
     if (withRuns) out.push(...(d.runs || []).filter(r => r.state !== "history").map(r => Object.assign(base(r),
       { kind: "run", stage: "Run", waiting: [], agent: r.agent, failed: r.failed })));
-    if (withRuns) out.push(...(skillRuns[d.full] || []).map(r => ({ full: d.full, repo: d.repo, number: null, title: r.name, url: null,
+    if (withRuns) out.push(...(skillRuns[d.full] || []).filter(r => r.state === "running").map(r => ({ full: d.full, repo: d.repo, number: null, title: r.name, url: null,
       created_at: new Date(r.started * 1000).toISOString(), blocked_by: [], needs_you: false, kind: "skill", id: r.id,
       stage: "Skill", waiting: [], skill: r.skill, state: r.state, failed: r.state === "failed" })));
     return out;
@@ -858,7 +858,9 @@
     const one = (kind, x, who, ask, failed) => ({ kind, full: d.full, repo: d.repo, number: x.number, title: x.title,
       created_at: x.created_at, who, ask, failed });
     return (d.runs || []).filter(r => r.state === "history").map(r => one("run", r, r.agent, r.ask, r.failed))
-      .concat((d.flows || []).filter(f => f.state === "history").map(f => one("flow", f, f.workflow, "", false)));
+      .concat((d.flows || []).filter(f => f.state === "history").map(f => one("flow", f, f.workflow, "", false)))
+      .concat((skillRuns[d.full] || []).filter(r => r.state !== "running").map(r => ({ kind: "skill", id: r.id, full: d.full, repo: d.repo,
+        number: null, title: r.name, created_at: new Date(r.started * 1000).toISOString(), who: r.skill, ask: "", failed: r.state === "failed" })));
   }
   function histShown(full) {
     const d = domains.find(x => x.full === full) || {}, st = histState(full), q = st.q.trim().toLowerCase();
@@ -872,9 +874,9 @@
   }
   function histRows(full, id) {
     const { out } = histShown(full);
-    const rows = pageSlice(id, out).map(x => `<div class="row" role="button" tabindex="0" data-act="${x.kind}item" data-repo="${esc(full)}" data-number="${x.number}">
-        <span class="lead">${icon(x.failed ? "error" : x.kind === "run" ? "description" : "account_tree")}</span>
-        <span class="mid"><span class="ttl">${esc(x.title)}</span><span class="tags"><span>${esc(x.repo)}#${x.number}</span>
+    const rows = pageSlice(id, out).map(x => `<div class="row" role="button" tabindex="0" data-act="${x.kind}item" data-repo="${esc(full)}" data-number="${x.number}"${x.kind === "skill" ? ` data-id="${esc(x.id)}"` : ""}>
+        <span class="lead">${icon(x.failed ? "error" : x.kind === "run" ? "description" : x.kind === "skill" ? "bolt" : "account_tree")}</span>
+        <span class="mid"><span class="ttl">${esc(x.title)}</span><span class="tags"><span>${esc(x.kind === "skill" ? x.repo : `${x.repo}#${x.number}`)}</span>
           <span class="tag">${esc(x.who)}</span><span>${esc(x.created_at.slice(0, 10))}</span></span></span>
         <span class="verb">Open ${icon("arrow_forward")}</span></div>`).join("");
     return (rows || `<div class="empty">Nothing here yet.</div>`) + pager(id, out.length);
