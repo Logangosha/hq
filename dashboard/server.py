@@ -185,10 +185,24 @@ def stage_label_time(full, number, label, created_at):
     return events[-1] if events else created_at
 
 
+def run_active(full, title):
+    """True if an Actions run for the issue titled `title` is queued or in progress,
+    False if none is, None if the run list can't be read. Runs are matched by their
+    displayTitle, the only issue link `gh run list` exposes."""
+    for status in ("queued", "in_progress"):
+        res = run(["gh", "run", "list", "-R", full, "-w", "work-item.yml", "-e", "issues",
+                   "-s", status, "--json", "displayTitle"], check=False)
+        if res.returncode != 0:
+            return None
+        if any(r["displayTitle"].endswith(title) for r in json.loads(res.stdout or "[]")):
+            return True
+    return False
+
+
 def stall_info(full, item, comments):
     """Whether this Work Item's current stage looks stuck: 15+ minutes have passed since
-    the stage label landed on the Issue (F7.10) — the only test, regardless of comments
-    or Actions run history. Posts the first comment for a stall and stays quiet after
+    the stage label landed on the Issue (F7.10) and no Actions run for it is still queued
+    or in progress (if the run list can't be read, time alone decides). Posts the first comment for a stall and stays quiet after
     that; parks the item on a 3rd stall in a row on the same stage, with no successful
     stage comment in between.
 
@@ -200,6 +214,8 @@ def stall_info(full, item, comments):
     elapsed = datetime.utcnow() - datetime.strptime(since, "%Y-%m-%dT%H:%M:%SZ")
     if elapsed < timedelta(seconds=900):
         return False, None, False  # stage started under 15 min ago — give it time
+    if run_active(full, item["title"]) is True:
+        return False, None, False  # an agent is still working — a long run isn't a stall
 
     title = stage.split(" ", 1)[1]
     reason = (f"🛑 Stalled: **{title}** — 15+ minutes have passed since this stage started "
