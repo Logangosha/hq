@@ -1023,9 +1023,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         if parsed.path in ("/", "/index.html"):
-            self.send(200, PAGE_HTML, "text/html; charset=utf-8")
-        elif parsed.path == "/v2":
             self.send(200, PAGE_V2_HTML, "text/html; charset=utf-8")
+        elif parsed.path == "/old":
+            self.send(200, PAGE_HTML, "text/html; charset=utf-8")
         elif parsed.path == "/api/items":
             try:
                 # The budget rides along as a header: GitHub reports it on every
