@@ -391,7 +391,7 @@
   const workCount = es => es.reduce((n, e) => n + (e.item ? 1 : e.parts.length), 0);
 
   const isReady = x => !!x.needs_you;
-  const isWorking = x => x.kind ? !x.needs_you : !x.stage.startsWith("6 ") && !x.waiting.includes("waiting:user")
+  const isWorking = x => x.kind === "skill" ? x.state === "running" : x.kind ? !x.needs_you : !x.stage.startsWith("6 ") && !x.waiting.includes("waiting:user")
     && !x.waiting.includes("waiting:work") && !x.waiting.includes("waiting:stopped");
 
   function verbOf(x) {
@@ -801,8 +801,11 @@
   const skKey = (full, id) => "skill|" + full + "|" + id;
   const skRepaint = () => { if (isList() || view.page === "about") rerender(); else if (view.page === "skillrun") renderSkillRun(); };
   async function loadSkillRuns(full, quiet) {
-    try { skillRuns[full] = await (await fetch("/api/skill/runs?repo=" + encodeURIComponent(full))).json(); }
-    catch (e) { return; }
+    try {
+      const res = await fetch("/api/skill/runs?repo=" + encodeURIComponent(full)), data = await res.json();
+      if (!res.ok || !Array.isArray(data)) return;
+      skillRuns[full] = data;
+    } catch (e) { return; }
     if (!(quiet && typing())) skRepaint();
     pollSkills(full);
   }
@@ -1650,6 +1653,7 @@
       if ((view.page === "hq" || view.page === "domain") && !typing()) renderList();
       else { renderTop(); updateSys(); }
       scheduleRefresh();
+      if (loaded && isList()) loadSkillRuns(view.page === "domain" ? view.repo : hqFull(), true);
     }
   }
 
