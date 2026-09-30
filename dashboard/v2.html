@@ -563,7 +563,7 @@
   function renderAbout() {
     const s = scopeFull();
     if (scopeIsHq()) {
-      frame("About", "info", "HQ", `HQ · <a href="/v2">dashboard</a>`,
+      frame("About", "info", "HQ", `HQ · <a href="/">dashboard</a>`,
         dsec("auto", "Auto-refresh", 1, `<p>The page refreshes itself every 5 seconds while an agent is working, otherwise every 30 seconds.
           It pauses when this tab is hidden or after 5 minutes without activity, and picks up again the moment you come back.
           A refresh never closes a page you have open or clears what you typed.</p>`) +
