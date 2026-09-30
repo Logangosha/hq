@@ -1,6 +1,7 @@
 ---
 name: repos
 description: Show all of the user's GitHub repos — which are domains, which are cloned on this computer, which aren't — so they can pick ones to add. Use when the user asks "show my repos", "what repos do I have", "what could I add", "what's local", or "/repos".
+hq-only: true
 ---
 
 # Repos

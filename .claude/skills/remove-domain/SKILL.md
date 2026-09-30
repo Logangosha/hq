@@ -1,6 +1,7 @@
 ---
 name: remove-domain
 description: Unregister a domain repo so HQ no longer sees it or sends Work Items there — the repo, its files and Issues are left as they are. Use when the user says "remove a domain", "unregister <repo>", "stop using HQ in <repo>", or "/remove-domain".
+hq-only: true
 ---
 
 # Remove a domain

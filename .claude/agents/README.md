@@ -31,6 +31,17 @@ Rule of thumb: if it names a particular app, repo, service or dataset, it doesn'
 
 Planned (F7.5): a project agent will override the HQ one of the same name in that repo.
 
+## Skills on a page
+
+A skill is `.claude/skills/<name>/SKILL.md`. The dashboard's Skills list follows the same
+inheritance as agents:
+
+- A domain page shows HQ's shared skills plus the domain's own `.claude/skills/`.
+- Same name: the domain's skill wins, and its entry says it replaces HQ's.
+- `hq-only: true` in a skill's frontmatter keeps it on HQ's page only; domains don't inherit it.
+- `dashboard-hidden: true` shows it on no page (HQ's file only; a domain's own skill of that name still shows).
+- No field = shared.
+
 ## The agent-file standard
 
 Every agent file follows this — HQ's own `.claude/agents/` and a repo's own. Detail scales

@@ -1,6 +1,7 @@
 ---
 name: run
 description: Start an agent — or a workflow — on GitHub for a one-off ask, outside the Work Item lifecycle. Use for "/run <agent|workflow> in <repo>: <ask>" (the ": <ask>" part is optional). Never the built-in "run" skill (launching/screenshotting an app) — this one dispatches a GitHub Actions run.
+dashboard-hidden: true
 ---
 
 # Run an agent on request

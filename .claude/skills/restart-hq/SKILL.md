@@ -1,6 +1,7 @@
 ---
 name: restart-hq
 description: Restart the review dashboard so it picks up the working copy's current state. Use when the user says "restart the dashboard", "restart hq", or "/restart-hq".
+hq-only: true
 ---
 
 # /restart-hq

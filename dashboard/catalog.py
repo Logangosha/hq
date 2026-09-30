@@ -1,7 +1,9 @@
-"""What a page can do: its agents and workflows (HQ's plus the domain's own, the domain's
-winning on a name clash), read from files — HQ's from this checkout, a domain's from
-GitHub. On a domain page HQ's stage agents are left out and HQ's general ones carry
-`general`. Formats: .claude/agents/README.md (agent cards), orchestration/workflows.md."""
+"""What a page can do: its agents, skills and workflows (HQ's plus the domain's own, the
+domain's winning on a name clash), read from files — HQ's from this checkout, a domain's
+from GitHub. On a domain page HQ's stage agents are left out and HQ's general ones carry
+`general`. A skill with `hq-only: true` in its frontmatter stays on HQ's page; one with
+`dashboard-hidden: true` shows on no page. Formats: .claude/agents/README.md (agent cards,
+skills), orchestration/workflows.md."""
 import base64
 import importlib.util
 import os
@@ -38,6 +40,24 @@ def _local(path):
         if d.is_dir() else []
 
 
+def _local_skills():
+    d = Path(HQ) / ".claude" / "skills"
+    return [(f.parent.name, f.read_text(encoding="utf-8")) for f in sorted(d.glob("*/SKILL.md"))] if d.is_dir() else []
+
+
+def _remote_skills(full, run):
+    """(folder, SKILL.md text) of each skill folder of repo `full`; [] if there is no skills folder."""
+    listing, _ = ghcache.fetch(f"repos/{full}/contents/.claude/skills", run, missing_ok=True)
+    out = []
+    for f in listing or []:
+        if f.get("type") != "dir":
+            continue
+        body, _ = ghcache.fetch(f"repos/{full}/contents/.claude/skills/{f['name']}/SKILL.md", run, missing_ok=True)
+        if body and body.get("content") is not None:
+            out.append((f["name"], base64.b64decode(body["content"]).decode("utf-8", "replace")))
+    return out
+
+
 def _files(full, hq_full, path, run):
     """HQ's files, then `full`'s own over them (skipped when `full` is HQ itself)."""
     files = dict(_local(path))
@@ -71,6 +91,31 @@ def agents(full, hq_full, run):
     cards = {s: dict(_card(s, t), general=True) for s, t in _local(".claude/agents") if s not in stage}
     cards.update({s: _card(s, t) for s, t in _remote(full, ".claude/agents", run)})
     return [cards[s] for s in sorted(cards)]
+
+
+def skills(full, hq_full, run):
+    """Skills of page `full`, sorted by name: HQ's (minus `dashboard-hidden: true` ones, and minus
+    `hq-only: true` ones on a domain page), then the domain's own over them (never filtered);
+    `replaces` marks one that displaces an HQ skill."""
+    hq = dict(_local_skills())
+    found = {}
+    for k, t in hq.items():
+        fm = agent_cards.frontmatter(t)
+        if fm.get("dashboard-hidden", "").lower() == "true":
+            continue
+        if full == hq_full or fm.get("hq-only", "").lower() != "true":
+            found[k] = t
+    own = {}
+    if full != hq_full:
+        own = dict(_remote_skills(full, run))
+        found.update(own)
+    out = []
+    for k in sorted(found):
+        fm = agent_cards.frontmatter(found[k])
+        out.append({"id": k, "name": fm.get("name") or k, "description": fm.get("description") or "",
+                    "file": f".claude/skills/{k}/SKILL.md", "replaces": k in own and k in hq,
+                    "hq_only": fm.get("hq-only", "").lower() == "true"})
+    return out
 
 
 def _rows(section):

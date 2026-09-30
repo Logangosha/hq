@@ -1,6 +1,7 @@
 ---
 name: start-hq
 description: Start the review dashboard. Use when the user says "start the dashboard", "start hq", or "/start-hq".
+hq-only: true
 ---
 
 # /start-hq

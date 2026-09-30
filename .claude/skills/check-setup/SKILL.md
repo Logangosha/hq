@@ -1,6 +1,7 @@
 ---
 name: check-setup
 description: Check whether HQ is fully set up — tools, HQ repo, every domain's repo, workflow, labels and Claude token — and fix what can be fixed. Use when the user asks "is everything set up?", "check my setup", "why isn't it running?", or after any setup change.
+hq-only: true
 ---
 
 # Check setup

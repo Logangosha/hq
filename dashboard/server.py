@@ -1284,6 +1284,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send(400, {"error": f"{full} isn't one of your domains."})
                 info = domain_info.get(full, {})
                 self.send(200, {"agents": catalog.agents(full, hq_full(), run),
+                                "skills": catalog.skills(full, hq_full(), run),
                                 "workflows": catalog.workflows(full, hq_full(), run),
                                 "description": info.get("description"), "url": f"https://github.com/{full}",
                                 "private": bool(info.get("private"))})

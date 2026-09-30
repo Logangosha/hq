@@ -1,6 +1,7 @@
 ---
 name: stop-hq
 description: Stop the review dashboard. Use when the user says "stop the dashboard", "stop hq", or "/stop-hq".
+hq-only: true
 ---
 
 # /stop-hq
