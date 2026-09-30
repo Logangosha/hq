@@ -243,9 +243,11 @@
     background: var(--surface); color: var(--text); }
   .askrow textarea { flex: 1; resize: none; min-height: 34px; max-height: 200px; border: 0; background: transparent; outline: none; }
   .askrow .grow { flex: 1; }
-  .askrow .send { background: transparent; border: 0; color: var(--muted); padding: 6px; }
-  .askrow .send.has { color: var(--text); }
-  .askrow .send:disabled { opacity: 1; }
+  .askrow .hint { flex: 1; color: var(--muted); padding: 6px 4px; }
+  .wrow > .row .grow { flex: 1; }
+  .askrow .send, .wrow > .row .send { background: transparent; border: 0; color: var(--muted); padding: 6px; }
+  .askrow .send.has, .wrow > .row .send.has { color: var(--text); }
+  .askrow .send:disabled, .wrow > .row .send:disabled { opacity: 1; }
   .berr { color: var(--accent); font-size: 13px; padding: 4px 6px; white-space: pre-wrap; }
   .needs { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin: 8px 0 2px; }
   .needs label { display: flex; flex-direction: column; font-size: 12px; color: var(--muted); gap: 2px; }
@@ -833,7 +835,14 @@
     const can = (!inp.length || !!(b.text.trim() || b.files.length)) && !b.busy;
     const tags = (s.replaces ? `<span class="tag">Replaces HQ's ${esc(s.id)}</span>` : "")
       + (s.hq_only ? `<span class="tag">HQ only</span>` : "");
-    return `<div class="wrow"><div class="row">${icon(s.icon || "bolt")}<span>${esc(s.display_name)}</span><span class="muted">${esc(s.purpose || "")}</span>${tags}</div>`
+    const head = `${icon(s.icon || "bolt")}<span>${esc(s.display_name)}</span><span class="muted">${esc(s.purpose || "")}</span>${tags}`;
+    if (!inp.length) {
+      const running = b.busy || (skillRuns[full] || []).some(r => r.skill === s.id && r.state === "running");
+      return `<div class="wrow"><div class="row">${head}<span class="grow"></span>`
+        + `<button class="send ${running ? "" : "has"}" data-act="skplay" data-box="${esc(k)}" ${running ? "disabled" : ""} title="Run ${esc(s.display_name)}">${icon("play_arrow")}</button></div>`
+        + `${b.error ? `<div class="berr">${esc(b.error)}</div>` : ""}</div>`;
+    }
+    return `<div class="wrow"><div class="row">${head}</div>`
       + `<div class="askbox keepfocus" ${inp.includes("files") ? `data-dropbox="${esc(k)}"` : ""}>`
       + (b.files.length ? `<div class="chips">${b.files.map((f, i) => `<span class="fchip">${icon(fileIcon(f))}${esc(f.name)}
         <span class="sz">${fmtSize(f.size || 0)}</span>
@@ -841,7 +850,7 @@
       + `<div class="askrow">`
       + (inp.includes("files") ? `<button class="ghost" data-act="addfile" data-box="${esc(k)}" title="Attach files">${icon("attach_file")}</button>
           <input type="file" multiple hidden data-fileinput="${esc(k)}">` : "")
-      + (inp.includes("text") ? `<textarea rows="1" data-box-text="${esc(k)}" placeholder="Add to ${esc(s.display_name)}…">${esc(b.text)}</textarea>` : `<span class="grow"></span>`)
+      + (inp.includes("text") ? `<textarea rows="1" data-box-text="${esc(k)}" placeholder="${esc(s.hint || `Tell ${s.display_name} what to do…`)}">${esc(b.text)}</textarea>` : `<span class="hint">${esc(s.hint || `Attach files for ${s.display_name}…`)}</span>`)
       + `<button class="send ${can ? "has" : ""}" data-act="skplay" data-box="${esc(k)}" ${can ? "" : "disabled"} title="Run ${esc(s.display_name)}">${icon("play_arrow")}</button>`
       + `</div>${b.error ? `<div class="berr">${esc(b.error)}</div>` : ""}</div></div>`;
   }
