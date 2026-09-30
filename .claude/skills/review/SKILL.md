@@ -1,7 +1,6 @@
 ---
 name: review
 description: Let the user look at a finished Work Item (or decide at a workflow gate) on their own computer, then approve (merge) or reject it (back to Requirements, or to Scope for a small item, with their comments). Use when a Work Item is at stage:review and the user says "review <repo>#<n>", "let me see it", "show me the app", or "/review".
-dashboard-hidden: true
 ---
 
 # Review

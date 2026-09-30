@@ -18,3 +18,13 @@ nothing else. Domains first, then the rest by name:
 | `<repo>` 🔒 if private | ✅ or blank | the folder path, or blank | `<description>`, or *no description* |
 
 Then one line: `/add-domain <repo>` adds any of them.
+
+## Card
+
+| Field | Value |
+|---|---|
+| Name | Repos |
+| Icon | inventory_2 |
+| Purpose | Lists your GitHub repos: domain or not, cloned here or not. |
+| Inputs | none |
+| Output | Your GitHub repos: domain or not, cloned here or not |

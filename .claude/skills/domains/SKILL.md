@@ -23,3 +23,13 @@ Then one line with the GitHub link that shows the same list, for their phone:
 this copy of HQ).
 
 **No domains yet** → one line: none yet, and `/add-domain <repo>` adds the first.
+
+## Card
+
+| Field | Value |
+|---|---|
+| Name | Domains |
+| Icon | folder |
+| Purpose | Lists your domains and what belongs in each. |
+| Inputs | none |
+| Output | Your domains and what belongs in each |

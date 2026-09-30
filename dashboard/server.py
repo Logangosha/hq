@@ -11,6 +11,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -1219,8 +1220,9 @@ def flow_start(full, name, text):
 
 
 SKILL_TIMEOUT = 1800
-skill_runs = {}  # "full|skill" -> {state: running|ok|failed, output, started, ended}
+skill_runs = {}  # id -> {repo, skill, name, state: running|ok|failed|stopped, output, started, ended, proc, stopped}
 skill_lock = threading.Lock()
+skill_ids = iter(range(1, 10**9))
 
 
 def local_copy(full):
@@ -1236,37 +1238,101 @@ def local_copy(full):
     raise UserError(f"No local copy of {short} on this computer — clone it to run its skills here.")
 
 
-def skill_start(full, skill):
+def _skill_files(files):
+    """Save attached files in a fresh temp folder outside any git tree; return (folder, paths)."""
+    folder = tempfile.mkdtemp(prefix="hq-skill-")
+    paths = []
+    try:
+        for f in files:
+            name = re.sub(r"[^A-Za-z0-9._-]", "_", os.path.basename(str(f.get("name", "")))).lstrip(".") or "file"
+            try:
+                data = base64.b64decode(f["content"], validate=True)
+            except (KeyError, ValueError, TypeError):
+                raise UserError(f"Couldn't read the file {name}.")
+            path = os.path.join(folder, name)
+            with open(path, "wb") as fh:
+                fh.write(data)
+            paths.append(path)
+        if run(["git", "-C", folder, "rev-parse", "--is-inside-work-tree"], check=False).returncode == 0:
+            raise UserError("The temp folder is inside a git working tree — files not saved.")
+    except Exception:
+        shutil.rmtree(folder, ignore_errors=True)
+        raise
+    return folder, paths
+
+
+def skill_start(full, skill, text, files):
     short = short_name(full)
-    if skill not in {s["id"] for s in catalog.skills(full, hq_full(), run)}:
+    s = next((s for s in catalog.skills(full, hq_full(), run) if s["id"] == skill), None)
+    if not s:
         raise UserError(f"{short} has no skill named {skill}.")
-    key = f"{full}|{skill}"
+    text = (text or "").strip()
+    files = files or []
+    if text and "text" not in s["inputs"]:
+        raise UserError(f"{s['display_name']} takes no text.")
+    if files and "files" not in s["inputs"]:
+        raise UserError(f"{s['display_name']} takes no files.")
+    if s["inputs"] and not text and not files:
+        raise UserError("Fill in the skill's input first.")
+    cwd = local_copy(full)
+    exe = shutil.which("claude")
+    if not exe:
+        raise UserError("Claude Code (claude) isn't installed or can't be run — it isn't on PATH as a runnable file.")
     with skill_lock:
-        if skill_runs.get(key, {}).get("state") == "running":
-            raise UserError(f"{skill} is already running in {short}.")
-        cwd = local_copy(full)
-        exe = shutil.which("claude")
-        if not exe:
-            raise UserError("Claude Code (claude) isn't installed or can't be run — it isn't on PATH as a runnable file.")
-        args = [exe, "-p", f"/{skill}", "--output-format", "json"]
-        # An inherited skill comes from HQ's folder; one the domain has itself runs as its own.
-        if full != hq_full() and not os.path.isfile(os.path.join(cwd, ".claude", "skills", skill, "SKILL.md")):
-            args += ["--add-dir", HQ]
-        env = {k: v for k, v in os.environ.items() if k not in ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT")}
-        try:
-            proc = subprocess.Popen(args, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE, text=True, encoding="utf-8", **NO_WINDOW)
-        except OSError as e:
-            raise UserError(f"Couldn't start claude: {e}")
-        skill_runs[key] = {"state": "running", "output": "", "started": time.time(), "ended": None}
-    threading.Thread(target=_skill_wait, args=(key, proc), daemon=True).start()
-    return {"message": f"Started {skill} in {short}."}
+        if any(r["repo"] == full and r["skill"] == skill and r["state"] == "running" for r in skill_runs.values()):
+            raise UserError(f"{s['display_name']} is already running in {short}.")
+    folder, paths = _skill_files(files) if files else (None, [])
+    prompt = f"/{skill}" + (" " + text if text else "")
+    if paths:
+        prompt += "\n\nAttached files:\n" + "\n".join(f"- {p}" for p in paths)
+    args = [exe, "-p", prompt, "--output-format", "json"]
+    # An inherited skill comes from HQ's folder; one the domain has itself runs as its own.
+    if full != hq_full() and not os.path.isfile(os.path.join(cwd, ".claude", "skills", skill, "SKILL.md")):
+        args += ["--add-dir", HQ]
+    if folder:
+        args += ["--add-dir", folder]
+    env = {k: v for k, v in os.environ.items() if k not in ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT")}
+    opts = NO_WINDOW if os.name == "nt" else {"start_new_session": True}
+    try:
+        proc = subprocess.Popen(args, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, text=True, encoding="utf-8", **opts)
+    except OSError as e:
+        raise UserError(f"Couldn't start claude: {e}")
+    with skill_lock:
+        rid = str(next(skill_ids))
+        skill_runs[rid] = {"repo": full, "skill": skill, "name": s["display_name"], "state": "running",
+                           "output": "", "started": time.time(), "ended": None, "proc": proc, "stopped": False}
+    threading.Thread(target=_skill_wait, args=(rid, proc), daemon=True).start()
+    return {"message": f"Started {s['display_name']} in {short}.", "id": rid}
 
 
-def _skill_wait(key, proc):
+def _kill(proc):
+    """End the process and everything it started."""
+    try:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True, **NO_WINDOW)
+        else:
+            os.killpg(proc.pid, signal.SIGTERM)
+    except (ProcessLookupError, PermissionError, OSError):
+        pass
+
+
+def skill_stop(full, rid):
+    with skill_lock:
+        r = skill_runs.get(rid)
+        if not r or r["repo"] != full or r["state"] != "running":
+            raise UserError("That run isn't running.")
+        r["stopped"] = True
+        proc = r["proc"]
+    _kill(proc)
+    return {"message": f"Stopping {r['name']}."}
+
+
+def _skill_wait(rid, proc):
     try:
         out, err = proc.communicate(timeout=SKILL_TIMEOUT)
     except subprocess.TimeoutExpired:
+        _kill(proc)
         proc.kill()
         proc.communicate()
         state, output = "failed", "Stopped after 30 min."
@@ -1292,13 +1358,18 @@ def _skill_wait(key, proc):
             output = f"claude exited with code {proc.returncode}"
         state = "failed" if failed else "ok"
     with skill_lock:
-        skill_runs[key].update(state=state, output=output, ended=time.time())
+        r = skill_runs[rid]
+        if r["stopped"]:
+            state, output = "stopped", (output if state == "ok" and output else "Stopped.")
+        r.update(state=state, output=output, ended=time.time())
 
 
 def skill_status(full):
-    prefix = f"{full}|"
+    """This repo's runs, newest first."""
+    keys = ("skill", "name", "state", "output", "started", "ended")
     with skill_lock:
-        return {k[len(prefix):]: dict(v) for k, v in skill_runs.items() if k.startswith(prefix)}
+        return [dict({k: r[k] for k in keys}, id=i) for i, r in reversed(list(skill_runs.items()))
+                if r["repo"] == full]
 
 
 def restart_hq():
@@ -1423,12 +1494,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(400, {"error": str(e)})
         try:
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
-            if self.path in ("/api/ask", "/api/flow/start", "/api/skill/run"):
+            if self.path in ("/api/ask", "/api/flow/start", "/api/skill/run", "/api/skill/stop"):
                 full = body["repo"]
                 if not _is_domain(full):
                     raise UserError(f"{full} isn't one of your domains.")
                 if self.path == "/api/skill/run":
-                    return self.send(200, skill_start(full, body["skill"]))
+                    return self.send(200, skill_start(full, body["skill"], body.get("text", ""), body.get("files") or []))
+                if self.path == "/api/skill/stop":
+                    return self.send(200, skill_stop(full, str(body["id"])))
                 if self.path == "/api/ask":
                     return self.send(200, ask(full, body["agent"], body.get("text", ""), body.get("files") or []))
                 return self.send(200, flow_start(full, body["workflow"], body.get("text", "")))
