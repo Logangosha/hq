@@ -295,6 +295,11 @@
   let banner = "";
   let view = { page: "hq" };  // page: hq | domain | about | review | answer | run | result
   let current = null;         // {repo, number} for the open detail page's actions
+  // Items just acted on, hidden from lists while GitHub still reports them as waiting on you.
+  const acted = new Map();    // `${full}#${number}` -> time acted
+  const ACTED_MS = 60000;
+  const actedKey = x => `${x.full}#${x.number}`;
+  const isHidden = x => x.needs_you && Date.now() - (acted.get(actedKey(x)) || 0) < ACTED_MS;
   let pingTimer = null;
   let timer = null, idleTimer = null;
   let paused = null;
@@ -343,6 +348,10 @@
   }
 
   function allItems(withRuns = false) {
+    return rawItems(withRuns).filter(x => !isHidden(x));
+  }
+
+  function rawItems(withRuns = false) {
     const all = [];
     for (const d of domains) {
       all.push(...extraRows(d, withRuns));
@@ -356,7 +365,8 @@
 
   // Top-level rows for the items passing `pred`: standalone items, and parents
   // carrying only the parts that pass.
-  function entries(pred, withRuns = false) {
+  function entries(pred0, withRuns = false) {
+    const pred = x => !isHidden(x) && pred0(x);
     const out = [];
     for (const d of domains) {
       for (const x of extraRows(d, withRuns)) if (pred(x)) out.push({ item: x, created: x.created_at || "", repo: x.repo });
@@ -1440,6 +1450,7 @@
     const from = view.from || listView();
     try {
       const { message } = await post(path, { ...current, ...extra });
+      if (current) acted.set(`${current.full || current.repo}#${current.number}`, Date.now());
       current = null;
       view = from;
       banner = message;
@@ -1537,6 +1548,9 @@
         setStatus("");
       } else {
         domains = data.domains; totals = data.totals; loadError = null; loaded = true;
+        // The hide ends once GitHub no longer lists the item as waiting on you.
+        const waiting = new Set(rawItems(true).filter(x => x.needs_you).map(actedKey));
+        for (const k of acted.keys()) if (!waiting.has(k)) acted.delete(k);
         setStatus("Updated " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" }));
       }
     } catch (e) {
