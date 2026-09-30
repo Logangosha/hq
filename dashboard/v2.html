@@ -55,6 +55,7 @@
   .topbar .name { font-weight: 600; font-size: 17px; padding: 4px 8px; border-color: transparent; background: transparent; }
   .topbar .name:hover { background: var(--hover); }
   .topbar .spacer { flex: 1; }
+  .topbar .repo { font-size: 13px; display: inline-flex; align-items: center; gap: 4px; }
   .ready { color: var(--accent); }
   .topbar .switch { font-size: 13px; }
   .dropdown { max-width: 860px; margin: 0 auto; padding: 0 16px 10px; }
@@ -941,6 +942,7 @@
         <span class="n mono ready">${allItems().filter(x => isReady(x) && x.full === d.full).length || ""}</span></div>`));
     topEl.innerHTML = `<div class="topbar">
         <button class="name" data-act="about" title="About this page">${esc(scopeName())}</button>
+        <a class="repo" href="https://github.com/${esc(s)}" target="_blank" rel="noopener" title="Open ${esc(s)} on GitHub">${icon("open_in_new")} GitHub</a>
         <span class="spacer"></span>
         <button class="switch ${others ? "ready" : ""}" data-drop="1">${others} ready in other domains ${icon("expand_more")}</button>
       </div>${dropOpen ? `<div class="dropdown">${opts.join("")}</div>` : ""}`;
@@ -1075,7 +1077,8 @@
           It pauses when this tab is hidden or after 5 minutes without activity, and picks up again the moment you come back.
           A refresh never closes a page you have open or clears what you typed.</p>`) +
         dsec("restart", "Restart HQ", 1, `<p>Restarts the dashboard server so it picks up the working copy's current state.</p>
-          <div class="appbar"><button id="restart-hq" type="button">▶ Restart HQ</button><span id="hq-status" class="muted"></span></div>`) + lists,
+          <div class="appbar"><button id="restart-hq" type="button">▶ Restart HQ</button><span id="hq-status" class="muted"></span></div>`) +
+        dsec("repo", "Repository", 1, `<p><a href="https://github.com/${esc(hqFull())}" target="_blank" rel="noopener">https://github.com/${esc(hqFull())}</a></p>`) + lists,
         `<div class="actions"><span class="hint">Nothing here needs a decision.</span></div>`);
       document.getElementById("restart-hq").addEventListener("click", restartHq);
     } else {
