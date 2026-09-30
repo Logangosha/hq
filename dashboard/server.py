@@ -3,6 +3,7 @@ need you on top (F8.4). Review opens one: its branch is checked out on this comp
 and its code changes shown, with Start/Stop/Restart/Open for its app if it has one
 (F8.5); then you approve or reject it with a comment (F8.6). Runs here, not on GitHub,
 so the buttons can use HQ's scripts and your local copies of the repos.
+Skills run here too, as `claude -p "/<skill>"` in the domain's local copy.
 
 Usage: python dashboard/server.py        then open http://localhost:8765
 """
@@ -14,6 +15,8 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 from datetime import datetime, timedelta
 from html import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -1215,6 +1218,89 @@ def flow_start(full, name, text):
     return {"message": f"Started {name} in {short_name(full)}."}
 
 
+SKILL_TIMEOUT = 1800
+skill_runs = {}  # "full|skill" -> {state: running|ok|failed, output, started, ended}
+skill_lock = threading.Lock()
+
+
+def local_copy(full):
+    """This computer's copy of a repo: HQ's own folder for HQ, else the first clone that isn't HQ's."""
+    if full == hq_full():
+        return HQ
+    short = short_name(full)
+    res = run([BASH, "scripts/find-clones.sh", short], check=False)
+    for line in res.stdout.splitlines():
+        d = line.split("\t")[-1].strip()
+        if d and os.path.abspath(d) != os.path.abspath(HQ):
+            return d
+    raise UserError(f"No local copy of {short} on this computer — clone it to run its skills here.")
+
+
+def skill_start(full, skill):
+    short = short_name(full)
+    if skill not in {s["id"] for s in catalog.skills(full, hq_full(), run)}:
+        raise UserError(f"{short} has no skill named {skill}.")
+    key = f"{full}|{skill}"
+    with skill_lock:
+        if skill_runs.get(key, {}).get("state") == "running":
+            raise UserError(f"{skill} is already running in {short}.")
+        cwd = local_copy(full)
+        exe = shutil.which("claude")
+        if not exe:
+            raise UserError("Claude Code (claude) isn't installed or can't be run — it isn't on PATH as a runnable file.")
+        args = [exe, "-p", f"/{skill}", "--output-format", "json"]
+        # An inherited skill comes from HQ's folder; one the domain has itself runs as its own.
+        if full != hq_full() and not os.path.isfile(os.path.join(cwd, ".claude", "skills", skill, "SKILL.md")):
+            args += ["--add-dir", HQ]
+        env = {k: v for k, v in os.environ.items() if k not in ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT")}
+        try:
+            proc = subprocess.Popen(args, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE, text=True, encoding="utf-8", **NO_WINDOW)
+        except OSError as e:
+            raise UserError(f"Couldn't start claude: {e}")
+        skill_runs[key] = {"state": "running", "output": "", "started": time.time(), "ended": None}
+    threading.Thread(target=_skill_wait, args=(key, proc), daemon=True).start()
+    return {"message": f"Started {skill} in {short}."}
+
+
+def _skill_wait(key, proc):
+    try:
+        out, err = proc.communicate(timeout=SKILL_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.communicate()
+        state, output = "failed", "Stopped after 30 min."
+    else:
+        out, err = (out or "").strip(), (err or "").strip()
+        try:
+            data = json.loads(out)
+            if not isinstance(data, dict):
+                raise ValueError
+        except ValueError:
+            data = None
+        if data is not None and "result" in data:
+            output = str(data["result"] or "")
+            failed = bool(data.get("is_error")) or proc.returncode != 0
+            denied = sorted({d.get("tool_name", "?") for d in data.get("permission_denials") or []
+                             if isinstance(d, dict)})
+            if denied:
+                output += ("\n" if output else "") + "Permission denied: " + ", ".join(denied)
+        else:
+            failed = proc.returncode != 0
+            output = out or err or (f"claude exited with code {proc.returncode}" if failed else "")
+        if failed and not output:
+            output = f"claude exited with code {proc.returncode}"
+        state = "failed" if failed else "ok"
+    with skill_lock:
+        skill_runs[key].update(state=state, output=output, ended=time.time())
+
+
+def skill_status(full):
+    prefix = f"{full}|"
+    with skill_lock:
+        return {k[len(prefix):]: dict(v) for k, v in skill_runs.items() if k.startswith(prefix)}
+
+
 def restart_hq():
     """Same as `python dashboard/ctl.py restart`, but from inside a request: refuses at
     once (R3/R9) if the working copy is dirty, otherwise hands off to a detached `ctl.py
@@ -1292,6 +1378,11 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200, {"refusal": {"kind": e.kind, "message": _refusal(e.kind, e.detail).message}})
             except (subprocess.CalledProcessError, RuntimeError, RefusalError) as e:
                 self.send(500, {"error": (getattr(e, "stderr", None) or str(e)).strip()})
+        elif parsed.path == "/api/skill/runs":
+            full = (parse_qs(parsed.query).get("repo") or [""])[0]
+            if not _is_domain(full):
+                return self.send(400, {"error": f"{full} isn't one of your domains."})
+            self.send(200, skill_status(full))
         elif parsed.path == "/api/branch":
             # This process's own checkout — never cached, so a review instance
             # (its own process, its own HQ constant) reports its own branch (R5).
@@ -1332,10 +1423,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(400, {"error": str(e)})
         try:
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
-            if self.path in ("/api/ask", "/api/flow/start"):
+            if self.path in ("/api/ask", "/api/flow/start", "/api/skill/run"):
                 full = body["repo"]
                 if not _is_domain(full):
                     raise UserError(f"{full} isn't one of your domains.")
+                if self.path == "/api/skill/run":
+                    return self.send(200, skill_start(full, body["skill"]))
                 if self.path == "/api/ask":
                     return self.send(200, ask(full, body["agent"], body.get("text", ""), body.get("files") or []))
                 return self.send(200, flow_start(full, body["workflow"], body.get("text", "")))
