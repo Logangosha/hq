@@ -812,6 +812,13 @@ def decide(full, number, decision, comment):
         run(["gh", "pr", "merge", pr, "--repo", full, "--squash", "--delete-branch"],
             cwd=tempfile.gettempdir())
         run(["git", "-C", r["path"], "pull", "--quiet"], check=False)
+        # GitHub doesn't always link "Closes #n" (seen on sub-issues), so close it
+        # ourselves; closing as completed is also what releases blocked Work Items.
+        state = run(["gh", "issue", "view", num, "--repo", full, "--json", "state",
+                     "--jq", ".state"], check=False).stdout.strip()
+        if state == "OPEN":
+            run(["gh", "issue", "close", num, "--repo", full, "--reason", "completed"],
+                check=False)
         ghcache.invalidate(f"repos/{full}/issues?state=open&per_page=100")
         return {"message": f"Approved — PR #{pr} merged."}
     run(["gh", "issue", "comment", num, "--repo", full,

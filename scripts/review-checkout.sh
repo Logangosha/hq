@@ -28,6 +28,12 @@ for N in $(gh issue view "$NUM" --repo "$REPO" --json closedByPullRequestsRefere
              --jq '.closedByPullRequestsReferences[].number'); do
   [ "$(gh pr view "$N" --repo "$REPO" --json state --jq .state)" = OPEN ] && PR="$N"
 done
+# GitHub doesn't always record that link (seen on sub-issues), so fall back to reading
+# the open PRs' own text for the same "Closes #<n>".
+if [ -z "$PR" ]; then
+  PR="$(gh pr list --repo "$REPO" --state open --limit 100 --json number,body \
+    --jq '[.[] | select(.body | test("(?i)(close[sd]?|fix(e[sd])?|resolve[sd]?) #'"$NUM"'([^0-9]|$)"))][0].number // empty')"
+fi
 if [ -z "$PR" ]; then
   echo "No open PR closes $REPO#$NUM." >&2
   exit 2
