@@ -1,6 +1,7 @@
 """What a page can do: its agents and workflows (HQ's plus the domain's own, the domain's
 winning on a name clash), read from files — HQ's from this checkout, a domain's from
-GitHub. Formats: .claude/agents/README.md (agent cards), orchestration/workflows.md."""
+GitHub. On a domain page HQ's stage agents are left out and HQ's general ones carry
+`general`. Formats: .claude/agents/README.md (agent cards), orchestration/workflows.md."""
 import base64
 import importlib.util
 import os
@@ -61,15 +62,33 @@ def _card(stem, text):
 
 
 def agents(full, hq_full, run):
-    """Cards for the agents of page `full`, sorted by id."""
-    files = _files(full, hq_full, ".claude/agents", run)
-    return [_card(stem, files[stem]) for stem in sorted(files)]
+    """Cards for the agents of page `full`, sorted by id. On a domain's page, HQ's stage
+    agents are left out and HQ's general ones are marked `general` (the domain's own win)."""
+    if full == hq_full:
+        files = _files(full, hq_full, ".claude/agents", run)
+        return [_card(stem, files[stem]) for stem in sorted(files)]
+    stage = stage_agents()
+    cards = {s: dict(_card(s, t), general=True) for s, t in _local(".claude/agents") if s not in stage}
+    cards.update({s: _card(s, t) for s, t in _remote(full, ".claude/agents", run)})
+    return [cards[s] for s in sorted(cards)]
 
 
 def _rows(section):
     out = [[c.strip().replace("`", "") for c in l.strip().strip("|").split("|")]
            for l in section.splitlines() if l.strip().startswith("|")]
     return out[0] if out else [], out[2:]
+
+
+def stage_agents():
+    """Names of HQ's stage agents: the Agent column of the `Stage | Agent` table in
+    .claude/agents/README.md."""
+    f = Path(HQ) / ".claude" / "agents" / "README.md"
+    text = f.read_text(encoding="utf-8") if f.is_file() else ""
+    for block in re.split(r"\n\s*\n", text):
+        head, rows = _rows(block)
+        if head == ["Stage", "Agent"]:
+            return {r[1][:-3] if r[1].endswith(".md") else r[1] for r in rows if len(r) > 1}
+    return set()
 
 
 def _sections(text):
