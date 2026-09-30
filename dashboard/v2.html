@@ -216,15 +216,33 @@
   .chip button, .split .half { border: 0; border-radius: 0; background: transparent; }
   .chip button { padding: 3px 10px; font-size: 13px; }
   .chip button.r { border-left: 1px solid var(--line); }
-  .fchip { display: inline-flex; align-items: center; gap: 4px; padding: 0 4px 0 8px; border-radius: 999px; background: var(--chip); font-size: 13px; }
-  .askbox { margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 6px; background: var(--bg); }
+  .itile { width: 32px; height: 32px; border-radius: 8px; background: var(--chip); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+  .pill { background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: 13px; }
+  .pill.on { background: var(--hover); }
+  .cpanel { background: var(--bg); border-radius: 8px; padding: 8px 10px; margin: 8px 0 2px; font-size: 13px; position: relative; }
+  .cpanel table { border-collapse: collapse; }
+  .cpanel td { padding: 2px 10px 2px 0; vertical-align: top; }
+  .cpanel td:first-child { color: var(--muted); white-space: nowrap; }
+  .cpanel code { font-family: ui-monospace, monospace; }
+  .solo-h { display: flex; align-items: center; gap: 6px; width: 100%; background: transparent; border: 0; padding: 8px 4px; margin-top: 8px; text-align: left; }
+  .solo-h .chev { transition: transform .15s; }
+  .solo-h.open .chev { transform: rotate(90deg); }
+  .srow { display: flex; align-items: center; gap: 8px; padding: 4px 8px; font-size: 14px; cursor: pointer; border-radius: 8px; }
+  .srow:hover { background: var(--hover); }
+  .srow .tag { margin-left: auto; color: var(--muted); font-size: 12px; }
+  .fchip { display: inline-flex; align-items: center; gap: 4px; padding: 0 4px 0 8px; border-radius: 999px; background: var(--surface); font-size: 13px; }
+  .fchip .sz { color: var(--muted); font-size: 12px; }
+  .askbox { margin-top: 8px; border: 0; border-radius: 18px; padding: 6px 8px; background: var(--chip); }
+  .askbox.dragging { outline: 2px dashed var(--line); }
   .askbox .chips { margin: 0 0 6px; }
   .askrow { display: flex; align-items: flex-end; gap: 6px; }
   .askrow textarea, .needs input, .viewpanel input[type=search], .bar .barin {
     font: inherit; font-size: 14px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line);
     background: var(--surface); color: var(--text); }
-  .askrow textarea { flex: 1; resize: vertical; min-height: 34px; }
-  .askrow .send { border-radius: 50%; padding: 6px; }
+  .askrow textarea { flex: 1; resize: none; min-height: 34px; max-height: 200px; border: 0; background: transparent; outline: none; }
+  .askrow .send { background: transparent; border: 0; color: var(--muted); padding: 6px; }
+  .askrow .send.has { color: var(--text); }
+  .askrow .send:disabled { opacity: 1; }
   .berr { color: var(--accent); font-size: 13px; padding: 4px 6px; white-space: pre-wrap; }
   .needs { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin: 8px 0 2px; }
   .needs label { display: flex; flex-direction: column; font-size: 12px; color: var(--muted); gap: 2px; }
@@ -525,6 +543,8 @@
   const catBusy = new Set();
   const boxes = {};          // "full|agent" -> {text, files: [{name, content}], error, busy}
   const starts = {};         // prompt key -> {spec, labels, values, error, busy}
+  const cardOpen = {};       // "full|agent" -> {about, sc: shortcut index | null}
+  const soloOpen = new Set(); // repos whose "Runs on its own" group is expanded
   const hist = {};           // full -> {q, agent, sort}
   let notice = "";
 
@@ -584,34 +604,74 @@
     return `<span class="chip"><button class="l" data-act="shortcut" ${at} title="About this shortcut">${esc(a.shortcuts[i].label)}</button><button class="r" data-act="scstart" ${at} title="Start">▶</button></span>`;
   }
 
+  const fileIcon = f => /^image\//.test(f.type) ? "image" : /pdf/.test(f.type) || /\.pdf$/i.test(f.name) ? "picture_as_pdf"
+    : /^text\//.test(f.type) || /\.(md|txt|docx?|csv|json)$/i.test(f.name) ? "description" : "draft";
+  const fmtSize = n => n < 1024 ? n + " B" : n < 1048576 ? Math.round(n / 1024) + " KB" : (n / 1048576).toFixed(1) + " MB";
+
   function askBox(full, a, cat) {
     const k = full + "|" + a.id, b = boxes[k] || { text: "", files: [] };
     const can = !!(b.text.trim() || b.files.length) && !b.busy;
-    return `<div class="askbox keepfocus">
-      ${b.files.length ? `<div class="chips">${b.files.map((f, i) => `<span class="fchip">${icon("description")}${esc(f.name)}
+    return `<div class="askbox keepfocus" ${cat.private ? `data-dropbox="${esc(k)}"` : ""}>
+      ${b.files.length ? `<div class="chips">${b.files.map((f, i) => `<span class="fchip">${icon(fileIcon(f))}${esc(f.name)}
+        <span class="sz">${fmtSize(f.size || 0)}</span>
         <button class="ghost" data-act="rmfile" data-box="${esc(k)}" data-i="${i}" title="Remove">×</button></span>`).join("")}</div>` : ""}
       <div class="askrow">
-        ${cat.private ? `<button class="ghost" data-act="addfile" data-box="${esc(k)}" title="Add files">${icon("add")}</button>
+        ${cat.private ? `<button class="ghost" data-act="addfile" data-box="${esc(k)}" title="Attach files">${icon("attach_file")}</button>
           <input type="file" multiple hidden data-fileinput="${esc(k)}">` : ""}
         <textarea rows="1" data-box-text="${esc(k)}" placeholder="Ask ${esc(a.display_name)}…">${esc(b.text)}</textarea>
-        <button class="send primary" data-act="send" data-box="${esc(k)}" ${can ? "" : "disabled"} title="Send">${icon("arrow_upward")}</button>
+        <button class="send ${can ? "has" : ""}" data-act="send" data-box="${esc(k)}" ${can ? "" : "disabled"} title="Send">${icon("arrow_upward")}</button>
       </div>${b.error ? `<div class="berr">${esc(b.error)}</div>` : ""}</div>`;
   }
 
-  function agentCard(full, a, cat) {
-    return `<div class="card" data-agent="${esc(a.id)}">
-      <div class="card-h">${icon(a.icon || "smart_toy")}<button class="ghost cname" data-act="agent" data-repo="${esc(full)}" data-agent="${esc(a.id)}">${esc(a.display_name)}</button></div>
-      <div class="muted">${esc(a.purpose || "")}</div>
-      ${a.shortcuts.length ? `<div class="chips">${a.shortcuts.map((_, i) => chipHtml(full, a, i)).join("")}</div>` : ""}
-      ${a.shortcuts.map((_, i) => promptHtml(scKey(full, a.id, i))).join("")}
-      ${a.inputs && a.inputs.length === 0 ? "" : askBox(full, a, cat)}</div>`;
+  const stateOf = (full, id) => cardOpen[full + "|" + id] ||= { about: false, sc: null };
+  const detailsHtml = a => `<div class="cpanel"><table>
+      <tr><td>Does</td><td>${esc(a.purpose || "not stated")}</td></tr>
+      <tr><td>Takes</td><td>${a.inputs == null ? "not stated" : a.inputs.length ? esc(a.inputs.join(", ")) : "none"}</td></tr>
+      <tr><td>Gives</td><td>${esc(a.output || "not stated")}</td></tr>
+      <tr><td>File</td><td><code>${esc(a.file || `.claude/agents/${a.id}.md`)}</code></td></tr></table></div>`;
+  const pillHtml = (full, a, i) => `<button class="pill ${stateOf(full, a.id).sc === i ? "on" : ""}" data-act="scpanel" data-repo="${esc(full)}" data-agent="${esc(a.id)}" data-i="${i}">▶ ${esc(a.shortcuts[i].label)}</button>`;
+  function scPanelHtml(full, a, i) {
+    const s = a.shortcuts[i];
+    return `<div class="cpanel"><table>
+      <tr><td>Does</td><td>${esc(s.ask || "")}</td></tr>
+      <tr><td>Needs</td><td>${esc(s.needs || "nothing")}</td></tr></table>
+      ${promptHtml(scKey(full, a.id, i))}</div>`
   }
 
-  const agentsSection = (group, id, full) => catSection(group, id, "Agents", full, c => c.agents, (a, c) => agentCard(full, a, c));
+  function agentCard(full, a, cat) {
+    const st = stateOf(full, a.id);
+    return `<div class="card" data-agent="${esc(a.id)}">
+      <div class="card-h"><span class="itile">${icon(a.icon || "smart_toy")}</span><button class="ghost cname" data-act="cabout" data-repo="${esc(full)}" data-agent="${esc(a.id)}">${esc(a.display_name)}</button></div>
+      <div class="muted">${esc(a.purpose || "")}</div>
+      ${st.about ? detailsHtml(a) : ""}
+      ${a.shortcuts.length ? `<div class="chips">${a.shortcuts.map((_, i) => pillHtml(full, a, i)).join("")}</div>` : ""}
+      ${st.sc != null && a.shortcuts[st.sc] ? scPanelHtml(full, a, st.sc) : ""}
+      ${askBox(full, a, cat)}</div>`;
+  }
+
+  const soloTag = a => ((a.description || "").match(/stage:[a-z-]+/) || [])[0] || "runs on its own";
+  function soloGroup(full, list) {
+    if (!list.length) return "";
+    const open = soloOpen.has(full);
+    return `<button class="solo-h ${open ? "open" : ""}" data-act="solo" data-repo="${esc(full)}">${icon("chevron_right", "chev")}Runs on its own (${list.length})</button>`
+      + (open ? list.map(a => `<div class="srow" role="button" tabindex="0" data-act="cabout" data-repo="${esc(full)}" data-agent="${esc(a.id)}">
+          ${icon(a.icon || "smart_toy")}<span>${esc(a.display_name)}</span><span class="tag">${esc(soloTag(a))}</span></div>`
+        + (stateOf(full, a.id).about ? detailsHtml(a) : "")).join("") : "");
+  }
+
+  function agentsSection(group, id, full) {
+    const cat = catalogs[full];
+    if (!cat) return section(group, id, "Agents", "…", `<div class="empty">Loading…</div>`);
+    if (cat.error) return section(group, id, "Agents", "!", `<div class="error">${esc(cat.error)}</div>`);
+    const solo = cat.agents.filter(a => a.inputs && a.inputs.length === 0);
+    const cards = cat.agents.filter(a => !(a.inputs && a.inputs.length === 0));
+    return section(group, id, "Agents", String(cat.agents.length),
+      pageSlice(id, cards).map(a => agentCard(full, a, cat)).join("") + pager(id, cards.length) + soloGroup(full, solo));
+  }
 
   const readFile = f => new Promise((ok, bad) => {
     const r = new FileReader();
-    r.onload = () => ok({ name: f.name, content: String(r.result).split(",")[1] || "" });
+    r.onload = () => ok({ name: f.name, size: f.size, type: f.type, content: String(r.result).split(",")[1] || "" });
     r.onerror = () => bad(r.error);
     r.readAsDataURL(f);
   });
@@ -634,7 +694,7 @@
     b.busy = true; b.error = "";
     rerender();
     try {
-      const { message } = await post("/api/ask", { repo: full, agent, text: b.text, files: b.files });
+      const { message } = await post("/api/ask", { repo: full, agent, text: b.text, files: b.files.map(({ name, content }) => ({ name, content })) });
       delete boxes[k];
       afterStart(message);
     } catch (e) { b.busy = false; b.error = e.message; rerender(); }
@@ -675,7 +735,12 @@
     if (!st || st.busy) return;
     st.busy = true; st.error = "";
     rerender();
-    try { const { message } = await launch(st.spec, st.values); delete starts[key]; afterStart(message); }
+    try {
+      const { message } = await launch(st.spec, st.values);
+      delete starts[key];
+      if (st.spec.type === "sc") stateOf(st.spec.full, st.spec.agent).sc = null;
+      afterStart(message);
+    }
     catch (e) { st.busy = false; st.error = e.message; rerender(); }
   }
   // The ▶ Start bar of a detail page: one field per need, dim until all are filled.
@@ -897,7 +962,16 @@
     if (el) el.textContent = t;
   }
 
+  const autosize = t => {
+    t.style.height = "auto";
+    t.style.height = Math.min(t.scrollHeight, 200) + "px";
+    t.style.overflowY = t.scrollHeight > 200 ? "auto" : "hidden";
+  };
   function renderList() {
+    renderListInner();
+    pageEl.querySelectorAll("[data-box-text]").forEach(autosize);
+  }
+  function renderListInner() {
     updateSys();
     renderTop();
     const banr = banner ? `<div class="done">${icon("check_circle")} ${esc(banner)}</div>` : "";
@@ -1510,6 +1584,19 @@
       case "agent": return go({ page: "agent", repo: d.repo, id: d.agent, scope: scopeFull(), from: backTo() });
       case "workflow": return go({ page: "workflow", repo: d.repo, id: d.wf, scope: scopeFull(), from: backTo() });
       case "shortcut": return go({ page: "shortcut", repo: d.repo, id: d.agent, idx: Number(d.i), scope: scopeFull(), from: backTo() });
+      case "cabout": { const st = stateOf(d.repo, d.agent); st.about = !st.about; return renderList(); }
+      case "solo": { soloOpen.has(d.repo) ? soloOpen.delete(d.repo) : soloOpen.add(d.repo); return renderList(); }
+      case "scpanel": {
+        const st = stateOf(d.repo, d.agent), i = Number(d.i), ag = agentOf(d.repo, d.agent);
+        if (st.sc != null) delete starts[scKey(d.repo, d.agent, st.sc)];
+        if (st.sc === i) st.sc = null;
+        else {
+          st.sc = i;
+          const s = ag.shortcuts[i];
+          starts[scKey(d.repo, d.agent, i)] = { spec: { type: "sc", full: d.repo, agent: d.agent, i }, labels: s.needs ? [s.needs] : [], values: [], error: "" };
+        }
+        return renderList();
+      }
       case "scstart": return beginStart({ type: "sc", full: d.repo, agent: d.agent, i: Number(d.i) });
       case "wfstart": return beginStart({ type: "wf", full: d.repo, name: d.wf });
       case "pgo": return promptGo(d.key);
@@ -1537,7 +1624,9 @@
     if (t.dataset.boxText !== undefined) {
       (boxes[t.dataset.boxText] ||= { text: "", files: [] }).text = t.value;
       const b = boxes[t.dataset.boxText];
-      t.closest(".askbox").querySelector(".send").disabled = !(b.text.trim() || b.files.length) || !!b.busy;
+      const send = t.closest(".askbox").querySelector(".send"), can = !!(b.text.trim() || b.files.length) && !b.busy;
+      send.disabled = !can; send.classList.toggle("has", can);
+      autosize(t);
     } else if (t.dataset.pv !== undefined) {
       const st = starts[t.dataset.pv];
       st.values[Number(t.dataset.pi)] = t.value;
@@ -1545,6 +1634,20 @@
     } else if (t.dataset.hq !== undefined) {
       histState(t.dataset.full).q = t.value; refreshHistory(t.dataset.full);
     }
+  });
+  document.addEventListener("dragover", e => {
+    const box = e.target.closest && e.target.closest("[data-dropbox]");
+    if (box) { e.preventDefault(); box.classList.add("dragging"); }
+  });
+  document.addEventListener("dragleave", e => {
+    const box = e.target.closest && e.target.closest("[data-dropbox]");
+    if (box && !box.contains(e.relatedTarget)) box.classList.remove("dragging");
+  });
+  document.addEventListener("drop", e => {
+    const box = e.target.closest && e.target.closest("[data-dropbox]");
+    if (!box) return;
+    e.preventDefault(); box.classList.remove("dragging");
+    addFiles(box.dataset.dropbox, e.dataTransfer.files);
   });
   document.addEventListener("change", e => {
     const t = e.target;

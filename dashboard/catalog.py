@@ -50,8 +50,9 @@ def _card(stem, text):
         p = Path(tmp) / f"{stem}.md"
         p.write_text(text, encoding="utf-8")
         e = agent_cards.parse(p)
-    e.pop("file", None)
     e["id"] = stem
+    e["file"] = f".claude/agents/{stem}.md"
+    e["description"] = agent_cards.frontmatter(text).get("description") or ""
     if e["errors"] or e["fallback"]:
         # A missing or malformed card falls back whole: name and description only.
         e.update(display_name=e["name"], icon="smart_toy", inputs=None, output=None, shortcuts=[])
