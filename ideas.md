@@ -11,3 +11,5 @@ Older roadmaps, open items included: `archive/features-v1.md`, `-v2.md`, `-v3.md
   blockers (`orchestration/workflows.md`)
 - Workflow tests, `/capabilities`, scheduled runs, cross-domain `librarian` — F14.3–F17 in
   `archive/features-v3.md`
+- Conversational skills on the dashboard: a skill proposes, the user says yes/no, it continues
+  (e.g. `new-work-item`). #235 covers one-shot skills only
