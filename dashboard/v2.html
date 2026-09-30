@@ -835,11 +835,20 @@
     try {
       const r = await post("/api/run/read", current);
       if (view !== me) return;
+      const open = r.pr?.state === "OPEN";
       frame("Agent run", r.failed ? "error" : "smart_toy", r.title, metaLine(me.repo, me.number, { url: r.url, label: "Issue" }) + ` · ${esc(r.agent)}`,
         dsec("ask", "Ask", lines(r.ask), `<pre>${esc(r.ask)}</pre>`) +
         (r.finished ? dsec("result", r.failed ? "Why it failed" : "Result", lines(r.result), blocks(r.result))
-          : dsec("status", "Status", 1, `<p>Still running — the result shows up here when it finishes.</p>`)),
-        hintBar("Nothing here needs a decision."));
+          : dsec("status", "Status", 1, `<p>Still running — the result shows up here when it finishes.</p>`)) +
+        (r.pr ? dsec("pr", "Pull request", r.pr.files.length,
+          `<p><a href="${esc(r.pr.url)}" target="_blank" rel="noopener">#${r.pr.number}</a> · ${esc(r.pr.state.toLowerCase())}</p>` +
+          `<ul>${r.pr.files.map(f => `<li><code>${esc(f)}</code></li>`).join("")}</ul>`) : ""),
+        open ? `<div class="actions"><span class="hint" id="hint"></span><button id="discard">Discard</button><button class="primary" id="merge">Merge</button></div>`
+          : hintBar("Nothing here needs a decision."));
+      if (open) {
+        armed(document.getElementById("discard"), "Click again to discard", () => send("/api/run/discard", {}, "Discarding…"));
+        armed(document.getElementById("merge"), "Click again to merge", () => send("/api/run/merge", {}, "Merging…"));
+      }
       if (r.finished) load(true);
     } catch (e) {
       if (view !== me) return;

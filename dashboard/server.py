@@ -566,7 +566,8 @@ def _run_fields(issue):
 
 def agent_runs(full, comments_by_number):
     """Every agent run (Issue labelled `run`) of the repo, with where it is: running until
-    its result or failure comment, ready until it is read (which closes it), then history."""
+    its result or failure comment, ready until it is read (which closes it) or, if it has an open PR, until that is
+    merged or discarded, then history."""
     out = []
     for issue in ghcache.fetch_all(runs_url(full), run):
         if "pull_request" in issue:
@@ -1086,22 +1087,71 @@ def drop(full, number, reason):
     return {"message": "Dropped." + (f" PR #{pr[0]} closed and its branch deleted." if pr else "")}
 
 
+def _run_pr(full, number, agent):
+    """The PR run-pr.sh opened for a run (head branch run/<n>-<agent>), or None."""
+    res = run(["gh", "pr", "list", "--repo", full, "--head", f"run/{number}-{agent}",
+               "--state", "all", "--limit", "1", "--json", "number,url,state,files"],
+              check=False, cwd=tempfile.gettempdir())
+    if res.returncode != 0:
+        return None
+    try:
+        prs = json.loads(res.stdout or "[]")
+    except ValueError:
+        return None
+    if not prs:
+        return None
+    pr = prs[0]
+    return {"number": pr["number"], "url": pr["url"], "state": pr["state"],
+            "files": [f["path"] for f in pr.get("files", [])]}
+
+
 def run_read(full, number):
-    """Open a run: its result (or why it failed). Reading a finished run closes its Issue as
-    "not planned" — that is what moves it to History, and it survives a restart. ("completed"
-    would start the stub's release job.) Reopening the Issue undoes it."""
+    """Open a run: its result (or why it failed), and its PR if it has one. Reading a finished
+    run closes its Issue as "not planned" — that is what moves it to History, and it survives
+    a restart — unless its PR is still open: then it stays until the PR is merged or discarded.
+    ("completed" would start the stub's release job.) Reopening the Issue undoes it."""
     data = json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
                            "--json", "title,url,body,state,labels,comments"]).stdout)
     if "run" not in [l["name"] for l in data["labels"]]:
         raise UserError("That isn't an agent run.")
     agent, ask = _run_fields(data)
     end = _end_comments([{"body": c["body"]} for c in data["comments"]])
-    if end and data["state"] == "OPEN":
+    pr = _run_pr(full, number, agent) if end else None
+    if end and data["state"] == "OPEN" and not (pr and pr["state"] == "OPEN"):
         run(["gh", "issue", "close", str(number), "--repo", full, "--reason", "not planned"])
         ghcache.invalidate(runs_url(full))
     return {"title": data["title"], "url": data["url"], "agent": agent, "ask": ask,
             "finished": bool(end), "failed": bool(end) and end[-1]["body"].startswith("🛑"),
-            "result": "\n\n".join(c["body"] for c in end)}
+            "result": "\n\n".join(c["body"] for c in end), "pr": pr}
+
+
+def run_pr_decide(full, number, action):
+    """Merge (squash, branch deleted, Issue closed as completed) or discard (PR closed, branch
+    deleted, Issue closed as not planned) a run's open PR. A failure leaves everything open."""
+    data = json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
+                           "--json", "body,labels"]).stdout)
+    if "run" not in [l["name"] for l in data["labels"]]:
+        raise UserError("That isn't an agent run.")
+    agent, _ = _run_fields(data)
+    pr = _run_pr(full, number, agent)
+    if not pr or pr["state"] != "OPEN":
+        raise UserError("That run has no open PR.")
+    n = str(pr["number"])
+    tmp = tempfile.gettempdir()
+    if action == "merge":
+        cmd, reason, done = ["gh", "pr", "merge", n, "--repo", full, "--squash", "--delete-branch"], "completed", "Merged"
+    else:
+        cmd, reason, done = ["gh", "pr", "close", n, "--repo", full, "--delete-branch"], "not planned", "Discarded"
+    res = run(cmd, check=False, cwd=tmp)
+    if res.returncode != 0:
+        raise UserError(res.stderr.strip() or f"Couldn't {action} PR #{n}.")
+    state = json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
+                            "--json", "state"]).stdout)["state"]
+    if state == "OPEN":
+        run(["gh", "issue", "close", str(number), "--repo", full, "--reason", reason])
+    ghcache.invalidate(runs_url(full))
+    ghcache.invalidate(f"repos/{full}/issues?state=open&per_page=100")
+    return {"message": f"{done} PR #{n}."}
 
 
 def _is_domain(full):
@@ -1309,6 +1359,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200, drop(full, number, body.get("comment", "")))
             elif self.path == "/api/run/read":
                 self.send(200, run_read(full, number))
+            elif self.path == "/api/run/merge":
+                self.send(200, run_pr_decide(full, number, "merge"))
+            elif self.path == "/api/run/discard":
+                self.send(200, run_pr_decide(full, number, "discard"))
             elif self.path == "/api/stopped":
                 self.send(200, stopped(full, number))
             elif self.path == "/api/resume":

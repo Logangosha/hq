@@ -64,7 +64,8 @@ BODY="$(printf 'You are the %s agent, run once on request — not a Work Item st
    your task.
 2. This is run Issue #%s, not a lifecycle Issue: do not touch its labels, do not
    comment on it, and do not follow the Work Item lifecycle.
-3. Leave any file changes uncommitted — the runner turns them into a PR itself.
+3. Do not commit or push — when you finish, the runner turns any file changes into a PR and
+   links it on this Issue. Say what you changed; never say it was left uncommitted.
 4. Your final message is posted as the result, so make it the answer, not a plan.
 
 Ask:
