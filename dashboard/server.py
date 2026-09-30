@@ -3,6 +3,7 @@ need you on top (F8.4). Review opens one: its branch is checked out on this comp
 and its code changes shown, with Start/Stop/Restart/Open for its app if it has one
 (F8.5); then you approve or reject it with a comment (F8.6). Runs here, not on GitHub,
 so the buttons can use HQ's scripts and your local copies of the repos.
+Skills run here too, as `claude -p "/<skill>"` in the domain's local copy.
 
 Usage: python dashboard/server.py        then open http://localhost:8765
 """
@@ -10,10 +11,13 @@ import json
 import os
 import re
 import shutil
+import signal
 import socket
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 from datetime import datetime, timedelta
 from html import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -1215,6 +1219,168 @@ def flow_start(full, name, text):
     return {"message": f"Started {name} in {short_name(full)}."}
 
 
+SKILL_TIMEOUT = 1800
+skill_runs = {}  # id -> {repo, skill, name, state: running|ok|failed|stopped, output, started, ended, proc, stopped}
+skill_lock = threading.Lock()
+skill_ids = iter(range(1, 10**9))
+
+
+def local_copy(full):
+    """This computer's copy of a repo: HQ's own folder for HQ, else the first clone that isn't HQ's."""
+    if full == hq_full():
+        return HQ
+    short = short_name(full)
+    res = run([BASH, "scripts/find-clones.sh", short], check=False)
+    for line in res.stdout.splitlines():
+        d = line.split("\t")[-1].strip()
+        if d and os.path.abspath(d) != os.path.abspath(HQ) and ".hq-reviews" not in re.split(r"[\\/]", d):
+            return d
+    raise UserError(f"No local copy of {short} on this computer — clone it to run its skills here.")
+
+
+def _skill_files(files):
+    """Save attached files in a fresh temp folder outside any git tree; return (folder, paths)."""
+    folder = tempfile.mkdtemp(prefix="hq-skill-")
+    paths = []
+    try:
+        for f in files:
+            name = re.sub(r"[^A-Za-z0-9._-]", "_", os.path.basename(str(f.get("name", "")))).lstrip(".") or "file"
+            try:
+                data = base64.b64decode(f["content"], validate=True)
+            except (KeyError, ValueError, TypeError):
+                raise UserError(f"Couldn't read the file {name}.")
+            path = os.path.join(folder, name)
+            with open(path, "wb") as fh:
+                fh.write(data)
+            paths.append(path)
+        if run(["git", "-C", folder, "rev-parse", "--is-inside-work-tree"], check=False).returncode == 0:
+            raise UserError("The temp folder is inside a git working tree — files not saved.")
+    except Exception:
+        shutil.rmtree(folder, ignore_errors=True)
+        raise
+    return folder, paths
+
+
+def skill_start(full, skill, text, files):
+    short = short_name(full)
+    s = next((s for s in catalog.skills(full, hq_full(), run) if s["id"] == skill), None)
+    if not s:
+        raise UserError(f"{short} has no skill named {skill}.")
+    text = (text or "").strip()
+    files = files or []
+    if text and "text" not in s["inputs"]:
+        raise UserError(f"{s['display_name']} takes no text.")
+    if files and "files" not in s["inputs"]:
+        raise UserError(f"{s['display_name']} takes no files.")
+    if s["inputs"] and not text and not files:
+        raise UserError("Fill in the skill's input first.")
+    cwd = local_copy(full)
+    exe = shutil.which("claude")
+    if not exe:
+        raise UserError("Claude Code (claude) isn't installed or can't be run — it isn't on PATH as a runnable file.")
+    with skill_lock:
+        if any(r["repo"] == full and r["skill"] == skill and r["state"] == "running" for r in skill_runs.values()):
+            raise UserError(f"{s['display_name']} is already running in {short}.")
+    folder, paths = _skill_files(files) if files else (None, [])
+    prompt = f"/{skill}" + (" " + text if text else "")
+    if paths:
+        prompt += "\n\nAttached files:\n" + "\n".join(f"- {p}" for p in paths)
+    args = [exe, "-p", prompt, "--output-format", "json"]
+    # An inherited skill comes from HQ's folder; one the domain has itself runs as its own.
+    if full != hq_full() and not os.path.isfile(os.path.join(cwd, ".claude", "skills", skill, "SKILL.md")):
+        args += ["--add-dir", HQ]
+    if folder:
+        args += ["--add-dir", folder]
+    env = {k: v for k, v in os.environ.items() if k not in ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT")}
+    opts = NO_WINDOW if os.name == "nt" else {"start_new_session": True}
+    try:
+        proc = subprocess.Popen(args, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, text=True, encoding="utf-8", **opts)
+    except OSError as e:
+        raise UserError(f"Couldn't start claude: {e}")
+    with skill_lock:
+        rid = str(next(skill_ids))
+        skill_runs[rid] = {"repo": full, "skill": skill, "name": s["display_name"], "state": "running",
+                           "output": "", "started": time.time(), "ended": None, "proc": proc, "stopped": False}
+    threading.Thread(target=_skill_wait, args=(rid, proc), daemon=True).start()
+    return {"message": f"Started {s['display_name']} in {short}.", "id": rid}
+
+
+def _kill(proc):
+    """End the process and everything it started."""
+    try:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True, **NO_WINDOW)
+        else:
+            os.killpg(proc.pid, signal.SIGTERM)
+            def hard():
+                if proc.poll() is None:
+                    try:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    except OSError:
+                        pass
+            t = threading.Timer(3, hard)
+            t.daemon = True
+            t.start()
+    except (ProcessLookupError, PermissionError, OSError):
+        pass
+
+
+def skill_stop(full, rid):
+    with skill_lock:
+        r = skill_runs.get(rid)
+        if not r or r["repo"] != full or r["state"] != "running":
+            raise UserError("That run isn't running.")
+        r["stopped"] = True
+        proc = r["proc"]
+    _kill(proc)
+    return {"message": f"Stopping {r['name']}."}
+
+
+def _skill_wait(rid, proc):
+    try:
+        out, err = proc.communicate(timeout=SKILL_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        _kill(proc)
+        proc.kill()
+        proc.communicate()
+        state, output = "failed", "Stopped after 30 min."
+    else:
+        out, err = (out or "").strip(), (err or "").strip()
+        try:
+            data = json.loads(out)
+            if not isinstance(data, dict):
+                raise ValueError
+        except ValueError:
+            data = None
+        if data is not None and "result" in data:
+            output = str(data["result"] or "")
+            failed = bool(data.get("is_error")) or proc.returncode != 0
+            denied = sorted({d.get("tool_name", "?") for d in data.get("permission_denials") or []
+                             if isinstance(d, dict)})
+            if denied:
+                output += ("\n" if output else "") + "Permission denied: " + ", ".join(denied)
+        else:
+            failed = proc.returncode != 0
+            output = out or err or (f"claude exited with code {proc.returncode}" if failed else "")
+        if failed and not output:
+            output = f"claude exited with code {proc.returncode}"
+        state = "failed" if failed else "ok"
+    with skill_lock:
+        r = skill_runs[rid]
+        if r["stopped"]:
+            state, output = "stopped", (output if state == "ok" and output else "Stopped.")
+        r.update(state=state, output=output, ended=time.time())
+
+
+def skill_status(full):
+    """This repo's runs, newest first."""
+    keys = ("skill", "name", "state", "output", "started", "ended")
+    with skill_lock:
+        return [dict({k: r[k] for k in keys}, id=i) for i, r in reversed(list(skill_runs.items()))
+                if r["repo"] == full]
+
+
 def restart_hq():
     """Same as `python dashboard/ctl.py restart`, but from inside a request: refuses at
     once (R3/R9) if the working copy is dirty, otherwise hands off to a detached `ctl.py
@@ -1292,6 +1458,11 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200, {"refusal": {"kind": e.kind, "message": _refusal(e.kind, e.detail).message}})
             except (subprocess.CalledProcessError, RuntimeError, RefusalError) as e:
                 self.send(500, {"error": (getattr(e, "stderr", None) or str(e)).strip()})
+        elif parsed.path == "/api/skill/runs":
+            full = (parse_qs(parsed.query).get("repo") or [""])[0]
+            if not _is_domain(full):
+                return self.send(400, {"error": f"{full} isn't one of your domains."})
+            self.send(200, skill_status(full))
         elif parsed.path == "/api/branch":
             # This process's own checkout — never cached, so a review instance
             # (its own process, its own HQ constant) reports its own branch (R5).
@@ -1332,10 +1503,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(400, {"error": str(e)})
         try:
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
-            if self.path in ("/api/ask", "/api/flow/start"):
+            if self.path in ("/api/ask", "/api/flow/start", "/api/skill/run", "/api/skill/stop"):
                 full = body["repo"]
                 if not _is_domain(full):
                     raise UserError(f"{full} isn't one of your domains.")
+                if self.path == "/api/skill/run":
+                    return self.send(200, skill_start(full, body["skill"], body.get("text", ""), body.get("files") or []))
+                if self.path == "/api/skill/stop":
+                    return self.send(200, skill_stop(full, str(body["id"])))
                 if self.path == "/api/ask":
                     return self.send(200, ask(full, body["agent"], body.get("text", ""), body.get("files") or []))
                 return self.send(200, flow_start(full, body["workflow"], body.get("text", "")))

@@ -242,6 +242,7 @@
     font: inherit; font-size: 14px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line);
     background: var(--surface); color: var(--text); }
   .askrow textarea { flex: 1; resize: none; min-height: 34px; max-height: 200px; border: 0; background: transparent; outline: none; }
+  .askrow .grow { flex: 1; }
   .askrow .send { background: transparent; border: 0; color: var(--muted); padding: 6px; }
   .askrow .send.has { color: var(--text); }
   .askrow .send:disabled { opacity: 1; }
@@ -256,6 +257,7 @@
   .split .half.r { border-left: 1px solid var(--line); }
   .split .mid { display: flex; flex-direction: column; flex: 1; }
   .werr { padding: 4px 6px; }
+  .skout { margin: 4px 6px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow: auto; font: 13px/1.5 var(--mono); }
   .bar .barin { min-width: 160px; }
   .viewpanel input[type=search] { min-width: 180px; }
   .blk-raw { margin: 6px 4px; white-space: pre-wrap; font: 13px/1.5 var(--mono); }
@@ -345,6 +347,9 @@
       { kind: "flow", stage: f.step || "flow", waiting: f.waiting, workflow: f.workflow, step: f.step, gate: f.gate }));
     if (withRuns) out.push(...(d.runs || []).filter(r => r.state !== "history").map(r => Object.assign(base(r),
       { kind: "run", stage: "Run", waiting: [], agent: r.agent, failed: r.failed })));
+    if (withRuns) out.push(...(skillRuns[d.full] || []).map(r => ({ full: d.full, repo: d.repo, number: null, title: r.name, url: null,
+      created_at: new Date(r.started * 1000).toISOString(), blocked_by: [], needs_you: false, kind: "skill", id: r.id,
+      stage: "Skill", waiting: [], skill: r.skill, state: r.state, failed: r.state === "failed" })));
     return out;
   }
 
@@ -386,10 +391,11 @@
   const workCount = es => es.reduce((n, e) => n + (e.item ? 1 : e.parts.length), 0);
 
   const isReady = x => !!x.needs_you;
-  const isWorking = x => x.kind ? !x.needs_you : !x.stage.startsWith("6 ") && !x.waiting.includes("waiting:user")
+  const isWorking = x => x.kind === "skill" ? x.state === "running" : x.kind ? !x.needs_you : !x.stage.startsWith("6 ") && !x.waiting.includes("waiting:user")
     && !x.waiting.includes("waiting:work") && !x.waiting.includes("waiting:stopped");
 
   function verbOf(x) {
+    if (x.kind === "skill") return x.state === "running" ? "Watch" : "Open";
     if (x.kind === "run") return x.needs_you ? "Read" : "Watch";
     if (x.kind === "flow") return x.needs_you ? "Decide" : "Watch";
     if (x.stage.startsWith("6 ")) return "Review";
@@ -414,6 +420,8 @@
 
   // ---- Rows ----
   function leadIcon(x, verb) {
+    if (x.kind === "skill") return x.state === "running" ? icon("progress_activity", "spin")
+      : icon(x.state === "ok" ? "check_circle" : x.state === "stopped" ? "stop_circle" : "error");
     if (verb === "Read") return icon(x.failed ? "error" : "description");
     if (verb === "Decide") return icon("rate_review");
     if (verb === "Review") return icon("rate_review");
@@ -428,13 +436,15 @@
     const blocked = x.blocked_by && x.blocked_by.length
       ? `<span>Waiting on ${x.blocked_by.map(b => esc(`${b.ref} (${b.state})`)).join(", ")}</span>` : "";
     return `<div class="row ${isReady(x) ? "isready" : ""} ${part ? "part" : ""}" role="button" tabindex="0"
-        data-act="${x.kind ? x.kind + "item" : verb.toLowerCase()}" data-repo="${esc(x.full)}" data-number="${x.number}">
+        data-act="${x.kind ? x.kind + "item" : verb.toLowerCase()}" data-repo="${esc(x.full)}" data-number="${x.number}"${x.kind === "skill" ? ` data-id="${esc(x.id)}"` : ""}>
       <span class="lead">${leadIcon(x, verb)}</span>
       <span class="mid"><span class="ttl">${esc(x.title)}</span>
-        <span class="tags"><span>${esc(x.repo)}#${x.number}</span><span class="tag">${esc(x.repo)}</span>
-          ${x.kind === "run" ? `<span class="tag">${esc(x.agent)}</span>${x.failed ? `<span class="tag">failed</span>` : ""}`
+        <span class="tags">${x.kind === "skill" ? "" : `<span>${esc(x.repo)}#${x.number}</span>`}<span class="tag">${esc(x.repo)}</span>
+          ${x.kind === "skill" ? `<span class="tag">${esc(x.skill)}</span><span class="tag">${x.state === "ok" ? "done" : esc(x.state)}</span>`
+            : x.kind === "run" ? `<span class="tag">${esc(x.agent)}</span>${x.failed ? `<span class="tag">failed</span>` : ""}`
             : x.kind === "flow" ? `<span class="tag">${esc(x.workflow)}</span><span class="tag">${esc(x.step)}</span>`
             : `<span class="tag">${esc(stageName(x.stage))}</span>${x.size === "small" ? `<span class="tag">small</span>` : ""}`}${blocked}</span></span>
+      ${x.kind === "skill" && x.state === "running" ? `<button class="ghost" data-act="skstop" data-repo="${esc(x.full)}" data-id="${esc(x.id)}" title="Stop">${icon("stop_circle")}</button>` : ""}
       <span class="verb">${verb} ${icon("arrow_forward", "")}</span>
     </div>`;
   }
@@ -561,7 +571,7 @@
   let notice = "";
 
   const isList = () => view.page === "hq" || view.page === "domain";
-  const rerender = () => { if (isList()) renderList(); };
+  const rerender = () => { if (isList()) renderList(); else if (view.page === "about") renderAbout(); };
   const typing = () => !!(document.activeElement && document.activeElement.closest && document.activeElement.closest(".keepfocus"));
   const backTo = () => isList() ? listView() : view;
   const hintBar = t => `<div class="actions"><span class="hint">${t}</span></div>`;
@@ -786,16 +796,60 @@
     return catSection(group, id, "Workflows", full, c => c.workflows, w => workflowRow(full, w));
   }
 
-  function skillRow(s) {
+  const skillRuns = {};      // full -> [{id, skill, name, state: running|ok|failed|stopped, output, started}], newest first
+  const skillPolls = new Set();
+  const skKey = (full, id) => "skill|" + full + "|" + id;
+  const skRepaint = () => { if (isList() || view.page === "about") rerender(); else if (view.page === "skillrun") renderSkillRun(); };
+  async function loadSkillRuns(full, quiet) {
+    try {
+      const res = await fetch("/api/skill/runs?repo=" + encodeURIComponent(full)), data = await res.json();
+      if (!res.ok || !Array.isArray(data)) return;
+      skillRuns[full] = data;
+    } catch (e) { return; }
+    if (!(quiet && typing())) skRepaint();
+    pollSkills(full);
+  }
+  async function pollSkills(full) {
+    if (skillPolls.has(full) || !(skillRuns[full] || []).some(r => r.state === "running")) return;
+    skillPolls.add(full);
+    await new Promise(r => setTimeout(r, 2000));
+    skillPolls.delete(full);
+    loadSkillRuns(full, true);
+  }
+  async function playSkill(key) {
+    const b = boxes[key] ||= { text: "", files: [] }, [, full, id] = key.split("|");
+    if (b.busy) return;
+    b.busy = true; b.error = "";
+    skRepaint();
+    try {
+      await post("/api/skill/run", { repo: full, skill: id, text: b.text, files: b.files.map(({ name, content }) => ({ name, content })) });
+      delete boxes[key];
+      await loadSkillRuns(full);
+    } catch (e) { b.busy = false; b.error = e.message; skRepaint(); }
+  }
+  // A skill's form follows its card's Inputs: none = play only, text = a text box, files = a file picker.
+  function skillRow(full, s) {
+    const k = skKey(full, s.id), b = boxes[k] || { text: "", files: [] }, inp = s.inputs || [];
+    const can = (!inp.length || !!(b.text.trim() || b.files.length)) && !b.busy;
     const tags = (s.replaces ? `<span class="tag">Replaces HQ's ${esc(s.id)}</span>` : "")
       + (s.hq_only ? `<span class="tag">HQ only</span>` : "");
-    return `<div class="row">${icon("bolt")}<span>${esc(s.name)}</span><span class="muted">${esc(s.description)}</span>${tags}</div>`;
+    return `<div class="wrow"><div class="row">${icon(s.icon || "bolt")}<span>${esc(s.display_name)}</span><span class="muted">${esc(s.purpose || "")}</span>${tags}</div>`
+      + `<div class="askbox keepfocus" ${inp.includes("files") ? `data-dropbox="${esc(k)}"` : ""}>`
+      + (b.files.length ? `<div class="chips">${b.files.map((f, i) => `<span class="fchip">${icon(fileIcon(f))}${esc(f.name)}
+        <span class="sz">${fmtSize(f.size || 0)}</span>
+        <button class="ghost" data-act="rmfile" data-box="${esc(k)}" data-i="${i}" title="Remove">×</button></span>`).join("")}</div>` : "")
+      + `<div class="askrow">`
+      + (inp.includes("files") ? `<button class="ghost" data-act="addfile" data-box="${esc(k)}" title="Attach files">${icon("attach_file")}</button>
+          <input type="file" multiple hidden data-fileinput="${esc(k)}">` : "")
+      + (inp.includes("text") ? `<textarea rows="1" data-box-text="${esc(k)}" placeholder="Add to ${esc(s.display_name)}…">${esc(b.text)}</textarea>` : `<span class="grow"></span>`)
+      + `<button class="send ${can ? "has" : ""}" data-act="skplay" data-box="${esc(k)}" ${can ? "" : "disabled"} title="Run ${esc(s.display_name)}">${icon("play_arrow")}</button>`
+      + `</div>${b.error ? `<div class="berr">${esc(b.error)}</div>` : ""}</div></div>`;
   }
   function skillsSection(group, id, full) {
     const cat = catalogs[full];
     if (cat && !cat.error && !cat.skills.length)
       return section(group, id, "Skills", "0", `<div class="empty">No skills.</div>`);
-    return catSection(group, id, "Skills", full, c => c.skills, skillRow);
+    return catSection(group, id, "Skills", full, c => c.skills, s => skillRow(full, s));
   }
 
   // -- History
@@ -880,6 +934,27 @@
     }
   }
 
+  function renderSkillRun() {
+    const me = view, r = (skillRuns[me.repo] || []).find(x => x.id === me.id);
+    if (!r) {
+      return frame("Skill run", "bolt", "Skill run", esc(short(me.repo)),
+        `<div class="empty">This run isn't listed any more.</div>`, hintBar("Nothing here needs a decision."));
+    }
+    const body = r.state === "running" ? `<p>Still running…</p>`
+      : r.state === "failed" ? `<div class="error">Failed: ${esc(r.output)}</div>`
+      : r.state === "stopped" ? `<p>Stopped.</p>` + (r.output && r.output !== "Stopped." ? `<pre class="skout">${esc(r.output)}</pre>` : "")
+      : `<pre class="skout">${esc(r.output)}</pre>`;
+    frame("Skill run", "bolt", r.name, `${esc(short(me.repo))} · ${r.state === "ok" ? "done" : esc(r.state)}`, body,
+      r.state === "running" ? `<div class="actions"><span class="hint" id="hint"></span><button class="primary" id="skstop">Stop</button></div>`
+        : hintBar("Nothing here needs a decision."));
+    const stop = document.getElementById("skstop");
+    if (stop) stop.addEventListener("click", async () => {
+      stop.disabled = true;
+      try { await post("/api/skill/stop", { repo: me.repo, id: me.id }); } catch (e) { document.getElementById("hint").textContent = e.message; }
+      loadSkillRuns(me.repo);
+    });
+  }
+
   function renderFlowItem() {
     const me = view, d = domains.find(x => x.full === me.repo) || {};
     const f = (d.flows || []).find(x => x.number === me.number);
@@ -906,7 +981,7 @@
     return dsec("agents", "Agents", cat.agents.length, cat.agents.map(a =>
         aboutRow("agent", `data-repo="${esc(full)}" data-agent="${esc(a.id)}"`, a.icon || "smart_toy", a.display_name, a.general ? "General · from HQ — " + a.purpose : a.purpose)).join("")
       || `<div class="empty">No agents.</div>`) +
-      dsec("skills", "Skills", cat.skills.length, cat.skills.map(skillRow).join("")
+      dsec("skills", "Skills", cat.skills.length, cat.skills.map(s => skillRow(full, s)).join("")
       || `<div class="empty">No skills.</div>`) +
       dsec("workflows", "Workflows", cat.workflows.length, cat.workflows.map(w =>
         aboutRow("workflow", `data-repo="${esc(full)}" data-wf="${esc(w.id)}"`, "account_tree", w.name, w.error ? `Can't run: ${w.error}` : w.purpose)).join("")
@@ -1056,6 +1131,7 @@
     dropOpen = false;
     if (v.page === "hq" || v.page === "domain") {
       current = null; renderList(); loadCatalog(v.page === "domain" ? v.repo : hqFull());
+      loadSkillRuns(v.page === "domain" ? v.repo : hqFull());
     }
     else if (v.page === "about") renderAbout();
     else if (v.page === "review") openReview();
@@ -1063,6 +1139,7 @@
     else if (v.page === "run") renderRun();
     else if (v.page === "result") renderResult();
     else if (v.page === "runitem") openRunResult();
+    else if (v.page === "skillrun") renderSkillRun();
     else if (v.page === "flowitem") renderFlowItem();
     else if (v.page === "agent") renderAgentAbout();
     else if (v.page === "workflow") renderWorkflowAbout();
@@ -1576,6 +1653,7 @@
       if ((view.page === "hq" || view.page === "domain") && !typing()) renderList();
       else { renderTop(); updateSys(); }
       scheduleRefresh();
+      if (loaded && isList()) loadSkillRuns(view.page === "domain" ? view.repo : hqFull(), true);
     }
   }
 
@@ -1625,6 +1703,10 @@
       case "agent": return go({ page: "agent", repo: d.repo, id: d.agent, scope: scopeFull(), from: backTo() });
       case "workflow": return go({ page: "workflow", repo: d.repo, id: d.wf, scope: scopeFull(), from: backTo() });
       case "shortcut": return go({ page: "shortcut", repo: d.repo, id: d.agent, idx: Number(d.i), scope: scopeFull(), from: backTo() });
+      case "skillitem": return go({ page: "skillrun", repo: d.repo, id: d.id, scope: scopeFull(), from: backTo() });
+      case "skplay": return playSkill(d.box);
+      case "skstop":
+        return post("/api/skill/stop", { repo: d.repo, id: d.id }).catch(e => showError(e.message)).then(() => loadSkillRuns(d.repo));
       case "cabout": { const st = stateOf(d.repo, d.agent); st.about = !st.about; return renderList(); }
       case "solo": { soloOpen.has(d.repo) ? soloOpen.delete(d.repo) : soloOpen.add(d.repo); return renderList(); }
       case "scpanel": {

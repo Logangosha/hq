@@ -1,8 +1,8 @@
 """What a page can do: its agents, skills and workflows (HQ's plus the domain's own, the
 domain's winning on a name clash), read from files — HQ's from this checkout, a domain's
 from GitHub. On a domain page HQ's stage agents are left out and HQ's general ones carry
-`general`. A skill with `hq-only: true` in its frontmatter stays on HQ's page; one with
-`dashboard-hidden: true` shows on no page. Formats: .claude/agents/README.md (agent cards,
+`general`. A skill shows only with a valid `## Card`; one with `hq-only: true` in its
+frontmatter stays on HQ's page. Formats: .claude/agents/README.md (agent cards,
 skills), orchestration/workflows.md."""
 import base64
 import importlib.util
@@ -66,11 +66,15 @@ def _files(full, hq_full, path, run):
     return files
 
 
-def _card(stem, text):
+def _parse(stem, text):
     with tempfile.TemporaryDirectory() as tmp:
         p = Path(tmp) / f"{stem}.md"
         p.write_text(text, encoding="utf-8")
-        e = agent_cards.parse(p)
+        return agent_cards.parse(p)
+
+
+def _card(stem, text):
+    e = _parse(stem, text)
     e["id"] = stem
     e["file"] = f".claude/agents/{stem}.md"
     e["description"] = agent_cards.frontmatter(text).get("description") or ""
@@ -94,16 +98,14 @@ def agents(full, hq_full, run):
 
 
 def skills(full, hq_full, run):
-    """Skills of page `full`, sorted by name: HQ's (minus `dashboard-hidden: true` ones, and minus
-    `hq-only: true` ones on a domain page), then the domain's own over them (never filtered);
-    `replaces` marks one that displaces an HQ skill."""
+    """Skills of page `full`, sorted by name: HQ's (minus `hq-only: true` ones on a domain
+    page), then the domain's own over them; `replaces` marks one that displaces an HQ skill.
+    Only skills with a valid `## Card` are listed, so a card-less domain skill hides the HQ
+    skill it replaces too."""
     hq = dict(_local_skills())
     found = {}
     for k, t in hq.items():
-        fm = agent_cards.frontmatter(t)
-        if fm.get("dashboard-hidden", "").lower() == "true":
-            continue
-        if full == hq_full or fm.get("hq-only", "").lower() != "true":
+        if full == hq_full or agent_cards.frontmatter(t).get("hq-only", "").lower() != "true":
             found[k] = t
     own = {}
     if full != hq_full:
@@ -111,10 +113,15 @@ def skills(full, hq_full, run):
         found.update(own)
     out = []
     for k in sorted(found):
+        card = _parse(k, found[k])
+        if card["fallback"] or any(not e["field"].startswith("Shortcuts") for e in card["errors"]):
+            continue  # no card, or a malformed one; a Shortcuts table is ignored
         fm = agent_cards.frontmatter(found[k])
         out.append({"id": k, "name": fm.get("name") or k, "description": fm.get("description") or "",
                     "file": f".claude/skills/{k}/SKILL.md", "replaces": k in own and k in hq,
-                    "hq_only": fm.get("hq-only", "").lower() == "true"})
+                    "hq_only": fm.get("hq-only", "").lower() == "true",
+                    "display_name": card["display_name"], "icon": card["icon"],
+                    "purpose": card["purpose"], "inputs": card["inputs"]})
     return out
 
 
