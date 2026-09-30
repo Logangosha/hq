@@ -3,6 +3,8 @@
 # It hands stage: labels to HQ's runner, and also releases waiting:work Work Items
 # (any repo) the moment one of this repo's Issues closes as merged — see
 # scripts/runner/release-blocked.sh, which is all the logic lives in.
+# An owner's reply on a `run` Issue (issue_comment) runs the same agent again with the
+# whole thread — see scripts/runner/run-reply.sh.
 # A manual run (workflow_dispatch: agent + ask) starts a named agent on a one-off
 # task, outside the lifecycle — see scripts/runner/run-*.sh. Workflow stages
 # (orchestration/workflows.md) start each other the same way, by dispatch, so the token
@@ -13,6 +15,8 @@ name: Work Item
 on:
   issues:
     types: [labeled, closed]
+  issue_comment:
+    types: [created]
   workflow_dispatch:
     inputs:
       agent:
@@ -25,7 +29,7 @@ on:
         type: string
 
 concurrency:
-  group: work-item-${{ github.event.issue.number || github.run_id }}
+  group: ${{ github.event_name == 'issue_comment' && format('comment-{0}', github.event.comment.id) || format('work-item-{0}', github.event.issue.number || github.run_id) }}
   cancel-in-progress: false
 
 # The most the runner's jobs may use; each job asks for what it needs.
@@ -135,4 +139,89 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NUM: ${{ steps.issue.outputs.num }}
           AGENT: ${{ inputs.agent }}
+        run: bash .hq/scripts/runner/run-failed.sh
+
+  reply:
+    if: >-
+      github.event_name == 'issue_comment'
+      && !github.event.issue.pull_request
+      && contains(github.event.issue.labels.*.name, 'run')
+      && github.event.comment.user.login == github.repository_owner
+    runs-on: ubuntu-latest
+    concurrency:
+      group: run-reply-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    permissions:
+      actions: write
+      contents: write
+      issues: write
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch HQ
+        run: git clone --depth 1 https://github.com/__HQ_REPO__.git .hq
+
+      - name: Take the reply
+        id: take
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .hq/scripts/runner/run-reply.sh
+
+      - name: Install HQ's agents
+        if: steps.take.outputs.go == 'true'
+        run: bash .hq/scripts/runner/install-agents.sh
+
+      - name: The agent's briefing
+        if: steps.take.outputs.go == 'true'
+        id: prompt
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NUM: ${{ steps.take.outputs.num }}
+          AGENT: ${{ steps.take.outputs.agent }}
+        run: bash .hq/scripts/runner/run-reply-prompt.sh
+
+      - name: The agent's flags
+        if: steps.take.outputs.go == 'true'
+        id: flags
+        env:
+          NAME: ${{ steps.take.outputs.agent }}
+          MAX_TURNS: 80
+          DEFAULT_MODEL: sonnet
+          DEFAULT_EFFORT: medium
+        run: bash .hq/scripts/runner/claude-args.sh
+
+      - uses: anthropics/claude-code-action@v1
+        if: steps.take.outputs.go == 'true'
+        id: run_agent
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: ${{ steps.flags.outputs.args }}
+          prompt: ${{ steps.prompt.outputs.text }}
+
+      - name: Post the agent's result
+        if: steps.take.outputs.go == 'true' && steps.run_agent.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NUM: ${{ steps.take.outputs.num }}
+          EXECUTION_FILE: ${{ steps.run_agent.outputs.execution_file }}
+        run: bash .hq/scripts/runner/run-result.sh
+
+      - name: Open a PR for any file changes
+        if: steps.take.outputs.go == 'true' && steps.run_agent.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NUM: ${{ steps.take.outputs.num }}
+          AGENT: ${{ steps.take.outputs.agent }}
+        run: bash .hq/scripts/runner/run-pr.sh
+
+      - name: Report a failed agent run
+        if: failure() && steps.take.outputs.go == 'true' && steps.prompt.outcome != 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NUM: ${{ steps.take.outputs.num }}
+          AGENT: ${{ steps.take.outputs.agent }}
         run: bash .hq/scripts/runner/run-failed.sh

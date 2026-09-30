@@ -8,7 +8,7 @@
 # fail, in which case it's overridden to opus/high (hq#78 R5). If the agent's
 # frontmatter has neither, DEFAULT_MODEL/DEFAULT_EFFORT are used instead (a manual
 # run's agent may not set them; stage agents always do, so they're unaffected).
-# On a manual run (workflow_dispatch) only, an agent's own `tools:` line picks the
+# On a manual run (workflow_dispatch) or a reply to one (issue_comment) only, an agent's own `tools:` line picks the
 # allowed tools instead of the default set (hq#196 R17) — stage runs (event `issues`,
 # or `workflow_call` from one) are unchanged (R18).
 # Usage: NAME=builder MAX_TURNS=80 [DEFAULT_MODEL=sonnet DEFAULT_EFFORT=medium] \
@@ -41,7 +41,7 @@ fi
 ALLOWED="Bash,Read,Write,Edit,Glob,Grep"
 DISALLOWED="Agent,Task"
 
-if [ "${GITHUB_EVENT_NAME:-}" = workflow_dispatch ]; then
+if [ "${GITHUB_EVENT_NAME:-}" = workflow_dispatch ] || [ "${GITHUB_EVENT_NAME:-}" = issue_comment ]; then
   AGENT_TOOLS_SCRIPT="$(dirname "${BASH_SOURCE[0]}")/agent-tools.sh"
   MANUAL_TOOLS="$(bash "$AGENT_TOOLS_SCRIPT" "$AGENT_FILE")"
   if [ -n "$MANUAL_TOOLS" ]; then
