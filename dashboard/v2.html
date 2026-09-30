@@ -813,8 +813,8 @@
     loadSkillRuns(full, true);
   }
   async function playSkill(key) {
-    const b = boxes[key], [, full, id] = key.split("|");
-    if (!b || b.busy) return;
+    const b = boxes[key] ||= { text: "", files: [] }, [, full, id] = key.split("|");
+    if (b.busy) return;
     b.busy = true; b.error = "";
     skRepaint();
     try {
