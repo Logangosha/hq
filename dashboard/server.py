@@ -1232,7 +1232,7 @@ def local_copy(full):
     short = short_name(full)
     res = run([BASH, "scripts/find-clones.sh", short], check=False)
     for line in res.stdout.splitlines():
-        d = line.split("\t")[-1].strip()
+        d = native_path(line.split("\t")[-1].strip())
         if d and os.path.abspath(d) != os.path.abspath(HQ) and ".hq-reviews" not in re.split(r"[\\/]", d):
             return d
     raise UserError(f"No local copy of {short} on this computer — clone it to run its skills here.")
