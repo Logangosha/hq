@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # A parent Issue for a big request's ordered parts (orchestration/lifecycle.md,
-# features.md F9). A parent is never a Work Item: no `stage:` label, so no agent
+# archive/features-v2.md F9). A parent is never a Work Item: no `stage:` label, so no agent
 # stage ever runs on it. Its `## Parts` list is always regenerated from GitHub's
 # sub-issues, so the two can never drift.
 #

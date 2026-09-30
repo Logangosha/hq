@@ -35,7 +35,7 @@ Brief, not clipped. Full sentences are fine; padding is not.
 | What | Where |
 |---|---|
 | Big picture | `README.md` |
-| Build roadmap (check off steps as they finish) | `features.md` — older ones in `archive/` |
+| Ideas inbox (one line each; older roadmaps in `archive/`) | `ideas.md` |
 | Big requests: parent Issue and its parts | `scripts/parent.sh` |
 | Lifecycle rules | `orchestration/lifecycle.md` |
 | Workflows (flowcharts HQ runs): the model | `orchestration/workflows.md` |
