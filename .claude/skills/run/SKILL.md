@@ -5,6 +5,8 @@ description: Start an agent — or a workflow — on GitHub for a one-off ask, o
 
 # Run an agent on request
 
+To continue a run, reply on its Issue (as the owner) or on its dashboard conversation page — the same agent answers again with the whole thread.
+
 Starts a named agent as a one-off GitHub Actions run (`workflow_dispatch`), not a Work
 Item. If the name is a **workflow** (`workflows/<name>.md` in the repo, else HQ's — the
 repo's wins, and a workflow wins over an agent of the same name), it opens an item Issue

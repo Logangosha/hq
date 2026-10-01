@@ -74,7 +74,10 @@ if [ -f "${RUNNER_TEMP:-/tmp}/hq-flow-step" ]; then
   BODY="Refs #$NUM"
   FLOW=1
 fi
-git switch -c "$BRANCH"
+# A reply turn runs on the run's existing branch (run-reply.sh put it there).
+if [ "$(git rev-parse --abbrev-ref HEAD)" != "$BRANCH" ]; then
+  git switch -c "$BRANCH"
+fi
 git add -A -- "${CHANGED[@]}"
 git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
   commit -m "Run #$NUM: $AGENT"
@@ -82,6 +85,17 @@ git -c http.https://github.com/.extraheader= \
   -c credential.helper= \
   -c credential.helper='!f() { echo username=x-access-token; echo "password=$GH_TOKEN"; }; f' \
   push "https://github.com/$GITHUB_REPOSITORY.git" "HEAD:refs/heads/$BRANCH"
+
+# An earlier turn already opened the PR: the push updated it.
+if [ -z "$FLOW" ]; then
+  OPEN_PR="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json url --jq '.[0].url // empty')"
+  if [ -n "$OPEN_PR" ]; then
+    echo "$OPEN_PR"
+    gh issue comment "$NUM" --repo "$GITHUB_REPOSITORY" \
+      --body "Updated PR #${OPEN_PR##*/} with these changes: $OPEN_PR"
+    exit 0
+  fi
+fi
 
 PR_URL=$(GH_TOKEN="$APP_TOKEN" gh pr create --repo "$GITHUB_REPOSITORY" --head "$BRANCH" \
   --title "Run #$NUM: $AGENT" \

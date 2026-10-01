@@ -19,17 +19,19 @@ same engine run it. Roadmap: F14 in `archive/features-v3.md`. The file format is
 
 ## Skill, agent or workflow?
 
-Pick the smallest shape that fits:
-
-| If it… | It's a… |
+| Shape | What it is |
 |---|---|
-| runs once and finishes, no judgment | **skill** |
-| needs judgment or several steps, but one role can do it | **agent** |
-| needs more than one role, or a user decision part-way | **workflow** (the decision is a gate) |
-| needs more than one workflow | out of scope for now |
+| **Skill** | A procedure: fixed steps, run the same way each time. Never talked to. |
+| **Agent** | A role with judgment that uses skills. Started by a shortcut or by a conversation; a reply is optional — no reply means it's done. |
+| **Workflow** | Fixed hand-offs between agents, with stops where the user decides (a gate). |
 
-So "propose, then yes/no, then act" is never a conversational skill: it's a workflow
-with a gate. Each shape can then assume the one below it is simple.
+Skills, agents and workflows can call one another. Finance examples:
+
+| The user says | It becomes |
+|---|---|
+| "add this to the budget" | An agent that uses a skill |
+| "I need a new investment strategy" | A conversation with an agent, ending in a PDF |
+| "we need a way to track taxes over time" | Starts the Work Item workflow |
 
 ## How it runs (job hunt)
 

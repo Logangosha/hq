@@ -550,6 +550,7 @@ def _totals_over_time(comments_by_number, totals):
 
 
 HQ_RUN_COMMENT = "<!-- hq-run"
+HQ_STOPPED = "<!-- hq-stopped"
 
 
 def runs_url(full):
@@ -559,6 +560,23 @@ def runs_url(full):
 def _end_comments(comments):
     """A run Issue's result/failure comments: everything but the `<!-- hq-run` cost blocks."""
     return [c for c in comments if not c["body"].startswith(HQ_RUN_COMMENT)]
+
+
+def _answers(comments):
+    """The run's agent answer, if the thread ends with one: the trailing comments after the
+    owner's last message (or all of them), minus cost and stop markers. Empty while the
+    agent is still working on the owner's latest message."""
+    shown = [c for c in comments if not c["body"].startswith(HQ_RUN_COMMENT)]
+    thread = [c for c in shown if not c["body"].startswith(HQ_STOPPED)]
+    last_owner = max((i for i, c in enumerate(thread) if _is_owner(c)), default=-1)
+    tail = thread[last_owner + 1:]
+    if not tail and shown and shown[-1]["body"].startswith(HQ_STOPPED):
+        return [shown[-1]]
+    return tail
+
+
+def _is_owner(comment):
+    return (comment.get("user") or comment.get("author") or {}).get("login") == owner()
 
 
 def _run_fields(issue):
@@ -577,11 +595,13 @@ def agent_runs(full, comments_by_number):
         if "pull_request" in issue:
             continue
         agent, ask = _run_fields(issue)
-        end = _end_comments(comments_by_number.get(issue["number"], []))
-        state = "history" if issue["state"] == "closed" else "ready" if end else "running"
+        end = _answers(comments_by_number.get(issue["number"], []))
+        answered = bool(end)
+        state = "history" if issue["state"] == "closed" else "ready" if answered else "running"
         out.append({"number": issue["number"], "title": issue["title"], "url": issue["html_url"],
                     "created_at": issue["created_at"], "agent": agent, "ask": ask, "state": state,
-                    "failed": bool(end) and end[-1]["body"].startswith("🛑")})
+                    "status": "Your reply" if answered else "Thinking",
+                    "failed": answered and end[-1]["body"].startswith("🛑")})
     return out
 
 
@@ -1110,23 +1130,90 @@ def _run_pr(full, number, agent):
 
 
 def run_read(full, number):
-    """Open a run: its result (or why it failed), and its PR if it has one. Reading a finished
+    """Open a run's conversation: the thread, and its PR if it has one. Reading an answered
     run closes its Issue as "not planned" — that is what moves it to History, and it survives
     a restart — unless its PR is still open: then it stays until the PR is merged or discarded.
-    ("completed" would start the stub's release job.) Reopening the Issue undoes it."""
+    ("completed" would start the stub's release job.) A reply reopens it (run_reply, or the
+    runner for a comment made on GitHub)."""
     data = json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
-                           "--json", "title,url,body,state,labels,comments"]).stdout)
+                           "--json", "title,url,body,state,labels,comments,createdAt"]).stdout)
     if "run" not in [l["name"] for l in data["labels"]]:
         raise UserError("That isn't an agent run.")
     agent, ask = _run_fields(data)
-    end = _end_comments([{"body": c["body"]} for c in data["comments"]])
+    comments = data["comments"]
+    end = _answers(comments)
     pr = _run_pr(full, number, agent) if end else None
     if end and data["state"] == "OPEN" and not (pr and pr["state"] == "OPEN"):
         run(["gh", "issue", "close", str(number), "--repo", full, "--reason", "not planned"])
         ghcache.invalidate(runs_url(full))
+    thread = [{"who": "you", "body": ask, "at": data.get("createdAt", "")}]
+    for c in comments:
+        if c["body"].startswith((HQ_RUN_COMMENT, HQ_STOPPED)):
+            continue
+        thread.append({"who": "you" if _is_owner(c) else "agent", "body": c["body"],
+                       "at": c.get("createdAt", "")})
     return {"title": data["title"], "url": data["url"], "agent": agent, "ask": ask,
             "finished": bool(end), "failed": bool(end) and end[-1]["body"].startswith("🛑"),
-            "result": "\n\n".join(c["body"] for c in end), "pr": pr}
+            "thinking": not end, "status": "Your reply" if end else "Thinking",
+            "thread": thread, "pr": pr,
+            "private": bool(domain_info.get(full, {}).get("private"))}
+
+
+def _run_cache_invalidate(full):
+    ghcache.invalidate(runs_url(full))
+    ghcache.invalidate(f"repos/{full}/issues/comments?per_page=100")
+
+
+def run_reply(full, number, text, files):
+    """The owner's reply on a run's conversation: a comment on its Issue, which the stub's
+    `reply` job answers. Files are saved as by ask(). A finished (closed) run is reopened."""
+    data = json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
+                           "--json", "state,labels,body"]).stdout)
+    labels = [l["name"] for l in data["labels"]]
+    if "run" not in labels or any(l.startswith("flow:") for l in labels):
+        raise UserError("That isn't an agent run.")
+    text = (text or "").strip()
+    paths = _save_files(full, _run_fields(data)[0], files)
+    if not text and not paths:
+        raise UserError("Write a reply first.")
+    message = text
+    if paths:
+        message += ("\n\n" if message else "") + "Files:\n" + "\n".join(f"- {p}" for p in paths)
+    if data["state"] == "CLOSED":
+        run(["gh", "issue", "reopen", str(number), "--repo", full])
+    run(["gh", "issue", "comment", str(number), "--repo", full, "--body-file", "-"], input=message)
+    _run_cache_invalidate(full)
+    return {"message": "Sent."}
+
+
+def run_stop(full, number):
+    """Cancel the agent's in-progress Actions run(s) for this conversation and mark the thread
+    so it doesn't read "Thinking" forever."""
+    data = json.loads(run(["gh", "issue", "view", str(number), "--repo", full,
+                           "--json", "title,body,labels"]).stdout)
+    if "run" not in [l["name"] for l in data["labels"]]:
+        raise UserError("That isn't an agent run.")
+    ids = set()
+    m = re.search(r"/actions/runs/(\d+)", data.get("body") or "")
+    if m:
+        ids.add(m.group(1))
+    for event in ("issue_comment", "workflow_dispatch"):
+        for status in ("queued", "in_progress"):
+            res = run(["gh", "run", "list", "-R", full, "-w", "work-item.yml", "-e", event,
+                       "-s", status, "--json", "databaseId,displayTitle"], check=False)
+            for r in json.loads(res.stdout or "[]") if res.returncode == 0 else []:
+                if r["displayTitle"].endswith(data["title"]):
+                    ids.add(str(r["databaseId"]))
+    cancelled = 0
+    for rid in ids:
+        res = run(["gh", "run", "cancel", rid, "-R", full], check=False)
+        cancelled += res.returncode == 0
+    if not cancelled:
+        raise UserError("Nothing is running for that conversation.")
+    run(["gh", "issue", "comment", str(number), "--repo", full, "--body-file", "-"],
+        input=f"{HQ_STOPPED} -->\nStopped by you.")
+    _run_cache_invalidate(full)
+    return {"message": "Stopped."}
 
 
 def run_pr_decide(full, number, action):
@@ -1162,17 +1249,9 @@ def _is_domain(full):
     return full in known or full in {d["full"] for d in work_items()["domains"]}
 
 
-def ask(full, agent, text, files):
-    """Start `agent` on `text` through the stub's manual trigger, like /run. Files are
-    committed under inbox/ first, and only in a private repo (HQ is public, and holds no
-    personal data); if anything fails nothing is started."""
-    if agent not in {a["id"] for a in catalog.agents(full, hq_full(), run)}:
-        if full != hq_full() and agent in catalog.stage_agents():
-            raise UserError(f"{agent} is a stage agent — it runs from stage: labels, not from the page.")
-        raise UserError(f"{full} has no agent named {agent}.")
-    text = (text or "").strip()
-    if re.match(r"hq-step \d+ ", text):
-        raise UserError("That ask would be read as a workflow step.")
+def _save_files(full, agent, files):
+    """Commit attached files under inbox/ and return their paths. Only in a private repo (HQ is
+    public, and holds no personal data); on any failure nothing more is saved."""
     if files and not domain_info.get(full, {}).get("private"):
         raise UserError(f"{short_name(full)} is a public repo — files are never saved to one.")
     stamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
@@ -1190,6 +1269,21 @@ def ask(full, agent, text, files):
         if res.returncode != 0:
             raise UserError(f"Couldn't save {name}: {(res.stderr or res.stdout).strip()}")
         paths.append(path)
+    return paths
+
+
+def ask(full, agent, text, files):
+    """Start `agent` on `text` through the stub's manual trigger, like /run. Files are
+    committed under inbox/ first, and only in a private repo (HQ is public, and holds no
+    personal data); if anything fails nothing is started."""
+    if agent not in {a["id"] for a in catalog.agents(full, hq_full(), run)}:
+        if full != hq_full() and agent in catalog.stage_agents():
+            raise UserError(f"{agent} is a stage agent — it runs from stage: labels, not from the page.")
+        raise UserError(f"{full} has no agent named {agent}.")
+    text = (text or "").strip()
+    if re.match(r"hq-step \d+ ", text):
+        raise UserError("That ask would be read as a workflow step.")
+    paths = _save_files(full, agent, files)
     message = text or "No ask given — use your defaults."
     if paths:
         message += "\n\nFiles:\n" + "\n".join(f"- {p}" for p in paths)
@@ -1537,6 +1631,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200, drop(full, number, body.get("comment", "")))
             elif self.path == "/api/run/read":
                 self.send(200, run_read(full, number))
+            elif self.path == "/api/run/reply":
+                self.send(200, run_reply(full, number, body.get("text", ""), body.get("files") or []))
+            elif self.path == "/api/run/stop":
+                self.send(200, run_stop(full, number))
             elif self.path == "/api/run/merge":
                 self.send(200, run_pr_decide(full, number, "merge"))
             elif self.path == "/api/run/discard":

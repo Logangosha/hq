@@ -239,7 +239,7 @@
   .srow .tag { margin-left: auto; color: var(--muted); font-size: 12px; }
   .fchip { display: inline-flex; align-items: center; gap: 4px; padding: 0 4px 0 8px; border-radius: 999px; background: var(--surface); font-size: 13px; }
   .fchip .sz { color: var(--muted); font-size: 12px; }
-  .askbox { margin-top: 8px; border: 0; border-radius: 18px; padding: 6px 8px; background: var(--chip); }
+  .askbox { margin-top: 8px; border: 1px solid var(--line); border-radius: 18px; padding: 6px 8px; background: var(--surface); }
   .askbox.dragging { outline: 2px dashed var(--line); }
   .askbox .chips { margin: 0 0 6px; }
   .askrow { display: flex; align-items: flex-end; gap: 6px; }
@@ -249,9 +249,15 @@
   .askrow textarea { flex: 1; resize: none; min-height: 34px; max-height: 200px; border: 0; background: transparent; outline: none; }
   .askrow .grow { flex: 1; }
   .askrow .hint { flex: 1; color: var(--muted); padding: 6px 4px; }
-  .askrow .send { background: transparent; border: 0; color: var(--muted); padding: 6px; }
+  .askrow .send, .askrow .addf { background: transparent; border: 0; border-radius: 50%; color: var(--muted); padding: 6px; box-shadow: none; }
+  .askrow .addf { color: var(--text); }
   .askrow .send.has { color: var(--text); }
   .askrow .send:disabled { opacity: 1; }
+  .askrow .send:not(:disabled):hover, .askrow .addf:hover { background: var(--hover); }
+  .msg { padding: 8px 0; border-top: 1px solid var(--line); }
+  .msg:first-child { border-top: 0; }
+  .msg .who { font: 12px var(--mono); color: var(--muted); margin-bottom: 4px; }
+  .replybox { margin-top: 12px; }
   .berr { color: var(--accent); font-size: 13px; padding: 4px 6px; white-space: pre-wrap; }
   .needs { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin: 8px 0 2px; }
   .needs label { display: flex; flex-direction: column; font-size: 12px; color: var(--muted); gap: 2px; }
@@ -356,7 +362,7 @@
     const out = (d.flows || []).filter(f => f.state !== "history").map(f => Object.assign(base(f),
       { kind: "flow", stage: f.step || "flow", waiting: f.waiting, workflow: f.workflow, step: f.step, gate: f.gate }));
     if (withRuns) out.push(...(d.runs || []).filter(r => r.state !== "history").map(r => Object.assign(base(r),
-      { kind: "run", stage: "Run", waiting: [], agent: r.agent, failed: r.failed })));
+      { kind: "run", stage: "Run", waiting: [], agent: r.agent, failed: r.failed, status: r.status })));
     if (withRuns) out.push(...(skillRuns[d.full] || []).filter(r => r.state === "running").map(r => ({ full: d.full, repo: d.repo, number: null, title: r.name, url: null,
       created_at: new Date(r.started * 1000).toISOString(), blocked_by: [], needs_you: false, kind: "skill", id: r.id,
       stage: "Skill", waiting: [], skill: r.skill, state: r.state, failed: r.state === "failed" })));
@@ -401,12 +407,14 @@
   const workCount = es => es.reduce((n, e) => n + (e.item ? 1 : e.parts.length), 0);
 
   const isReady = x => !!x.needs_you;
+  // Running: not waiting on you — but an answered agent run stays here too, so it can be replied to.
+  const runsOpen = x => !isReady(x) || x.kind === "run";
   const isWorking = x => x.kind === "skill" ? x.state === "running" : x.kind ? !x.needs_you : !x.stage.startsWith("6 ") && !x.waiting.includes("waiting:user")
     && !x.waiting.includes("waiting:work") && !x.waiting.includes("waiting:stopped");
 
   function verbOf(x) {
     if (x.kind === "skill") return x.state === "running" ? "Watch" : "Open";
-    if (x.kind === "run") return x.needs_you ? "Read" : "Watch";
+    if (x.kind === "run") return x.needs_you ? "Reply" : "Watch";
     if (x.kind === "flow") return x.needs_you ? "Decide" : "Watch";
     if (x.stage.startsWith("6 ")) return "Review";
     if (x.waiting.includes("waiting:user")) return "Answer";
@@ -432,7 +440,7 @@
   function leadIcon(x, verb) {
     if (x.kind === "skill") return x.state === "running" ? icon("progress_activity", "spin")
       : icon(x.state === "ok" ? "check_circle" : x.state === "stopped" ? "stop_circle" : "error");
-    if (verb === "Read") return icon(x.failed ? "error" : "description");
+    if (verb === "Reply") return icon(x.failed ? "error" : "description");
     if (verb === "Decide") return icon("rate_review");
     if (verb === "Review") return icon("rate_review");
     if (verb === "Answer") return icon("help");
@@ -451,7 +459,7 @@
       <span class="mid"><span class="ttl">${esc(x.title)}</span>
         <span class="tags">${x.kind === "skill" ? "" : `<span>${esc(x.repo)}#${x.number}</span>`}<span class="tag">${esc(x.repo)}</span>
           ${x.kind === "skill" ? `<span class="tag">${esc(x.skill)}</span><span class="tag">${x.state === "ok" ? "done" : esc(x.state)}</span>`
-            : x.kind === "run" ? `<span class="tag">${esc(x.agent)}</span>${x.failed ? `<span class="tag">failed</span>` : ""}`
+            : x.kind === "run" ? `<span class="tag">${esc(x.agent)}</span>${x.status ? `<span class="tag">${esc(x.status)}</span>` : ""}${x.failed ? `<span class="tag">failed</span>` : ""}`
             : x.kind === "flow" ? `<span class="tag">${esc(x.workflow)}</span><span class="tag">${esc(x.step)}</span>`
             : `<span class="tag">${esc(stageName(x.stage))}</span>${x.size === "small" ? `<span class="tag">small</span>` : ""}`}${blocked}</span></span>
       ${x.kind === "skill" && x.state === "running" ? `<button class="ghost" data-act="skstop" data-repo="${esc(x.full)}" data-id="${esc(x.id)}" title="Stop">${icon("stop_circle")}</button>` : ""}
@@ -581,7 +589,7 @@
   let notice = "";
 
   const isList = () => view.page === "hq" || view.page === "domain";
-  const rerender = () => { if (isList()) renderList(); else if (view.page === "about") renderAbout(); };
+  const rerender = () => { if (isList()) renderList(); else if (view.page === "about") renderAbout(); else if (view.page === "runitem") drawReply(); };
   const typing = () => !!(document.activeElement && document.activeElement.closest && document.activeElement.closest(".keepfocus"));
   const backTo = () => isList() ? listView() : view;
   const hintBar = t => `<div class="actions"><span class="hint">${t}</span></div>`;
@@ -641,20 +649,22 @@
     : /^text\//.test(f.type) || /\.(md|txt|docx?|csv|json)$/i.test(f.name) ? "description" : "draft";
   const fmtSize = n => n < 1024 ? n + " B" : n < 1048576 ? Math.round(n / 1024) + " KB" : (n / 1048576).toFixed(1) + " MB";
 
-  function askBox(full, a, cat) {
-    const k = full + "|" + a.id, b = boxes[k] || { text: "", files: [] };
-    const can = !!(b.text.trim() || b.files.length) && !b.busy;
-    return `<div class="askbox keepfocus" ${cat.private ? `data-dropbox="${esc(k)}"` : ""}>
+  // The one input box: + (attach), text field, arrow. o: {attach, text, act, ic, title}.
+  function inputBox(k, placeholder, o) {
+    const b = boxes[k] || { text: "", files: [] }, hasText = o.text !== false;
+    const can = !!((hasText && b.text.trim()) || b.files.length) && !b.busy;
+    return `<div class="askbox keepfocus" ${o.attach ? `data-dropbox="${esc(k)}"` : ""}>
       ${b.files.length ? `<div class="chips">${b.files.map((f, i) => `<span class="fchip">${icon(fileIcon(f))}${esc(f.name)}
         <span class="sz">${fmtSize(f.size || 0)}</span>
         <button class="ghost" data-act="rmfile" data-box="${esc(k)}" data-i="${i}" title="Remove">×</button></span>`).join("")}</div>` : ""}
       <div class="askrow">
-        ${cat.private ? `<button class="ghost" data-act="addfile" data-box="${esc(k)}" title="Attach files">${icon("attach_file")}</button>
+        ${o.attach ? `<button class="addf" data-act="addfile" data-box="${esc(k)}" title="Attach files">${icon("add")}</button>
           <input type="file" multiple hidden data-fileinput="${esc(k)}">` : ""}
-        <textarea rows="1" data-box-text="${esc(k)}" placeholder="Ask ${esc(a.display_name)}…">${esc(b.text)}</textarea>
-        <button class="send ${can ? "has" : ""}" data-act="send" data-box="${esc(k)}" ${can ? "" : "disabled"} title="Send">${icon("arrow_upward")}</button>
+        ${hasText ? `<textarea rows="1" data-box-text="${esc(k)}" placeholder="${esc(placeholder)}">${esc(b.text)}</textarea>` : `<span class="hint">${esc(placeholder)}</span>`}
+        <button class="send ${can ? "has" : ""}" data-act="${o.act || "send"}" data-box="${esc(k)}" ${can ? "" : "disabled"} title="${esc(o.title || "Send")}">${icon(o.ic || "arrow_upward")}</button>
       </div>${b.error ? `<div class="berr">${esc(b.error)}</div>` : ""}</div>`;
   }
+  const askBox = (full, a, cat) => inputBox(full + "|" + a.id, `Ask ${a.display_name}…`, { attach: !!cat.private });
 
   const stateOf = (full, id) => cardOpen[full + "|" + id] ||= { about: false, sc: null };
   const detailsHtml = a => `<div class="cpanel"><table>
@@ -869,16 +879,8 @@
         + `${b.error ? `<div class="berr">${esc(b.error)}</div>` : ""}</div>`;
     }
     return `<div class="wrow"><div class="split stack">${left}<div class="half b">`
-      + `<div class="askbox keepfocus" ${inp.includes("files") ? `data-dropbox="${esc(k)}"` : ""}>`
-      + (b.files.length ? `<div class="chips">${b.files.map((f, i) => `<span class="fchip">${icon(fileIcon(f))}${esc(f.name)}
-        <span class="sz">${fmtSize(f.size || 0)}</span>
-        <button class="ghost" data-act="rmfile" data-box="${esc(k)}" data-i="${i}" title="Remove">×</button></span>`).join("")}</div>` : "")
-      + `<div class="askrow">`
-      + (inp.includes("files") ? `<button class="ghost" data-act="addfile" data-box="${esc(k)}" title="Attach files">${icon("attach_file")}</button>
-          <input type="file" multiple hidden data-fileinput="${esc(k)}">` : "")
-      + (inp.includes("text") ? `<textarea rows="1" data-box-text="${esc(k)}" placeholder="${esc(hint)}">${esc(b.text)}</textarea>` : `<span class="hint">${esc(hint)}</span>`)
-      + `<button class="send ${can ? "has" : ""}" data-act="skplay" data-box="${esc(k)}" ${can ? "" : "disabled"} title="Run ${esc(s.display_name)}">${icon("play_arrow")}</button>`
-      + `</div>${b.error ? `<div class="berr">${esc(b.error)}</div>` : ""}</div></div></div></div>`;
+      + inputBox(k, hint, { attach: inp.includes("files"), text: inp.includes("text"), act: "skplay", ic: "play_arrow", title: `Run ${s.display_name}` })
+      + `</div></div></div>`;
   }
   function skillsSection(group, id, full) {
     const cat = catalogs[full];
@@ -941,34 +943,89 @@
   }
 
   // -- Run result and workflow item pages
+  // A run is a conversation: the ask, the agent's answers and the owner's replies, then a reply box.
+  let convo = null;  // the last /api/run/read of the open conversation
+  const replyKey = () => `reply|${view.repo}|${view.number}`;
+  const threadHtml = r => r.thread.map(m => `<div class="msg"><div class="who">${m.who === "you" ? "You" : esc(r.agent)}</div>${blocks(m.body)}</div>`).join("")
+    + (r.thinking ? `<div class="msg"><div class="who">${esc(r.agent)}</div><p class="muted">Thinking…</p></div>` : "");
+  function barHtml(r) {
+    const open = r.pr?.state === "OPEN";
+    return `<div class="actions"><span class="hint" id="hint">${r.thinking ? "The agent is working." : "Reply to keep going, or leave it — no reply means it's done."}</span>`
+      + (r.thinking ? `<button id="runstop">Stop</button>` : "")
+      + (open ? `<button id="discard">Discard</button><button class="primary" id="merge">Merge</button>` : "") + `</div>`;
+  }
+  function wireBar(r) {
+    const me = view;
+    if (r.pr?.state === "OPEN") {
+      armed(document.getElementById("discard"), "Click again to discard", () => send("/api/run/discard", {}, "Discarding…"));
+      armed(document.getElementById("merge"), "Click again to merge", () => send("/api/run/merge", {}, "Merging…"));
+    }
+    const stop = document.getElementById("runstop");
+    if (stop) stop.addEventListener("click", async () => {
+      stop.disabled = true;
+      try { await post("/api/run/stop", current); } catch (e) { document.getElementById("hint").textContent = e.message; }
+      if (view === me) refreshConvo(me);
+    });
+  }
+  function drawReply() {
+    const el = document.getElementById("replybox");
+    if (!el || !convo) return;
+    el.innerHTML = inputBox(replyKey(), `Reply to ${convo.agent}…`, { attach: convo.private, act: "replysend" });
+    el.querySelectorAll("[data-box-text]").forEach(autosize);
+  }
+  async function refreshConvo(me) {
+    try {
+      const r = await post("/api/run/read", current);
+      if (view !== me) return;
+      convo = r;
+      const t = document.getElementById("thread"), bar = document.getElementById("bar");
+      if (t) t.innerHTML = threadHtml(r);
+      if (bar) { bar.innerHTML = barHtml(r); wireBar(r); }
+      if (!r.thinking) load(true);
+    } catch (e) { if (view !== me) return; }
+    if (view === me && convo?.thinking) setTimeout(() => { if (view === me) refreshConvo(me); }, 5000);
+  }
   async function openRunResult() {
     const me = view;
     current = { repo: me.repo, number: me.number };
-    frame("Agent run", "smart_toy", `${short(me.repo)}#${me.number}`, metaLine(me.repo, me.number),
+    convo = null;
+    frame("Conversation", "smart_toy", `${short(me.repo)}#${me.number}`, metaLine(me.repo, me.number),
       `<div class="spinner">Reading the run…</div>`, hintBar("Nothing here needs a decision."));
     try {
       const r = await post("/api/run/read", current);
       if (view !== me) return;
-      const open = r.pr?.state === "OPEN";
-      frame("Agent run", r.failed ? "error" : "smart_toy", r.title, metaLine(me.repo, me.number, { url: r.url, label: "Issue" }) + ` · ${esc(r.agent)}`,
-        dsec("ask", "Ask", lines(r.ask), `<pre>${esc(r.ask)}</pre>`) +
-        (r.finished ? dsec("result", r.failed ? "Why it failed" : "Result", lines(r.result), blocks(r.result))
-          : dsec("status", "Status", 1, `<p>Still running — the result shows up here when it finishes.</p>`)) +
+      convo = r;
+      frame("Conversation", r.failed ? "error" : "smart_toy", r.title, metaLine(me.repo, me.number, { url: r.url, label: "Issue" }) + ` · ${esc(r.agent)}`,
+        dsec("thread", "Conversation", r.thread.length, `<div id="thread">${threadHtml(r)}</div>`) +
         (r.pr ? dsec("pr", "Pull request", r.pr.files.length,
           `<p><a href="${esc(r.pr.url)}" target="_blank" rel="noopener">#${r.pr.number}</a> · ${esc(r.pr.state.toLowerCase())}</p>` +
-          `<ul>${r.pr.files.map(f => `<li><code>${esc(f)}</code></li>`).join("")}</ul>`) : ""),
-        open ? `<div class="actions"><span class="hint" id="hint"></span><button id="discard">Discard</button><button class="primary" id="merge">Merge</button></div>`
-          : hintBar("Nothing here needs a decision."));
-      if (open) {
-        armed(document.getElementById("discard"), "Click again to discard", () => send("/api/run/discard", {}, "Discarding…"));
-        armed(document.getElementById("merge"), "Click again to merge", () => send("/api/run/merge", {}, "Merging…"));
-      }
-      if (r.finished) load(true);
+          `<ul>${r.pr.files.map(f => `<li><code>${esc(f)}</code></li>`).join("")}</ul>`) : "")
+        + `<div class="replybox" id="replybox"></div>`,
+        barHtml(r));
+      pageEl.querySelector('.sec[data-id="thread"]')?.classList.add("open");
+      openSec.detail = "thread";
+      drawReply();
+      wireBar(r);
+      if (r.finished) load(true); else refreshConvo(me);
     } catch (e) {
       if (view !== me) return;
       document.getElementById("notice").innerHTML = `<div class="error">${esc(e.message)}</div>`;
       pageEl.querySelector(".spinner")?.remove();
     }
+  }
+  async function sendReply() {
+    const k = replyKey(), b = boxes[k], me = view;
+    if (!b || b.busy || !(b.text.trim() || b.files.length)) return;
+    b.busy = true; b.error = "";
+    drawReply();
+    try {
+      await post("/api/run/reply", { ...current, text: b.text, files: b.files.map(({ name, content }) => ({ name, content })) });
+      delete boxes[k];
+      if (view !== me) return;
+      drawReply();
+      await refreshConvo(me);
+      load(true);
+    } catch (e) { b.busy = false; b.error = e.message; if (view === me) drawReply(); }
   }
 
   function renderSkillRun() {
@@ -1146,7 +1203,7 @@
       ensureCatalog(full);
       pageEl.innerHTML = banr + note +
         listSection("dom", "d-ready", "Ready for you", x => isReady(x) && x.full === full, true, false, true) +
-        listSection("dom", "d-running", "Running", x => !isReady(x) && x.full === full, false, false, true) +
+        listSection("dom", "d-running", "Running", x => runsOpen(x) && x.full === full, false, false, true) +
         agentsSection("dom", "d-agents", full) + skillsSection("dom", "d-skills", full) + workflowsSection("dom", "d-workflows", full) +
         historySection("dom", "d-history", full);
       return;
@@ -1158,12 +1215,12 @@
     const ownReady = own.filter(isReady).length;
     pageEl.innerHTML = banr + note +
       group("all", "Across all domains", `${ready.length} ready · ${running} running · ${domains.length} domains`,
-        listSection("all", "a-ready", "Ready for you", isReady, true, true) +
-        listSection("all", "a-running", "Running", x => !isReady(x), false, true) +
+        listSection("all", "a-ready", "Ready for you", isReady, true, true, true) +
+        listSection("all", "a-running", "Running", runsOpen, false, true, true) +
         domainsSection() + costSection()) +
       group("own", "HQ's own", `${ownReady} ready · ${own.length - ownReady} running`,
         listSection("own", "o-ready", "Ready for you", x => isReady(x) && x.full === hq, true, true, true) +
-        listSection("own", "o-running", "Running", x => !isReady(x) && x.full === hq, false, true, true) +
+        listSection("own", "o-running", "Running", x => runsOpen(x) && x.full === hq, false, true, true) +
         agentsSection("own", "o-agents", hq) + skillsSection("own", "o-skills", hq) + workflowsSection("own", "o-workflows", hq) +
         historySection("own", "o-history", hq));
   }
@@ -1775,6 +1832,7 @@
       case "wfstart": return beginStart({ type: "wf", full: d.repo, name: d.wf });
       case "pgo": return promptGo(d.key);
       case "send": return sendBox(d.box);
+      case "replysend": return sendReply();
       case "addfile": return document.querySelector(`[data-fileinput="${CSS.escape(d.box)}"]`).click();
       case "rmfile": { boxes[d.box].files.splice(Number(d.i), 1); return rerender(); }
       case "goto": return go(d.repo && d.repo !== hqFull() ? { page: "domain", repo: d.repo } : { page: "hq" });
