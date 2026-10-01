@@ -106,6 +106,7 @@
   .sec { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin-bottom: 8px; }
   .sec-h { display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer; border-radius: 10px; }
   .sec-h:hover { background: var(--hover); }
+  .sec-h .sec-ico { color: var(--muted); font-size: 20px; }
   .sec-h .t { font-weight: 500; }
   .count { font: 12px var(--mono); padding: 1px 8px; border-radius: 999px; background: var(--chip); color: var(--muted); }
   .count.ready { background: var(--accent-soft); color: var(--accent); }
@@ -506,11 +507,13 @@
   }
 
   // ---- Sections ----
+  const SEC_ICONS = { "Ready for you": "inbox", Running: "progress_activity", Domains: "folder_copy", Cost: "payments",
+    Agents: "smart_toy", Skills: "build", Workflows: "account_tree", Triggers: "bolt", History: "history" };
   function section(group, id, title, count, body, extra = "", opts = {}) {
     const open = openSec[group] === id;
     return `<section class="sec ${open ? "open" : ""}" data-group="${group}" data-id="${id}">
       <div class="sec-h" role="button" tabindex="0" data-toggle="sec">${icon("expand_more", "chev")}
-        <span class="t">${esc(title)}</span><span class="count ${opts.ready ? "ready" : ""}">${esc(count)}</span>
+        ${SEC_ICONS[title] ? icon(SEC_ICONS[title], "sec-ico") : ""}<span class="t">${esc(title)}</span><span class="count ${opts.ready ? "ready" : ""}">${esc(count)}</span>
         ${extra ? `<span class="extra">${extra}</span>` : ""}</div>
       ${opts.panel || ""}<div class="sec-b">${body}</div></section>`;
   }
