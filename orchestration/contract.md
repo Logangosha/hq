@@ -59,11 +59,11 @@ as `| Field | Value |` rows. Other docs link here instead of repeating them.
 A part's permission is its Uses list: it may call only what Uses names, and **nothing by
 default**. Agents are enforced by their frontmatter lists. Skills and workflows are enforced on
 runner runs, by `scripts/runner/uses-hook.sh` and `uses-lib.sh`: a Skill call
-(`PreToolUse` hook), `scripts/flow-start.sh` / `work-item-start.sh` and `scripts/run-start.sh`
+(`PreToolUse` / `PostToolUse` hooks on Skill), `scripts/flow-start.sh` / `work-item-start.sh` and `scripts/run-start.sh`
 are refused (exit 9) unless the caller's `Uses` names it. A workflow's `Stages` agents
 count as its Uses.
 
-- The caller is the skill most recently started in the run (there is no "skill finished" signal). No card, no `Uses` row or a malformed one = calls nothing.
+- The caller is the top of a stack: a started skill is pushed. Only a `context: fork` skill signals finish (`PostToolUse` on Skill): it is popped, so the caller reverts. Calling a skill already on the stack pops back to below it, then checks against the new top, so a part can call the same skill repeatedly. An inline skill otherwise stays the caller for the rest of the run (fix: mark it `context: fork`). No card, no `Uses` row or a malformed one = calls nothing.
 - On a workflow stage run, the workflow's Uses bounds the stage agent's calls too.
 - Limits stack: the agent's own `skills:` / `workflows:` still apply; a Uses never widens them.
 - Local sessions, and a Work Item stage run's own `work-item` workflow, aren't limited.
