@@ -1276,10 +1276,13 @@ def ask(full, agent, text, files):
     """Start `agent` on `text` through the stub's manual trigger, like /run. Files are
     committed under inbox/ first, and only in a private repo (HQ is public, and holds no
     personal data); if anything fails nothing is started."""
-    if agent not in {a["id"] for a in catalog.agents(full, hq_full(), run)}:
+    card = next((a for a in catalog.agents(full, hq_full(), run) if a["id"] == agent), None)
+    if not card:
         if agent in catalog.stage_agents():
             raise UserError(f"{agent} is a stage agent — it runs from stage: labels, not from the page.")
         raise UserError(f"{full} has no agent named {agent}.")
+    if card["view_only"]:
+        raise UserError(f"{card['display_name']} is view only — started by {', '.join(card['started_by'])}, not by you.")
     text = (text or "").strip()
     if re.match(r"hq-step \d+ ", text):
         raise UserError("That ask would be read as a workflow step.")
@@ -1304,7 +1307,9 @@ def flow_start(full, name, text):
     if not wf:
         raise UserError(f"{short_name(full)} has no workflow named {name}.")
     if wf["view_only"]:
-        raise UserError(f"{wf['name']} is view only — start it with new-work-item.")
+        if any(t["kind"] == "work-item" for t in wf["triggers"]):
+            raise UserError(f"{wf['name']} is view only — start it with new-work-item.")
+        raise UserError(f"{wf['name']} is view only — started by {', '.join(wf['started_by'])}, not by you.")
     if not wf["can_start"]:
         raise UserError(wf["error"] or f"{name} can't be started by hand.")
     res = run([BASH, "scripts/flow-start.sh", full, name], check=False,
@@ -1362,6 +1367,8 @@ def skill_start(full, skill, text, files):
     s = next((s for s in catalog.skills(full, hq_full(), run) if s["id"] == skill), None)
     if not s:
         raise UserError(f"{short} has no skill named {skill}.")
+    if s["view_only"]:
+        raise UserError(f"{s['display_name']} is view only — started by {', '.join(s['started_by'])}, not by you.")
     text = (text or "").strip()
     files = files or []
     if text and "text" not in s["inputs"]:

@@ -2,6 +2,14 @@
 
 The Work Item lifecycle (`orchestration/lifecycle.md`), drawn. View only: the hard-coded runner still does the work.
 
+## Card
+
+| Field | Value |
+|---|---|
+| Product | The Work Item lifecycle, drawn |
+| Uses | none |
+| Started by | agent, skill |
+
 ## Trigger
 
 | Kind | Value |

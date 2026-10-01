@@ -64,4 +64,5 @@ set the label back. On a re-run, head it `## 3b. Plan (re-run) — planner ✅`.
 | Icon | route |
 | Purpose | Decides how the work gets done, covering every requirement. |
 | Inputs | none |
-| Output | Its stage 3 comment on the Issue: the plan |
+| Product | Its stage 3 comment on the Issue: the plan |
+| Started by | label |

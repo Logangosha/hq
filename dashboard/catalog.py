@@ -3,7 +3,8 @@ domain's winning on a name clash), read from files — HQ's from this checkout, 
 from GitHub. HQ's stage agents are left out on every page; on a domain page HQ's general ones carry
 `general`. A skill shows only with a valid `## Card`; one with `hq-only: true` in its
 frontmatter stays on HQ's page; `disable-model-invocation: true` makes it user-only
-(`user_only`). An agent card carries `can_use` (its listed skills and workflows) and
+(`user_only`). Every card carries `product`, `uses`, `started_by` and `view_only`
+(orchestration/contract.md). An agent card carries `can_use` (its listed skills and workflows) and
 `access_errors` (a listed user-only skill). Formats: .claude/agents/README.md (agent cards,
 skills), orchestration/workflows.md."""
 import base64
@@ -68,11 +69,11 @@ def _files(full, hq_full, path, run):
     return files
 
 
-def _parse(stem, text):
+def _parse(stem, text, kind="agent"):
     with tempfile.TemporaryDirectory() as tmp:
         p = Path(tmp) / f"{stem}.md"
         p.write_text(text, encoding="utf-8")
-        return agent_cards.parse(p)
+        return agent_cards.parse(p, kind)
 
 
 def _card(stem, text):
@@ -82,7 +83,8 @@ def _card(stem, text):
     e["description"] = agent_cards.frontmatter(text).get("description") or ""
     if e["errors"] or e["fallback"]:
         # A missing or malformed card falls back whole: name and description only.
-        e.update(display_name=e["name"], icon="smart_toy", inputs=None, output=None, shortcuts=[])
+        e.update(display_name=e["name"], icon="smart_toy", inputs=None, product=None,
+                 started_by=["user"], view_only=False, shortcuts=[])
         e["purpose"] = agent_cards.frontmatter(text).get("description") or ""
     return e
 
@@ -156,7 +158,7 @@ def skills(full, hq_full, run):
     found, own, hq = _skill_merge(full, hq_full, run)
     out = []
     for k in sorted(found):
-        card = _parse(k, found[k])
+        card = _parse(k, found[k], "skill")
         if card["fallback"] or any(not e["field"].startswith("Shortcuts") for e in card["errors"]):
             continue  # no card, or a malformed one; a Shortcuts table is ignored
         fm = agent_cards.frontmatter(found[k])
@@ -166,7 +168,8 @@ def skills(full, hq_full, run):
                     "user_only": _user_only(found[k]),
                     "display_name": card["display_name"], "icon": card["icon"],
                     "purpose": card["purpose"], "inputs": card["inputs"],
-                    "hint": card["hint"]})
+                    "hint": card["hint"], "product": card["product"], "uses": card["uses"],
+                    "started_by": card["started_by"], "view_only": card["view_only"]})
     return out
 
 
@@ -208,7 +211,8 @@ def parse_workflow(name, text):
     startable by hand. `error` is a non-empty reason when the file can't run; the rest is filled
     as far as it reads."""
     w = {"id": name, "name": name, "purpose": "", "triggers": [], "inputs": [], "stages": [],
-         "can_start": False, "view_only": False, "error": ""}
+         "can_start": False, "view_only": False, "error": "",
+         "product": None, "uses": [], "started_by": ["user"]}
     h = re.search(r"^# (.+?)[ \t]*$", text, re.M)
     if h:
         w["name"] = h.group(1)
@@ -239,8 +243,31 @@ def parse_workflow(name, text):
     w["stages"] = [{"stage": r[0], "kind": r[1], "agent": r[2], "ask": r[3]} for r in parsed.get("Stages", [])]
     if "Items" in parsed and not any(r[0] == "trigger" for r in parsed["Items"]):
         problems.append("## Items has no row made by trigger")
+    if "Card" in secs:
+        header, rows = _rows(secs["Card"])
+        vals = {}
+        for r in rows:
+            if len(r) != 2:
+                problems.append(f"## Card row has {len(r)} cells, want 2: {'|'.join(r)}")
+            elif r[0] not in ("Product", "Uses", "Started by"):
+                problems.append(f"## Card: unknown field {r[0]}")
+            else:
+                vals[r[0]] = r[1]
+        w["product"] = vals.get("Product") or None
+        if "Uses" in vals:
+            w["uses"], bad = agent_cards.uses(vals["Uses"])
+            if bad:
+                problems.append(f"## Card Uses: {bad}")
+                w["uses"] = []
+        if "Started by" in vals:
+            w["started_by"], bad = agent_cards.started_by(vals["Started by"])
+            if bad:
+                problems.append(f"## Card Started by: {bad}")
+                w["started_by"] = ["user"]
+    seen = {f"agent:{x['agent']}" for x in w["stages"] if x["kind"] == "agent"}
+    w["uses"] += sorted(seen - set(w["uses"]))
     w["error"] = "; ".join(problems)
-    w["view_only"] = any(t["kind"] == "work-item" for t in w["triggers"])
+    w["view_only"] = any(t["kind"] == "work-item" for t in w["triggers"]) or "user" not in w["started_by"]
     w["can_start"] = (not w["error"] and not w["view_only"]
                       and any(t["kind"] == "run" for t in w["triggers"]))
     return w

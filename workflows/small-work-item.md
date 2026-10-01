@@ -2,6 +2,14 @@
 
 The small Work Item path (`orchestration/lifecycle.md`), drawn. View only: the hard-coded runner still does the work.
 
+## Card
+
+| Field | Value |
+|---|---|
+| Product | The small Work Item path, drawn |
+| Uses | none |
+| Started by | agent, skill |
+
 ## Trigger
 
 | Kind | Value |

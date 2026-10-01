@@ -73,4 +73,5 @@ Normal items are unchanged.
 | Icon | construction |
 | Purpose | Does the work in a PR, following the plan and requirements. |
 | Inputs | none |
-| Output | A PR that closes the Work Item |
+| Product | A PR that closes the Work Item |
+| Started by | label |

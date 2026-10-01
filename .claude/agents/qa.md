@@ -71,4 +71,5 @@ the fix is one character, it is still the builder's to make.
 | Icon | verified |
 | Purpose | Runs every verification check against the built work. |
 | Inputs | none |
-| Output | Its stage 5 comment on the Issue: pass/fail evidence |
+| Product | Its stage 5 comment on the Issue: pass/fail evidence |
+| Started by | label |

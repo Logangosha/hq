@@ -5,6 +5,14 @@ shopping list the user approves.
 
 `research` is a hypothetical agent — HQ has no such agent; this file is an example of the format and is not run.
 
+## Card
+
+| Field | Value |
+|---|---|
+| Product | An approved shopping list |
+| Uses | none |
+| Started by | user |
+
 ## Trigger
 
 | Kind | Value |

@@ -2,7 +2,8 @@
 """Print every agent's self-description (its `## Card`) as JSON.
 
 Usage: agent-cards.py <dir or .md file>...
-A dir means its *.md files except README.md. Format: .claude/agents/README.md.
+A dir means its *.md files except README.md. Format: .claude/agents/README.md; the
+Product, Uses and Started by fields: orchestration/contract.md.
 Exit 0 if all cards are fine, 1 if any is malformed (JSON is still printed in full),
 2 on a bad path or usage.
 """
@@ -11,8 +12,10 @@ import re
 import sys
 from pathlib import Path
 
-FIELDS = {"Name", "Icon", "Purpose", "Inputs", "Output"}
-OPTIONAL = {"Hint"}
+FIELDS = {"Name", "Icon", "Purpose", "Inputs"}
+OPTIONAL = {"Hint", "Product", "Output", "Uses", "Started by"}
+STARTERS = ["user", "agent", "skill", "workflow", "label", "schedule"]
+USES_RE = re.compile(r"(skill|agent|workflow):[a-z0-9][a-z0-9-]*")
 KINDS = {"question", "log", "job"}
 INPUTS = {"text", "files", "text, files", "none"}
 SHORTCUT_COLS = ["Label", "Kind", "Ask", "Needs"]
@@ -40,13 +43,30 @@ def card_section(text):
     return m.group(1) if m else None
 
 
-def parse(path):
+def started_by(v):
+    """(list, problem) for a Started by value."""
+    items = [x.strip() for x in v.split(",")]
+    bad = [x for x in items if x not in STARTERS]
+    return items, (f"must be from {', '.join(STARTERS)}, got: {', '.join(bad)}" if bad else None)
+
+
+def uses(v):
+    """(list, problem) for a Uses value."""
+    if v == "none":
+        return [], None
+    items = [x.strip() for x in v.split(",")]
+    bad = [x for x in items if not USES_RE.fullmatch(x)]
+    return items, (f"must be none or skill:/agent:/workflow:<name>, got: {', '.join(bad)}" if bad else None)
+
+
+def parse(path, kind="agent"):
     text = path.read_text(encoding="utf-8")
     fm = frontmatter(text)
     name = fm.get("name") or path.stem
     entry = {"file": str(path), "name": name, "display_name": name,
              "icon": None, "purpose": fm.get("description"), "inputs": None,
-             "output": None, "hint": None, "shortcuts": [], "fallback": False, "errors": []}
+             "product": None, "uses": [], "started_by": ["user"], "view_only": False,
+             "hint": None, "shortcuts": [], "fallback": False, "errors": []}
     err = lambda f, p: entry["errors"].append({"field": f, "problem": p})
     card = card_section(text)
     if card is None:
@@ -64,12 +84,30 @@ def parse(path):
     for f in sorted(FIELDS):
         if not values.get(f):
             err(f, "missing or empty")
+    if values.get("Product") and values.get("Output"):
+        err("Output", "old name of Product; give only Product")
+    product = values.get("Product") or values.get("Output")
+    if not product:
+        err("Product", "missing or empty")
+    entry["product"] = product or None
+    if values.get("Started by"):
+        entry["started_by"], problem = started_by(values["Started by"])
+        if problem:
+            err("Started by", problem)
+            entry["started_by"] = ["user"]
+    entry["view_only"] = "user" not in entry["started_by"]
+    if "Uses" in values:
+        if kind == "agent":
+            err("Uses", "an agent's Uses is its skills:/workflows: frontmatter; remove the row")
+        else:
+            entry["uses"], problem = uses(values["Uses"])
+            if problem:
+                err("Uses", problem)
+                entry["uses"] = []
     if values.get("Name"):
         entry["display_name"] = values["Name"]
     if values.get("Purpose"):
         entry["purpose"] = values["Purpose"]
-    if values.get("Output"):
-        entry["output"] = values["Output"]
     if values.get("Hint"):
         entry["hint"] = values["Hint"]
     icon = values.get("Icon")

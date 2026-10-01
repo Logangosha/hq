@@ -76,7 +76,8 @@ Issue already made, then the error. If nothing was made, start `Nothing created:
 | Icon | lightbulb |
 | Purpose | Shapes an idea into a Work Item proposal, then starts it on your go. |
 | Inputs | text, files |
-| Output | A proposal, then the Work Item link |
+| Product | A proposal, then the Work Item link |
+| Started by | user, agent |
 | Hint | Describe what you want done |
 
 ### Shortcuts

@@ -4,6 +4,14 @@
 hard-coded. This shows it on paper in the format. Left out: the `size:small` path,
 three strikes, `waiting:work`.
 
+## Card
+
+| Field | Value |
+|---|---|
+| Product | The Work Item lifecycle on paper |
+| Uses | none |
+| Started by | user |
+
 ## Trigger
 
 | Kind | Value |

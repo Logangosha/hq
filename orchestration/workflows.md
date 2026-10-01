@@ -79,6 +79,7 @@ these `## ` sections, each holding one table. Examples: `orchestration/workflow-
 | Stages | The boxes: agents and gates | Required, at least one row |
 | Arrows | Where an item goes next, by outcome | Required |
 | Items | How items are created and where they start | Required |
+| Card | Product, Uses and Started by ([contract](contract.md)) | Optional |
 | Results | Where results are reported | Optional; default: each stage comments on its own item's Issue |
 
 ### Trigger — `| Kind | Value |`
@@ -103,6 +104,10 @@ with a default. `/run` asks for any missing required input.
 - **Ask** — for `gate`, the question put to the user. For `agent`, `—`.
 
 The first row is not special; the Items table says where items start.
+
+### Card — `| Field | Value |`
+
+Rows `Product`, `Uses` and `Started by`; meanings and allowed values: [contract.md](contract.md).
 
 ### Arrows — `| From | Outcome | To |`
 
@@ -133,7 +138,7 @@ rejecting one is the latest.
 
 ### View-only workflows
 
-A workflow with a `work-item` Trigger row is only drawn. The dashboard shows a "View only"
+A workflow with a `work-item` Trigger row, or a Started by without `user`, is only drawn. The dashboard shows a "View only"
 tag and its stages as boxes, with no ▶ Start; `/run` and the dashboard refuse it (use
 `new-work-item`). An agent with it on its `workflows:` list starts it with
 `scripts/work-item-start.sh` — the same Issue as `create-work-item.sh` (`--small` for
