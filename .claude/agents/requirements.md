@@ -41,4 +41,5 @@ the time after, and so on) and post the **full** list again, not just the change
 | Icon | checklist |
 | Purpose | Turns a Work Item's goal into numbered requirements. |
 | Inputs | none |
-| Output | Its stage 1 comment on the Issue: numbered requirements |
+| Product | Its stage 1 comment on the Issue: numbered requirements |
+| Started by | label |

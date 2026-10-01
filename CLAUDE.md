@@ -38,6 +38,7 @@ Brief, not clipped. Full sentences are fine; padding is not.
 | Ideas inbox (one line each; older roadmaps in `archive/`) | `ideas.md` |
 | Big requests: parent Issue and its parts | `scripts/parent.sh` |
 | Lifecycle rules | `orchestration/lifecycle.md` |
+| Parts, card fields (Product, Uses, Started by), permission | `orchestration/contract.md` |
 | Workflows (flowcharts HQ runs): the model | `orchestration/workflows.md` |
 | Domain repos (where work goes) | `scripts/list-domains.sh` — why nothing is listed: `registry/domains.md` |
 | Which repo a request goes to | `registry/routing.md` |

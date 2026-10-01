@@ -2,6 +2,14 @@
 
 Find new jobs each morning, tailor a résumé for each, apply once the user approves.
 
+## Card
+
+| Field | Value |
+|---|---|
+| Product | Applications sent once the user approves |
+| Uses | none |
+| Started by | user, schedule |
+
 ## Trigger
 
 | Kind | Value |

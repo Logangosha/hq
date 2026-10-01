@@ -78,4 +78,5 @@ make it easier to check.
 | Icon | fact_check |
 | Purpose | Turns requirements into a checklist where every check can fail. |
 | Inputs | none |
-| Output | Its stage 2 comment on the Issue: the checklist |
+| Product | Its stage 2 comment on the Issue: the checklist |
+| Started by | label |

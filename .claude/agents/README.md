@@ -31,7 +31,7 @@ Planned (F7.5): a project agent will override the HQ one of the same name in tha
 A skill is `.claude/skills/<name>/SKILL.md`. It shows on a page only if the file ends with
 a valid `## Card` ([card format](#self-description-card)). No card, or a malformed one,
 means hidden. The card's `Inputs` sets the form: `none` is just a play button on the row, no box; `text` adds a
-text box; `files` a file picker; `text, files` both. `Hint` sets the box's hint text. Skills use no Shortcuts. The Skills list follows the same
+text box; `files` a file picker; `text, files` both. `Hint` sets the box's hint text. Skills use no Shortcuts. A skill's card also carries Product, Uses and Started by ([contract](../../orchestration/contract.md)). The Skills list follows the same
 inheritance as agents:
 
 - A domain page shows HQ's shared skills plus the domain's own `.claude/skills/`.
@@ -52,7 +52,7 @@ with the agent: there's no fixed number of parts or length, just cover what the 
 | `name` | The agent's id. |
 | `description` | What it does and when to use it — Claude picks an agent by this. |
 | `tools` | The fewest tools the job needs. Every extra tool is something the agent can misuse. |
-| `skills` | Skills the agent may use, one line, comma-separated (`skills: work-items, review`). |
+| `skills` | Skills the agent may use (its Uses, see [contract](../../orchestration/contract.md)), one line, comma-separated (`skills: work-items, review`). |
 | `workflows` | Workflows the agent may start, same format (`workflows: research`). |
 | `model` | Which model runs it. |
 | `effort` | How much reasoning effort it gets. |
@@ -64,7 +64,7 @@ with the agent: there's no fixed number of parts or length, just cover what the 
 - Listing `work-item` or `small-work-item` (HQ's view-only workflows) lets the agent open a Work Item with `scripts/work-item-start.sh <repo> <workflow> "Title" "Current" "Desired"`.
 - Listed skills may be the repo's own or HQ's shared ones. HQ's `hq-only` skills aren't shared, so a domain run can't use them even if listed.
 - A user-only skill (see above) can't be listed. If listed, it's still refused, and the agent's card shows an error naming it.
-- The card shows listed skills as blue pills and workflows as purple pills ("Can use"); a skill's row says which agents use it.
+- The card shows listed skills as blue pills and workflows as purple pills ("Can use").
 
 ### Handing an idea to `propose`
 
@@ -95,8 +95,12 @@ JSON for the dashboard.
 | `Icon` | required | A [Material Symbols](https://fonts.google.com/icons) icon name (lowercase, digits, `_`), e.g. `route`. |
 | `Purpose` | required | One line. |
 | `Inputs` | required | `text`, `files`, `text, files` or `none`. `none` = the dashboard shows no input box. |
-| `Output` | required | One line: what it produces, e.g. "an answer comment" or "a PR". |
+| `Product` | required | One line: what it produces, e.g. "an answer comment" or "a PR". An old `Output` row is read as Product. |
+| `Started by` | optional | Who may start it; missing = `user`. A card with no `user` is view only. |
+| `Uses` | — | An agent's Uses is its `skills:` / `workflows:` frontmatter; no `Uses` row. |
 | `Hint` | optional | One line: what the user should enter. The dashboard shows it as a skill's input hint; blank = a default hint. |
+
+Meanings and allowed values of Product, Uses and Started by: [contract.md](../../orchestration/contract.md).
 
 Optional `### Shortcuts` table, `| Label | Kind | Ask | Needs |`:
 
@@ -124,7 +128,8 @@ Example:
 | Icon | account_balance |
 | Purpose | Answers questions about the budget and logs spending. |
 | Inputs | text, files |
-| Output | An answer comment on the run Issue |
+| Product | An answer comment on the run Issue |
+| Started by | user |
 
 ### Shortcuts
 

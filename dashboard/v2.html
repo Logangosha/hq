@@ -236,6 +236,7 @@
   .pill.on { background: var(--hover); }
   .pill.sk { background: var(--sk-bg); color: var(--sk-fg); border-color: transparent; }
   .pill.wf { background: var(--wf-bg); color: var(--wf-fg); border-color: transparent; }
+  .pill.ag { background: var(--card, #eee); color: var(--muted); border-color: var(--line, #ccc); }
   .canuse { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 2px; font-size: 13px; color: var(--muted); }
   .cpanel { background: var(--bg); border-radius: 8px; padding: 8px 10px; margin: 8px 0 2px; font-size: 13px; position: relative; }
   .cpanel table { border-collapse: collapse; }
@@ -653,6 +654,7 @@
 
   function chipHtml(full, a, i) {
     const at = `data-repo="${esc(full)}" data-agent="${esc(a.id)}" data-i="${i}"`;
+    if (a.view_only) return `<span class="chip"><button class="l" data-act="shortcut" ${at} title="About this shortcut">${esc(a.shortcuts[i].label)}</button></span>`;
     return `<span class="chip"><button class="l" data-act="shortcut" ${at} title="About this shortcut">${esc(a.shortcuts[i].label)}</button><button class="r" data-act="scstart" ${at} title="Start">▶</button></span>`;
   }
 
@@ -677,11 +679,17 @@
   }
   const askBox = (full, a, cat) => inputBox(full + "|" + a.id, `Ask ${a.display_name}…`, { attach: !!cat.private });
 
+  // Uses: a list of "skill:x" / "agent:x" / "workflow:x", drawn as pills.
+  const usesHtml = l => l.length ? l.map(x => { const [k, ...n] = x.split(":");
+    return `<span class="pill ${k === "skill" ? "sk" : k === "workflow" ? "wf" : "ag"}">${esc(n.join(":"))}</span>`; }).join(" ") : "none";
+  const agentUses = a => { const c = a.can_use || { skills: [], workflows: [] };
+    return c.skills.map(x => "skill:" + x.name).concat(c.workflows.map(x => "workflow:" + x.name)); };
   const stateOf = (full, id) => cardOpen[full + "|" + id] ||= { about: false, sc: null };
   const detailsHtml = a => `<div class="cpanel"><table>
       <tr><td>Does</td><td>${esc(a.purpose || "not stated")}</td></tr>
       <tr><td>Takes</td><td>${a.inputs == null ? "not stated" : a.inputs.length ? esc(a.inputs.join(", ")) : "none"}</td></tr>
-      <tr><td>Gives</td><td>${esc(a.output || "not stated")}</td></tr>
+      <tr><td>Product</td><td>${esc(a.product || "not stated")}</td></tr>
+      <tr><td>Uses</td><td>${usesHtml(agentUses(a))}</td></tr>
       <tr><td>File</td><td><code>${esc(a.file || `.claude/agents/${a.id}.md`)}</code></td></tr></table></div>`;
   const pillHtml = (full, a, i) => `<button class="pill ${stateOf(full, a.id).sc === i ? "on" : ""}" data-act="scpanel" data-repo="${esc(full)}" data-agent="${esc(a.id)}" data-i="${i}">▶ ${esc(a.shortcuts[i].label)}</button>`;
   function scPanelHtml(full, a, i) {
@@ -718,7 +726,7 @@
     const open = soloOpen.has(full);
     return `<button class="solo-h ${open ? "open" : ""}" data-act="solo" data-repo="${esc(full)}">${icon("chevron_right", "chev")}Runs on its own (${list.length})</button>`
       + (open ? list.map(a => `<div class="srow" role="button" tabindex="0" data-act="cabout" data-repo="${esc(full)}" data-agent="${esc(a.id)}">
-          ${icon(a.icon || "smart_toy")}<span>${esc(a.display_name)}</span><span class="tag">${a.general ? "General · from HQ" : esc(soloTag(a))}</span></div>`
+          ${icon(a.icon || "smart_toy")}<span>${esc(a.display_name)}</span><span class="tag">${a.view_only ? "View only" : a.general ? "General · from HQ" : esc(soloTag(a))}</span></div>`
         + (stateOf(full, a.id).about ? detailsHtml(a) : "")).join("") : "");
   }
 
@@ -726,8 +734,9 @@
     const cat = catalogs[full];
     if (!cat) return section(group, id, "Agents", "…", `<div class="empty">Loading…</div>`);
     if (cat.error) return section(group, id, "Agents", "!", `<div class="error">${esc(cat.error)}</div>`);
-    const solo = cat.agents.filter(a => a.inputs && a.inputs.length === 0);
-    const cards = cat.agents.filter(a => !(a.inputs && a.inputs.length === 0));
+    const isSolo = a => a.view_only || (a.inputs && a.inputs.length === 0);
+    const solo = cat.agents.filter(isSolo);
+    const cards = cat.agents.filter(a => !isSolo(a));
     return section(group, id, "Agents", String(cat.agents.length),
       pageSlice(id, cards).map(a => agentCard(full, a, cat)).join("") + pager(id, cards.length) + soloGroup(full, solo));
   }
@@ -880,12 +889,12 @@
     const can = (!inp.length || !!(b.text.trim() || b.files.length)) && !b.busy;
     const tags = (s.replaces ? `<span class="tag">Replaces HQ's ${esc(s.id)}</span>` : "")
       + (s.hq_only ? `<span class="tag">HQ only</span>` : "")
-      + (s.user_only ? `<span class="tag">You only</span>` : "");
-    const users = s.user_only ? [] : ((catalogs[full] || {}).agents || [])
-      .filter(a => ((a.can_use || {}).skills || []).some(x => x.id === s.id)).map(a => a.display_name);
+      + (s.user_only ? `<span class="tag">You only</span>` : "")
+      + (s.view_only ? viewTag : "");
     const at = `data-repo="${esc(full)}" data-skill="${esc(s.id)}"`;
     const left = `<button class="half l" data-act="skill" ${at}>${icon(s.user_only ? "lock" : s.icon || "bolt")}<span class="mid"><span class="ttl">${esc(s.display_name)}</span>
-        <span class="muted">${esc(s.purpose || "")}${users.length ? ` · Used by ${esc(users.join(", "))}` : ""}</span></span>${tags}<span class="verb">Details</span></button>`;
+        <span class="muted">${esc(s.purpose || "")}</span></span>${tags}<span class="verb">Details</span></button>`;
+    if (s.view_only) return `<div class="wrow"><div class="split">${left}</div></div>`;
     const hint = skillHint(s);
     if (!inp.length) {
       const running = b.busy || (skillRuns[full] || []).some(r => r.skill === s.id && r.state === "running");
@@ -1104,7 +1113,9 @@
     frame("Agent", a.icon || "smart_toy", a.display_name, `${esc(short(full))} · ${esc(a.id)}`,
       dsec("purpose", "Purpose", 1, `<p>${esc(a.purpose || "")}</p>`) +
       dsec("inputs", "Inputs", 1, `<p>${esc(inputs)}</p>`) +
-      dsec("output", "Output", 1, `<p>${esc(a.output || "not stated")}</p>`) +
+      dsec("product", "Product", 1, `<p>${esc(a.product || "not stated")}</p>`) +
+      dsec("uses", "Uses", 1, `<p>${usesHtml(agentUses(a))}</p>`) +
+      (a.view_only ? `<p>${viewTag}</p>` : "") +
       dsec("shortcuts", "Shortcuts", a.shortcuts.length, a.shortcuts.length
         ? `<div class="chips">${a.shortcuts.map((_, i) => chipHtml(full, a, i)).join("")}</div>` : `<div class="empty">No shortcuts.</div>`),
       hintBar("Nothing here needs a decision."));
@@ -1117,6 +1128,9 @@
     frame("Skill", s.icon || "bolt", s.display_name, `${esc(short(full))} · ${esc(s.id)}`,
       dsec("purpose", "Purpose", 1, `<p>${esc(s.purpose || "")}</p>`) +
       dsec("inputs", "Inputs", 1, `<p>${esc(inp.length ? inp.join(", ") : "none")}</p>`) +
+      dsec("product", "Product", 1, `<p>${esc(s.product || "not stated")}</p>`) +
+      dsec("uses", "Uses", 1, `<p>${usesHtml(s.uses || [])}</p>`) +
+      (s.view_only ? `<p>${viewTag}</p>` : "") +
       (hint ? dsec("hint", "Hint", 1, `<p>${esc(hint)}</p>`) : "") +
       dsec("file", "File", 1, `<p><code>${esc(s.file || "")}</code></p>`),
       hintBar("Nothing here needs a decision."));
@@ -1129,6 +1143,8 @@
     frame("Workflow", "account_tree", w.name, `${esc(short(full))} · ${codify(w.purpose)}`,
       (w.view_only ? `<p>${viewTag}</p>${flowLine(w)}` : "") +
       (w.error ? `<div class="error">Can't run: ${esc(w.error)}</div>` : "") +
+      dsec("product", "Product", 1, `<p>${esc(w.product || "not stated")}</p>`) +
+      dsec("uses", "Uses", 1, `<p>${usesHtml(w.uses || [])}</p>`) +
       dsec("triggers", "Triggers", w.triggers.length, w.triggers.length ? `<table>${w.triggers.map(t =>
         `<tr><td class="k">${esc(t.kind)}</td><td>${esc(t.value)}</td></tr>`).join("")}</table>` : `<div class="empty">None.</div>`) +
       dsec("inputs", "Inputs", w.inputs.length, w.inputs.length ? `<table><thead><tr><th>Input</th><th>Required</th><th>Default</th><th>Meaning</th></tr></thead><tbody>${w.inputs.map(i =>
@@ -1150,8 +1166,8 @@
         <tr><td class="k">Kind</td><td>${esc(s.kind)}</td></tr>
         <tr><td class="k">Ask</td><td>${esc(s.ask)}</td></tr>
         <tr><td class="k">Needs</td><td>${esc(s.needs || "nothing")}</td></tr></table>`),
-      startBar(s.needs ? [s.needs] : [], ""));
-    wireStartBar(spec);
+      a.view_only ? hintBar("View only — not started by you.") : startBar(s.needs ? [s.needs] : [], ""));
+    if (!a.view_only) wireStartBar(spec);
   }
 
   // ---- Page shell ----

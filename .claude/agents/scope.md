@@ -59,4 +59,5 @@ forward-moving comment.
 | Icon | target |
 | Purpose | Writes requirements and the plan for a small Work Item in one comment. |
 | Inputs | none |
-| Output | Its scope comment on the Issue: requirements and plan |
+| Product | Its scope comment on the Issue: requirements and plan |
+| Started by | label |
