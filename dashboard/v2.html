@@ -814,16 +814,15 @@
   }
 
   // -- Workflows
+  const codify = t => esc(t).replace(/`([^`]+)`/g, "<code>$1</code>");
   const viewTag = `<span class="tag">View only</span>`;
   const stageLabel = s => (s.stage === "qa" ? "QA" : s.stage.charAt(0).toUpperCase() + s.stage.slice(1)) + (s.kind === "gate" ? " (you)" : "");
   const flowLine = w => `<div class="flowline">${w.stages.map(s => `<span class="box">${esc(stageLabel(s))}</span>`).join(`<span class="arr">→</span>`)}</div>`;
   function workflowRow(full, w) {
     const at = `data-repo="${esc(full)}" data-wf="${esc(w.id)}"`;
     return `<div class="wrow"><div class="split">
-        <button class="half l" data-act="workflow" ${at}>${icon("account_tree")}<span class="mid"><span class="ttl">${esc(w.name)}</span>${w.view_only ? " " + viewTag : ""}
-          <span class="muted">${esc(w.purpose)}</span></span><span class="verb">Details</span></button>
+        <button class="half l" data-act="workflow" ${at}>${icon("account_tree")}<span class="mid"><span><span class="ttl">${esc(w.name)}</span>${w.view_only ? " " + viewTag : ""}</span>${w.view_only ? flowLine(w) : ""}</span></button>
         ${w.can_start ? `<button class="half r" data-act="wfstart" ${at} title="Start">▶ Start</button>` : ""}</div>
-      ${w.view_only ? flowLine(w) : ""}
       ${w.error ? `<div class="empty werr">Can't run: ${esc(w.error)}</div>` : ""}${promptHtml(wfKey(full, w.id))}</div>`;
   }
   function workflowsSection(group, id, full) {
@@ -1118,7 +1117,7 @@
     const full = view.repo, w = workflowOf(full, view.id);
     if (!w) return frame("Workflow", "account_tree", view.id, esc(short(full)), `<div class="empty">Loading…</div>`, hintBar("Nothing here needs a decision."));
     const spec = { type: "wf", full, name: w.id }, labels = w.can_start ? labelsOf(spec) : [];
-    frame("Workflow", "account_tree", w.name, `${esc(short(full))} · ${esc(w.purpose)}`,
+    frame("Workflow", "account_tree", w.name, `${esc(short(full))} · ${codify(w.purpose)}`,
       (w.view_only ? `<p>${viewTag}</p>${flowLine(w)}` : "") +
       (w.error ? `<div class="error">Can't run: ${esc(w.error)}</div>` : "") +
       dsec("triggers", "Triggers", w.triggers.length, w.triggers.length ? `<table>${w.triggers.map(t =>
