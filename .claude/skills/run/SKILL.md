@@ -33,6 +33,7 @@ bash scripts/run-check.sh <repo> <agent>
 - Exit 4 → the repo has no Work Item workflow with a manual trigger. Say so in one line
   and stop. Nothing is asked, nothing is dispatched.
 - Exit 3 → `<agent>` isn't in `<repo>` or in HQ. Say so and ask for another agent name.
+- Exit 8 → it's the view-only Work Item lifecycle. Say to use `new-work-item`, and stop.
 - Exit 0 → prints `repo=`, the agent file's contents, and `source=repo|hq`. Carry the
   agent file text into step 3.
 - Exit 0 with `kind=workflow` → it printed the workflow file, `source=` and one

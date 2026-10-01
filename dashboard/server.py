@@ -1303,6 +1303,8 @@ def flow_start(full, name, text):
     wf = catalog.workflow(full, hq_full(), name, run)
     if not wf:
         raise UserError(f"{short_name(full)} has no workflow named {name}.")
+    if wf["view_only"]:
+        raise UserError(f"{wf['name']} is view only — start it with new-work-item.")
     if not wf["can_start"]:
         raise UserError(wf["error"] or f"{name} can't be started by hand.")
     res = run([BASH, "scripts/flow-start.sh", full, name], check=False,

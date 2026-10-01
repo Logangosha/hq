@@ -9,7 +9,7 @@
 # workflow, not an agent: prints the file, source=repo|hq, kind=workflow, and one
 # required=<input> per `yes` Input.
 #
-# Exit codes: 0 ok. 1 bad usage. 4 repo has no Work Item workflow with
+# Exit codes: 8 the name is a view-only Work Item workflow. 0 ok. 1 bad usage. 4 repo has no Work Item workflow with
 # workflow_dispatch. 3 the agent isn't in the repo or in HQ.
 set -euo pipefail
 
@@ -48,6 +48,11 @@ fi
 . "$HERE/scripts/runner/flow-lib.sh"
 FLOW_TMP_FILE="$(mktemp)"
 if FLOW_SRC="$(flow_fetch "$REPO" "$AGENT" "$FLOW_TMP_FILE")"; then
+  if [ -n "$(flow_rows "$FLOW_TMP_FILE" Trigger | awk -F'\t' '$1 == "work-item"')" ]; then
+    rm -f "$FLOW_TMP_FILE"
+    echo "$AGENT is the Work Item lifecycle — use the new-work-item skill, not /run." >&2
+    exit 8
+  fi
   cat "$FLOW_TMP_FILE"
   echo "source=$FLOW_SRC"
   echo "kind=workflow"

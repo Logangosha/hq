@@ -213,6 +213,9 @@
   /* agents, workflows, history */
   .card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 8px 4px; background: var(--surface); }
   .card-h { display: flex; align-items: center; gap: 8px; }
+  .flowline { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 6px 0 2px; }
+  .flowline .box { border: 1px solid var(--line); border-radius: 6px; padding: 1px 8px; font-size: 12px; }
+  .flowline .arr { color: var(--muted); }
   .card-h .tag { margin-left: auto; color: var(--muted); font-size: 12px; }
   .card .cname { font-weight: 600; padding: 2px 6px; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
@@ -811,12 +814,16 @@
   }
 
   // -- Workflows
+  const viewTag = `<span class="tag">View only</span>`;
+  const stageLabel = s => (s.stage === "qa" ? "QA" : s.stage.charAt(0).toUpperCase() + s.stage.slice(1)) + (s.kind === "gate" ? " (you)" : "");
+  const flowLine = w => `<div class="flowline">${w.stages.map(s => `<span class="box">${esc(stageLabel(s))}</span>`).join(`<span class="arr">→</span>`)}</div>`;
   function workflowRow(full, w) {
     const at = `data-repo="${esc(full)}" data-wf="${esc(w.id)}"`;
     return `<div class="wrow"><div class="split">
-        <button class="half l" data-act="workflow" ${at}>${icon("account_tree")}<span class="mid"><span class="ttl">${esc(w.name)}</span>
+        <button class="half l" data-act="workflow" ${at}>${icon("account_tree")}<span class="mid"><span class="ttl">${esc(w.name)}</span>${w.view_only ? " " + viewTag : ""}
           <span class="muted">${esc(w.purpose)}</span></span><span class="verb">Details</span></button>
         ${w.can_start ? `<button class="half r" data-act="wfstart" ${at} title="Start">▶ Start</button>` : ""}</div>
+      ${w.view_only ? flowLine(w) : ""}
       ${w.error ? `<div class="empty werr">Can't run: ${esc(w.error)}</div>` : ""}${promptHtml(wfKey(full, w.id))}</div>`;
   }
   function workflowsSection(group, id, full) {
@@ -1078,7 +1085,7 @@
       dsec("skills", "Skills", cat.skills.length, cat.skills.map(s => skillRow(full, s)).join("")
       || `<div class="empty">No skills.</div>`) +
       dsec("workflows", "Workflows", cat.workflows.length, cat.workflows.map(w =>
-        aboutRow("workflow", `data-repo="${esc(full)}" data-wf="${esc(w.id)}"`, "account_tree", w.name, w.error ? `Can't run: ${w.error}` : w.purpose)).join("")
+        aboutRow("workflow", `data-repo="${esc(full)}" data-wf="${esc(w.id)}"`, "account_tree", w.name, w.error ? `Can't run: ${w.error}` : (w.view_only ? "View only · " : "") + w.purpose)).join("")
       || `<div class="empty">No workflows here yet.</div>`);
   }
 
@@ -1112,6 +1119,7 @@
     if (!w) return frame("Workflow", "account_tree", view.id, esc(short(full)), `<div class="empty">Loading…</div>`, hintBar("Nothing here needs a decision."));
     const spec = { type: "wf", full, name: w.id }, labels = w.can_start ? labelsOf(spec) : [];
     frame("Workflow", "account_tree", w.name, `${esc(short(full))} · ${esc(w.purpose)}`,
+      (w.view_only ? `<p>${viewTag}</p>${flowLine(w)}` : "") +
       (w.error ? `<div class="error">Can't run: ${esc(w.error)}</div>` : "") +
       dsec("triggers", "Triggers", w.triggers.length, w.triggers.length ? `<table>${w.triggers.map(t =>
         `<tr><td class="k">${esc(t.kind)}</td><td>${esc(t.value)}</td></tr>`).join("")}</table>` : `<div class="empty">None.</div>`) +
