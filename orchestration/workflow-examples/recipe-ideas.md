@@ -3,6 +3,8 @@
 The F14.3 test, for `hq-test-recipes`: research recipe ideas, one Issue each, then a
 shopping list the user approves.
 
+`research` is a hypothetical agent — HQ has no such agent; this file is an example of the format and is not run.
+
 ## Trigger
 
 | Kind | Value |

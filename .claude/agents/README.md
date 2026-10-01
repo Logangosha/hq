@@ -11,13 +11,6 @@ These are the reusable agent roles for the Work Item lifecycle. One file per sta
 | 5. QA | `qa.md` |
 | Scope (small items) | `scope.md` |
 
-HQ also holds generic, non-stage agents — run one-off via `/run <agent> in <repo>: <ask>`,
-outside the lifecycle:
-
-| Agent | What it does |
-|---|---|
-| `research.md` | Answers a question about a repo, read-only. `/run research in <repo>: <question>` |
-
 ## What belongs here, and what doesn't
 
 Skill, agent or workflow — which shape a capability takes: `orchestration/workflows.md`.
