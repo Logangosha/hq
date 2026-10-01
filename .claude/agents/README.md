@@ -66,6 +66,12 @@ with the agent: there's no fixed number of parts or length, just cover what the 
 - A user-only skill (see above) can't be listed. If listed, it's still refused, and the agent's card shows an error naming it.
 - The card shows listed skills as blue pills and workflows as purple pills ("Can use"); a skill's row says which agents use it.
 
+### Handing an idea to `propose`
+
+An agent with `Bash` hands an idea over with
+`printf '%s' "$IDEA" | bash .hq/scripts/run-start.sh "$GITHUB_REPOSITORY" propose`. It
+creates nothing itself; the owner replies on the new run Issue as usual.
+
 ### Body
 
 - **Purpose** — what the agent is for, and when to use it.
