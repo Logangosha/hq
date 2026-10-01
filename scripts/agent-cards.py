@@ -14,7 +14,7 @@ from pathlib import Path
 
 FIELDS = {"Name", "Icon", "Purpose", "Inputs"}
 OPTIONAL = {"Hint", "Product", "Output", "Uses", "Started by"}
-STARTERS = ["user", "agent", "skill", "workflow", "label", "schedule"]
+STARTERS = ["user", "agent", "skill", "workflow", "label", "schedule", "event"]
 USES_RE = re.compile(r"(skill|agent|workflow):[a-z0-9][a-z0-9-]*")
 KINDS = {"question", "log", "job"}
 INPUTS = {"text", "files", "text, files", "none"}

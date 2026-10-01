@@ -18,23 +18,27 @@ its name (`[a-z0-9-]`). `# <name>`, an optional purpose line, then one `| Field 
 
 | Field | Meaning | Required |
 |---|---|---|
-| Kind | `manual`, `schedule` or `event` | Yes |
+| Kind | `schedule` or `event` | Yes |
 | Target | exactly one of `skill:<name>`, `agent:<name>`, `workflow:<name>` | Yes |
-| When | `schedule`: a 5-field cron, UTC, numbers only (`*`, `a`, `a-b`, `*/s`, `a-b/s`, lists; day of week 0–7). `event`: the event name. `manual`: leave out | By kind |
+| When | `schedule`: a 5-field cron, UTC, numbers only (`*`, `a`, `a-b`, `*/s`, `a-b/s`, lists; day of week 0–7). `event`: `label:<name>` | By kind |
 | Ask | One line passed to the target; without it the target runs with no ask | No |
 
-- **manual** — ▶ Start and `/run` of a workflow are allowed exactly when a valid manual
-  trigger in the repo targets it and the workflow is not view only. A schedule is a kind of
-  trigger, not a part of its own.
+- **manual** is retired: such a file shows broken and grants nothing. ▶ Start and `/run` need no trigger file — see [View only](#view-only).
 - **schedule** — starts its target on GitHub, once per cron time, with no dashboard open.
   It runs only if the target exists and its `Started by` includes `schedule`. An agent is
   dispatched like `/run`; a workflow is started like `/run`; a skill runs through the generic
   `skill-runner` agent. The run's Issue names the trigger.
-- **event** — reserved. Listed, never run.
+- **event** — `When: label:<name>`. Fires when an Issue in the repo gets that label, once per
+  labelling, with no dashboard open. It runs only if the target exists and its `Started by`
+  includes `event`. Targets start as for a schedule. The ask is the Issue's number and link,
+  then the trigger's `Ask` if set. The run's Issue names the trigger. Runs it opened (and
+  workflow step Issues made from them) never re-fire event triggers. Fired by the runner's
+  `event` job (`scripts/runner/event.sh`).
 - **Per repo.** A repo's triggers apply only to that repo: HQ's are not run or listed for
   domains. A trigger's target may be HQ's own skill, agent or workflow.
-- **Broken triggers** (bad kind, target missing or not exactly one, bad cron, a schedule
-  whose target isn't started by `schedule`) still show in the dashboard's Triggers list, with
+- **Broken triggers** (bad kind, target missing or not exactly one, bad cron, an event
+  whose When isn't `label:<name>`, a schedule or event whose target isn't started by
+  `schedule` / `event`) still show in the dashboard's Triggers list, with
   the reason, and never run.
 - **Timing.** The scheduler ticks hourly at :17 UTC (`scripts/runner/schedule.sh`, via the
   stub's `schedule` job). The finest schedule honoured is hourly — a finer cron fires at most
@@ -52,7 +56,7 @@ as `| Field | Value |` rows. Other docs link here instead of repeating them.
 |---|---|---|---|
 | Product | What the part leaves behind, in one line (an agent card's old `Output` is read as Product) | free text | Yes, on every agent and skill card |
 | Uses | What the part may call | `none`, or a comma-separated list of `skill:<name>`, `agent:<name>`, `workflow:<name>`. An agent's Uses is its `skills:` / `workflows:` frontmatter, so its card has no `Uses` row | No; missing = `none` |
-| Started by | Who or what may start the part | comma-separated, from `user`, `agent`, `skill`, `workflow`, `label` (a `stage:` label), `schedule` | No; missing = `user`. HQ's own cards always state it |
+| Started by | Who or what may start the part | comma-separated, from `user`, `agent`, `skill`, `workflow`, `label` (a `stage:` label), `schedule`, `event` (an event trigger) | No; missing = `user`. HQ's own cards always state it |
 
 ## Permission = Uses
 
@@ -72,4 +76,5 @@ count as its Uses.
 
 A part whose Started by does not include `user` is **view only**: the dashboard shows a
 "View only" tag, with no run or ▶ Start button, and the server refuses to start it.
-`work-item` and `small-work-item` are always view only.
+The one Start rule: a part whose Started by includes `user` gets ▶ Start (and `/run`), with
+no trigger file. `work-item` and `small-work-item` are always view only.
