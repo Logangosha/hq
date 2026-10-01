@@ -10,12 +10,6 @@ The small Work Item path (`orchestration/lifecycle.md`), drawn. View only: the h
 | Uses | none |
 | Started by | agent, skill |
 
-## Trigger
-
-| Kind | Value |
-|---|---|
-| work-item | `scripts/create-work-item.sh --small` |
-
 ## Stages
 
 | Stage | Kind | Agent | Ask |

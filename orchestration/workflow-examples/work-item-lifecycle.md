@@ -12,12 +12,6 @@ three strikes, `waiting:work`.
 | Uses | none |
 | Started by | user |
 
-## Trigger
-
-| Kind | Value |
-|---|---|
-| run | `/new-work-item` (a request in chat) |
-
 ## Inputs
 
 | Input | Required | Default | Meaning |

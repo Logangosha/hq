@@ -15,7 +15,7 @@ same engine run it. Roadmap: F14 in `archive/features-v3.md`. The file format is
 | **Gate** | A stage where the user decides, not an agent | "approve this application?" |
 | **Arrow** | Where an item goes next, by how the stage went | approved → apply; rejected → résumé |
 | **Item** | One thing moving through the flowchart. A GitHub Issue — its memory | one job listing |
-| **Trigger** | What starts the workflow | `/run`, a schedule, an event |
+| **Trigger** | What starts the workflow: its own file, `triggers/<name>.md` ([contract](contract.md#triggers)) | a manual start, a schedule |
 | **Runner** | HQ's engine on GitHub: moves items along arrows, starts the next agent | the Work Item runner, generalised |
 
 ## Skill, agent or workflow?
@@ -48,7 +48,7 @@ Skills, agents and workflows can call one another. Finance examples:
 | To | Do |
 |---|---|
 | Create a workflow | Describe it in chat → a Work Item; an agent writes the file |
-| Start it | `/run <workflow> in <repo>`, or its schedule |
+| Start it | ▶ Start or `/run <workflow> in <repo>` (needs a manual trigger), or a schedule trigger |
 | See what's happening | Dashboard: each workflow as a board, items in their stages (F15) |
 | Decide | Items at a gate show as "needs you"; approve or reject with `/review` |
 | Change it | Say what to change → a Work Item |
@@ -74,7 +74,6 @@ these `## ` sections, each holding one table. Examples: `orchestration/workflow-
 
 | Section | Meaning | Required / default |
 |---|---|---|
-| Trigger | What starts a run | Required, at least one row |
 | Inputs | What a run needs to know | Optional; default none |
 | Stages | The boxes: agents and gates | Required, at least one row |
 | Arrows | Where an item goes next, by outcome | Required |
@@ -82,13 +81,7 @@ these `## ` sections, each holding one table. Examples: `orchestration/workflow-
 | Card | Product, Uses and Started by ([contract](contract.md)) | Optional |
 | Results | Where results are reported | Optional; default: each stage comments on its own item's Issue |
 
-### Trigger — `| Kind | Value |`
-
-- `run` — `/run <name> in <repo>`.
-- `schedule` — a cron string in backticks, UTC, e.g. `` `0 7 * * *` ``.
-- `event` — reserved for later; runners ignore it.
-- `work-item` — the workflow is view-only (see below). Value: the `create-work-item.sh`
-  command it stands for.
+Triggers are not part of the workflow file: each is its own file, see [contract](contract.md#triggers).
 
 ### Inputs — `| Input | Required | Default | Meaning |`
 
@@ -138,10 +131,10 @@ rejecting one is the latest.
 
 ### View-only workflows
 
-A workflow with a `work-item` Trigger row, or a Started by without `user`, is only drawn. The dashboard shows a "View only"
+A workflow whose Started by lacks `user` — and always `work-item` and `small-work-item` — is only drawn. The dashboard shows a "View only"
 tag and its stages as boxes, with no ▶ Start; `/run` and the dashboard refuse it (use
 `new-work-item`). An agent with it on its `workflows:` list starts it with
-`scripts/work-item-start.sh` — the same Issue as `create-work-item.sh` (`--small` for
+`scripts/work-item-start.sh` (which keys on those two names) — the same Issue as `create-work-item.sh` (`--small` for
 `small-work-item`). Files: `workflows/work-item.md`, `workflows/small-work-item.md`.
 
 ### Stage on the Issue
@@ -157,7 +150,7 @@ and a `trigger` item's Issue also gets the run summary.
 
 ### How it runs on GitHub
 
-- `/run <workflow> in <repo>` (`scripts/flow-start.sh`) opens the item Issue and starts the
+- `/run <workflow> in <repo>` (`scripts/flow-start.sh`; a schedule trigger starts it the same way, through `scripts/runner/schedule.sh`) opens the item Issue and starts the
   first stage. Every stage start is a `workflow_dispatch` of the domain's `work-item.yml`
   (agent = the stage's Agent, ask = `hq-step <n> <stage>`); the runner reuses the item's
   Issue and gives the agent the Issue digest (ask, answers, rejection comments).

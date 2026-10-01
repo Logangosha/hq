@@ -10,13 +10,6 @@ Find new jobs each morning, tailor a résumé for each, apply once the user appr
 | Uses | none |
 | Started by | user, schedule |
 
-## Trigger
-
-| Kind | Value |
-|---|---|
-| schedule | `0 7 * * *` |
-| run | `/run job-hunt in <repo>` |
-
 ## Inputs
 
 | Input | Required | Default | Meaning |

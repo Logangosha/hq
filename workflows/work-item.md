@@ -10,12 +10,6 @@ The Work Item lifecycle (`orchestration/lifecycle.md`), drawn. View only: the ha
 | Uses | none |
 | Started by | agent, skill |
 
-## Trigger
-
-| Kind | Value |
-|---|---|
-| work-item | `scripts/create-work-item.sh` |
-
 ## Stages
 
 | Stage | Kind | Agent | Ask |

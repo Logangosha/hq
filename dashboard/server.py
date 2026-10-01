@@ -72,6 +72,9 @@ def find_bash():
 
 
 BASH = find_bash()
+# The one trigger-file parser is bash (scripts/runner/trigger-read.sh), shared with the scheduler.
+catalog.read_trigger = lambda name, text: run(
+    [BASH, "scripts/runner/trigger-read.sh", name], input=text, check=False).stdout
 # "<repo>#<n>" -> {"default", "path", "pr", "app", "port", "url", "heartbeat", "watchdog"}
 # app/port/url/heartbeat/watchdog are None until Start.
 reviews = {}
@@ -1284,7 +1287,7 @@ def ask(full, agent, text, files):
     if card["view_only"]:
         raise UserError(f"{card['display_name']} is view only — started by {', '.join(card['started_by'])}, not by you.")
     text = (text or "").strip()
-    if re.match(r"hq-step \d+ ", text):
+    if re.match(r"hq-(step|issue) \d+", text):
         raise UserError("That ask would be read as a workflow step.")
     paths = _save_files(full, agent, files)
     message = text or "No ask given — use your defaults."
@@ -1307,7 +1310,7 @@ def flow_start(full, name, text):
     if not wf:
         raise UserError(f"{short_name(full)} has no workflow named {name}.")
     if wf["view_only"]:
-        if any(t["kind"] == "work-item" for t in wf["triggers"]):
+        if name in ("work-item", "small-work-item"):
             raise UserError(f"{wf['name']} is view only — start it with new-work-item.")
         raise UserError(f"{wf['name']} is view only — started by {', '.join(wf['started_by'])}, not by you.")
     if not wf["can_start"]:
@@ -1555,6 +1558,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200, {"agents": catalog.agents(full, hq_full(), run),
                                 "skills": catalog.skills(full, hq_full(), run),
                                 "workflows": catalog.workflows(full, hq_full(), run),
+                                "triggers": catalog.triggers(full, hq_full(), run),
                                 "description": info.get("description"), "url": f"https://github.com/{full}",
                                 "private": bool(info.get("private"))})
             except ghcache.GhRefusal as e:

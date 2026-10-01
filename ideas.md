@@ -9,4 +9,3 @@ Older roadmaps, open items included: `archive/features-v1.md`, `-v2.md`, `-v3.md
 - Event triggers (email arrives, PR merges)
 - Run the Work Item lifecycle from a workflow file, once the format handles its loops, gates and
   blockers (today it is only drawn, view-only — #251; `orchestration/workflows.md`)
-- Scheduled workflow runs — the `schedule` trigger is documented, but nothing runs it yet (F16)

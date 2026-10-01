@@ -13,12 +13,6 @@ shopping list the user approves.
 | Uses | none |
 | Started by | user |
 
-## Trigger
-
-| Kind | Value |
-|---|---|
-| run | `/run recipe-ideas in Logangosha/hq-test-recipes` |
-
 ## Inputs
 
 | Input | Required | Default | Meaning |

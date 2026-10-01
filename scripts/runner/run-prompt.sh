@@ -55,6 +55,12 @@ The Issue so far (ask, answers, earlier stages, any rejection comment):
   exit 0
 fi
 
+# A scheduled start: the ask is the one on the run Issue the scheduler opened.
+if [[ "$ASK" =~ ^hq-issue\ [0-9]+$ ]]; then
+  ASK="$(gh issue view "$NUM" --repo "$GITHUB_REPOSITORY" --json body --jq '
+    .body | capture("Ask:\n\n(?<a>(.|\n)*?)(\n\n---\nStarted from|$)").a // ""')"
+fi
+
 DELIM="prompt-$(date +%s%N)"
 while grep -qF "$DELIM" <<<"$ASK"; do DELIM="${DELIM}x"; done
 

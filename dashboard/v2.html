@@ -849,6 +849,19 @@
     return catSection(group, id, "Workflows", full, c => c.workflows, w => workflowRow(full, w));
   }
 
+  function triggerRow(t) {
+    return `<div class="wrow"><div class="row"><span class="lead">${icon(t.kind === "schedule" ? "schedule" : t.kind === "event" ? "bolt" : "touch_app")}</span>
+        <span class="mid"><span class="ttl">${esc(t.name)}</span>
+        <span class="tags"><span>${esc(t.kind || "?")}</span><span>${esc(t.target || "no target")}</span><span>${esc(t.when || "")}</span></span></span></div>
+      ${t.error ? `<div class="empty werr">Can't run: ${esc(t.error)}</div>` : ""}</div>`;
+  }
+  function triggersSection(group, id, full) {
+    const cat = catalogs[full];
+    if (cat && !cat.error && !(cat.triggers || []).length)
+      return section(group, id, "Triggers", "0", `<div class="empty">No triggers here yet.</div>`);
+    return catSection(group, id, "Triggers", full, c => c.triggers || [], triggerRow);
+  }
+
   const skillRuns = {};      // full -> [{id, skill, name, state: running|ok|failed|stopped, output, started}], newest first
   const skillPolls = new Set();
   const skKey = (full, id) => "skill|" + full + "|" + id;
@@ -1103,7 +1116,11 @@
       || `<div class="empty">No skills.</div>`) +
       dsec("workflows", "Workflows", cat.workflows.length, cat.workflows.map(w =>
         aboutRow("workflow", `data-repo="${esc(full)}" data-wf="${esc(w.id)}"`, "account_tree", w.name, w.error ? `Can't run: ${w.error}` : (w.view_only ? "View only · " : "") + w.purpose)).join("")
-      || `<div class="empty">No workflows here yet.</div>`);
+      || `<div class="empty">No workflows here yet.</div>`) +
+      dsec("triggers", "Triggers", (cat.triggers || []).length, (cat.triggers || []).map(t =>
+        `<div class="row"><span class="lead">${icon(t.kind === "schedule" ? "schedule" : t.kind === "event" ? "bolt" : "touch_app")}</span>
+          <span class="mid"><span class="ttl">${esc(t.name)}</span><span class="tags"><span>${esc(t.error ? "Can't run: " + t.error : t.kind + " · " + t.target + " · " + t.when)}</span></span></span></div>`).join("")
+      || `<div class="empty">No triggers here yet.</div>`);
   }
 
   function renderAgentAbout() {
@@ -1146,7 +1163,7 @@
       dsec("product", "Product", 1, `<p>${esc(w.product || "not stated")}</p>`) +
       dsec("uses", "Uses", 1, `<p>${usesHtml(w.uses || [])}</p>`) +
       dsec("triggers", "Triggers", w.triggers.length, w.triggers.length ? `<table>${w.triggers.map(t =>
-        `<tr><td class="k">${esc(t.kind)}</td><td>${esc(t.value)}</td></tr>`).join("")}</table>` : `<div class="empty">None.</div>`) +
+        `<tr><td class="k">${esc(t.kind)}</td><td>${esc(t.name)} · ${esc(t.value)}${t.error ? ` — can't run: ${esc(t.error)}` : ""}</td></tr>`).join("")}</table>` : `<div class="empty">None.</div>`) +
       dsec("inputs", "Inputs", w.inputs.length, w.inputs.length ? `<table><thead><tr><th>Input</th><th>Required</th><th>Default</th><th>Meaning</th></tr></thead><tbody>${w.inputs.map(i =>
         `<tr><td>${esc(i.name)}</td><td>${i.required ? "yes" : "no"}</td><td>${esc(i.default)}</td><td>${esc(i.meaning)}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">None.</div>`) +
       dsec("stages", "Stages", w.stages.length, w.stages.map(s => `<div class="step"><span class="lead">${icon(s.kind === "gate" ? "help" : "smart_toy")}</span>
@@ -1242,7 +1259,7 @@
       pageEl.innerHTML = banr + note +
         listSection("dom", "d-ready", "Ready for you", x => isReady(x) && x.full === full, true, false, true) +
         listSection("dom", "d-running", "Running", x => runsOpen(x) && x.full === full, false, false, true) +
-        agentsSection("dom", "d-agents", full) + skillsSection("dom", "d-skills", full) + workflowsSection("dom", "d-workflows", full) +
+        agentsSection("dom", "d-agents", full) + skillsSection("dom", "d-skills", full) + workflowsSection("dom", "d-workflows", full) + triggersSection("dom", "d-triggers", full) +
         historySection("dom", "d-history", full);
       return;
     }
@@ -1259,7 +1276,7 @@
       group("own", "HQ's own", `${ownReady} ready · ${own.length - ownReady} running`,
         listSection("own", "o-ready", "Ready for you", x => isReady(x) && x.full === hq, true, true, true) +
         listSection("own", "o-running", "Running", x => runsOpen(x) && x.full === hq, false, true, true) +
-        agentsSection("own", "o-agents", hq) + skillsSection("own", "o-skills", hq) + workflowsSection("own", "o-workflows", hq) +
+        agentsSection("own", "o-agents", hq) + skillsSection("own", "o-skills", hq) + workflowsSection("own", "o-workflows", hq) + triggersSection("own", "o-triggers", hq) +
         historySection("own", "o-history", hq));
   }
 
