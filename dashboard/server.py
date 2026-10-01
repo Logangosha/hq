@@ -1277,7 +1277,7 @@ def ask(full, agent, text, files):
     committed under inbox/ first, and only in a private repo (HQ is public, and holds no
     personal data); if anything fails nothing is started."""
     if agent not in {a["id"] for a in catalog.agents(full, hq_full(), run)}:
-        if full != hq_full() and agent in catalog.stage_agents():
+        if agent in catalog.stage_agents():
             raise UserError(f"{agent} is a stage agent — it runs from stage: labels, not from the page.")
         raise UserError(f"{full} has no agent named {agent}.")
     text = (text or "").strip()
