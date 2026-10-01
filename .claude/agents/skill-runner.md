@@ -42,7 +42,7 @@ Whatever the skill leaves behind, then one line saying what was done.
 |---|---|
 | Name | Skill runner |
 | Icon | play_circle |
-| Purpose | Runs a named skill unattended, for a schedule trigger. |
+| Purpose | Runs a named skill unattended, for a schedule or event trigger. |
 | Inputs | text |
 | Product | Whatever the skill leaves behind |
-| Started by | schedule |
+| Started by | schedule, event |

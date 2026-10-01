@@ -15,7 +15,7 @@ same engine run it. Roadmap: F14 in `archive/features-v3.md`. The file format is
 | **Gate** | A stage where the user decides, not an agent | "approve this application?" |
 | **Arrow** | Where an item goes next, by how the stage went | approved → apply; rejected → résumé |
 | **Item** | One thing moving through the flowchart. A GitHub Issue — its memory | one job listing |
-| **Trigger** | What starts the workflow: its own file, `triggers/<name>.md` ([contract](contract.md#triggers)) | a manual start, a schedule |
+| **Trigger** | What starts the workflow: its own file, `triggers/<name>.md` ([contract](contract.md#triggers)) | a label event, a schedule |
 | **Runner** | HQ's engine on GitHub: moves items along arrows, starts the next agent | the Work Item runner, generalised |
 
 ## Skill, agent or workflow?
@@ -48,7 +48,7 @@ Skills, agents and workflows can call one another. Finance examples:
 | To | Do |
 |---|---|
 | Create a workflow | Describe it in chat → a Work Item; an agent writes the file |
-| Start it | ▶ Start or `/run <workflow> in <repo>` (needs a manual trigger), or a schedule trigger |
+| Start it | ▶ Start or `/run <workflow> in <repo>` (Started by includes `user`), or a schedule/event trigger |
 | See what's happening | Dashboard: each workflow as a board, items in their stages (F15) |
 | Decide | Items at a gate show as "needs you"; approve or reject with `/review` |
 | Change it | Say what to change → a Work Item |

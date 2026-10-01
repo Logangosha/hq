@@ -108,9 +108,10 @@ trigger_read() {
   [ -n "$err" ] || { [ "$nk" -le 1 ] && [ "$nt" -le 1 ] && [ "$nw" -le 1 ] && [ "$na" -le 1 ] || err="a field is given twice"; }
   if [ -z "$err" ]; then
     case "$kind" in
-      manual|schedule|event) ;;
-      "") err="no Kind (manual, schedule or event)" ;;
-      *) err="bad Kind \`$kind\` (manual, schedule or event)" ;;
+      schedule|event) ;;
+      "") err="no Kind (schedule or event)" ;;
+      *) if [ "$kind" = "man""ual" ]; then err="Kind $kind is retired — a part whose Started by includes user has ▶ Start; delete this file"
+         else err="bad Kind \`$kind\` (schedule or event)"; fi ;;
     esac
   fi
   if [ -z "$err" ]; then
@@ -124,9 +125,7 @@ trigger_read() {
         if [ -z "$when" ] || [ "$when" = "—" ]; then err="a schedule needs a cron in When"
         elif ! cron_valid "$when"; then err="bad cron \`$when\`"; fi ;;
       event)
-        { [ -n "$when" ] && [ "$when" != "—" ]; } || err="an event trigger needs an event name in When" ;;
-      manual)
-        if [ -n "$when" ] && [ "$when" != "—" ] && [ "$when" != "-" ]; then err="a manual trigger takes no When"; fi ;;
+        [[ "$when" =~ ^label:[^[:space:]] ]] || err="an event trigger's When must be label:<name>" ;;
     esac
   fi
   [ "$when" = "—" ] && when=""

@@ -211,8 +211,8 @@ HEADERS = {
 def parse_workflow(name, text):
     """A workflow file as {name, purpose, triggers, inputs, stages, can_start, view_only, error}.
     `name` is the `# ` heading. `view_only` (Started by without `user`) means drawn only: never
-    startable by hand. `triggers` and `can_start` are filled by `workflows()`, from the page's
-    trigger files. `error` is a non-empty reason when the file can't run; the rest is filled
+    startable by hand. `triggers` and `can_start` are filled by `workflows()`; Start needs no
+    trigger file. `error` is a non-empty reason when the file can't run; the rest is filled
     as far as it reads."""
     w = {"id": name, "name": name, "purpose": "", "triggers": [], "inputs": [], "stages": [],
          "can_start": False, "view_only": False, "error": "",
@@ -298,7 +298,7 @@ def _trigger_rows(full, hq_full, run):
         kind = f.get("kind", "")
         err = f.get("error") if "error" in f else "trigger file could not be read"
         out.append({"id": name, "name": name, "kind": kind, "target": f.get("target", ""),
-                    "when": "manual" if kind == "manual" else f.get("when", ""),
+                    "when": f.get("when", ""),
                     "cron": f.get("when", "") if kind == "schedule" else "",
                     "ask": f.get("ask", ""), "error": err or ""})
     return out
@@ -326,6 +326,8 @@ def triggers(full, hq_full, run):
             r["error"] = f"no such {kind} {name} here"
         elif r["kind"] == "schedule" and "schedule" not in (card["started_by"] if card else ["user"]):
             r["error"] = f"{r['target']} isn't started by schedule"
+        elif r["kind"] == "event" and "event" not in (card["started_by"] if card else ["user"]):
+            r["error"] = f"{r['target']} isn't started by event"
     return rows
 
 
@@ -338,8 +340,7 @@ def workflows(full, hq_full, run):
         w["triggers"] = [{"kind": t["kind"], "value": t["when"] or t["target"], "name": t["name"],
                           "error": t["error"]}
                          for t in rows if t["target"] == f"workflow:{n}"]
-        w["can_start"] = (not w["error"] and not w["view_only"] and n not in WORK_ITEM_NAMES
-                          and any(t["kind"] == "manual" and not t["error"] for t in w["triggers"]))
+        w["can_start"] = not w["error"] and not w["view_only"] and n not in WORK_ITEM_NAMES
         w["view_only"] = w["view_only"] or n in WORK_ITEM_NAMES
         out.append(w)
     return out
