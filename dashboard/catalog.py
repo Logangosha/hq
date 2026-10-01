@@ -1,6 +1,6 @@
 """What a page can do: its agents, skills and workflows (HQ's plus the domain's own, the
 domain's winning on a name clash), read from files — HQ's from this checkout, a domain's
-from GitHub. On a domain page HQ's stage agents are left out and HQ's general ones carry
+from GitHub. HQ's stage agents are left out on every page; on a domain page HQ's general ones carry
 `general`. A skill shows only with a valid `## Card`; one with `hq-only: true` in its
 frontmatter stays on HQ's page; `disable-model-invocation: true` makes it user-only
 (`user_only`). An agent card carries `can_use` (its listed skills and workflows) and
@@ -104,8 +104,8 @@ def _with_access(access, text, card):
 
 
 def agents(full, hq_full, run):
-    """Cards for the agents of page `full`, sorted by id. On a domain's page, HQ's stage
-    agents are left out and HQ's general ones are marked `general` (the domain's own win)."""
+    """Cards for the agents of page `full`, sorted by id. HQ's stage agents are left
+    out on every page; on a domain's page HQ's general ones are marked `general` (the domain's own win)."""
     sk = _skill_texts(full, hq_full, run)
     names = {}
     for k, t in sk.items():
@@ -116,10 +116,10 @@ def agents(full, hq_full, run):
 
     def card(stem, text, **extra):
         return _with_access(access, text, dict(_card(stem, text), **extra))
+    stage = stage_agents()
     if full == hq_full:
         files = _files(full, hq_full, ".claude/agents", run)
-        return [card(stem, files[stem]) for stem in sorted(files)]
-    stage = stage_agents()
+        return [card(stem, files[stem]) for stem in sorted(files) if stem not in stage]
     cards = {s: card(s, t, general=True) for s, t in _local(".claude/agents") if s not in stage}
     cards.update({s: card(s, t) for s, t in _remote(full, ".claude/agents", run)})
     return [cards[s] for s in sorted(cards)]
