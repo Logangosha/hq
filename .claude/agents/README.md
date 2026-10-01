@@ -95,8 +95,8 @@ JSON for the dashboard.
 | `Icon` | required | A [Material Symbols](https://fonts.google.com/icons) icon name (lowercase, digits, `_`), e.g. `route`. |
 | `Purpose` | required | One line. |
 | `Inputs` | required | `text`, `files`, `text, files` or `none`. `none` = the dashboard shows no input box. |
-| `Product` | required | One line: what it produces, e.g. "an answer comment" or "a PR". An old `Output` row is read as Product. |
-| `Started by` | optional | Who may start it; missing = `user`. A card with no `user` is view only. |
+| `Product` | required | See [contract.md](../../orchestration/contract.md). |
+| `Started by` | optional | See [contract.md](../../orchestration/contract.md). |
 | `Uses` | — | An agent's Uses is its `skills:` / `workflows:` frontmatter; no `Uses` row. |
 | `Hint` | optional | One line: what the user should enter. The dashboard shows it as a skill's input hint; blank = a default hint. |
 

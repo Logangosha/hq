@@ -79,7 +79,7 @@ these `## ` sections, each holding one table. Examples: `orchestration/workflow-
 | Stages | The boxes: agents and gates | Required, at least one row |
 | Arrows | Where an item goes next, by outcome | Required |
 | Items | How items are created and where they start | Required |
-| Card | Product, Uses and Started by ([contract](contract.md)) | Optional; default: Started by `user` |
+| Card | Product, Uses and Started by ([contract](contract.md)) | Optional |
 | Results | Where results are reported | Optional; default: each stage comments on its own item's Issue |
 
 ### Trigger — `| Kind | Value |`
