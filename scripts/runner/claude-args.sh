@@ -11,6 +11,12 @@
 # On a manual run (workflow_dispatch) only, an agent's own `tools:` line picks the
 # allowed tools instead of the default set (hq#196 R17) — stage runs (event `issues`,
 # or `workflow_call` from one) are unchanged (R18).
+# Skills and workflows: an agent's `skills:` / `workflows:` lines (agent-access.sh) are
+# all it may use, nothing if absent (hq#249). Every skill found in the repo's
+# .claude/skills and HQ's (.hq/.claude/skills, the repo's own winning a name clash) that
+# isn't listed, is user-only (`disable-model-invocation: true`), or is HQ's `hq-only`
+# one, goes into --disallowedTools as Skill(<name>); with none allowed, plain `Skill`.
+# The workflow list goes to $GITHUB_ENV for flow-start.sh to check.
 # Usage: NAME=builder MAX_TURNS=80 [DEFAULT_MODEL=sonnet DEFAULT_EFFORT=medium] \
 #        bash .hq/scripts/runner/claude-args.sh
 # Writes args=<flags> to $GITHUB_OUTPUT (stdout when that isn't set).
@@ -52,12 +58,47 @@ if [ "${GITHUB_EVENT_NAME:-}" = workflow_dispatch ]; then
   fi
 fi
 
-ARGS="--permission-mode bypassPermissions --allowedTools \"$ALLOWED\" --disallowedTools \"$DISALLOWED\" --max-turns $MAX_TURNS --model $MODEL --effort $EFFORT"
+ACCESS_SCRIPT="$(dirname "${BASH_SOURCE[0]}")/agent-access.sh"
+LISTED_SKILLS="$(bash "$ACCESS_SCRIPT" "$AGENT_FILE" skills)"
+LISTED_WORKFLOWS="$(bash "$ACCESS_SCRIPT" "$AGENT_FILE" workflows)"
+SKILL_FILE_FM() { sed -n '/^---$/,/^---$/p' "$1"; }
+declare -A SKILL_SRC=()
+for F in .hq/.claude/skills/*/SKILL.md; do
+  [ -f "$F" ] && SKILL_SRC["$(basename "$(dirname "$F")")"]="$F:hq"
+done
+for F in .claude/skills/*/SKILL.md; do
+  [ -f "$F" ] && SKILL_SRC["$(basename "$(dirname "$F")")"]="$F:own"
+done
+ALLOWED_SKILLS=0
+for S in "${!SKILL_SRC[@]}"; do
+  F="${SKILL_SRC[$S]%:*}"; WHOSE="${SKILL_SRC[$S]##*:}"
+  FM="$(SKILL_FILE_FM "$F")"
+  if [[ ",$LISTED_SKILLS," == *",$S,"* ]] \
+     && ! grep -qiE '^disable-model-invocation: *true' <<<"$FM" \
+     && { [ "$WHOSE" = own ] || ! grep -qiE '^hq-only: *true' <<<"$FM"; }; then
+    ALLOWED_SKILLS=$((ALLOWED_SKILLS + 1))
+  else
+    DISALLOWED="$DISALLOWED,Skill($S)"
+  fi
+done
+EXTRA_DIRS=""
+if [ "$ALLOWED_SKILLS" -gt 0 ]; then
+  ALLOWED="$ALLOWED,Skill"
+  EXTRA_DIRS=" --add-dir .hq"
+else
+  DISALLOWED="$DISALLOWED,Skill"
+fi
+
+ARGS="--permission-mode bypassPermissions --allowedTools \"$ALLOWED\" --disallowedTools \"$DISALLOWED\" --max-turns $MAX_TURNS --model $MODEL --effort $EFFORT$EXTRA_DIRS"
 
 # Settings carry HQ's hooks (install-hooks.sh put them there). Named explicitly so the
 # run doesn't depend on the action picking project settings up on its own.
 if [ -f .claude/settings.local.json ]; then
   ARGS="$ARGS --settings .claude/settings.local.json"
+fi
+
+if [ -n "${GITHUB_ENV:-}" ]; then
+  printf 'HQ_RUN_AGENT=%s\nHQ_RUN_WORKFLOWS=%s\n' "$NAME" "$LISTED_WORKFLOWS" >> "$GITHUB_ENV"
 fi
 
 printf 'args=%s\n' "$ARGS" >> "${GITHUB_OUTPUT:-/dev/stdout}"

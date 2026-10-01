@@ -38,6 +38,7 @@ inheritance as agents:
 - Same name: the domain's skill wins, and its entry says it replaces HQ's. A domain skill with no card hides the HQ skill it replaces too.
 - `hq-only: true` in a skill's frontmatter keeps it on HQ's page only; domains don't inherit it.
 - No field = shared.
+- `disable-model-invocation: true` makes a skill user-only: only the user runs it (`/<name>` in Claude Code, or its ▶ button); Claude never starts it on its own. Its row shows a lock and "You only".
 
 ## The agent-file standard
 
@@ -51,8 +52,18 @@ with the agent: there's no fixed number of parts or length, just cover what the 
 | `name` | The agent's id. |
 | `description` | What it does and when to use it — Claude picks an agent by this. |
 | `tools` | The fewest tools the job needs. Every extra tool is something the agent can misuse. |
+| `skills` | Skills the agent may use, one line, comma-separated (`skills: work-items, review`). |
+| `workflows` | Workflows the agent may start, same format (`workflows: research`). |
 | `model` | Which model runs it. |
 | `effort` | How much reasoning effort it gets. |
+
+### What an agent may use
+
+- No `skills:` / `workflows:` line = none. Nothing is allowed by default.
+- An agent run (stage, `/run` or workflow stage) is given only what its lists name. Other skills are refused by the Skill tool (`--disallowedTools`, set in `scripts/runner/claude-args.sh`); another workflow is refused by `scripts/flow-start.sh` (exit 7). Local sessions aren't limited.
+- Listed skills may be the repo's own or HQ's shared ones. HQ's `hq-only` skills aren't shared, so a domain run can't use them even if listed.
+- A user-only skill (see above) can't be listed. If listed, it's still refused, and the agent's card shows an error naming it.
+- The card shows listed skills as blue pills and workflows as purple pills ("Can use"); a skill's row says which agents use it.
 
 ### Body
 

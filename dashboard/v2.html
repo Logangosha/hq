@@ -14,6 +14,7 @@
     --line: #e3e3e0; --hover: #efefed; --chip: #ecece9;
     --accent: #c2410c; --accent-soft: #fbeae1;
     --add-bg: #f0f0ee; --del-bg: #e2e2df;
+    --sk-bg: #dbeafe; --sk-fg: #1d4ed8; --wf-bg: #ede9fe; --wf-fg: #6d28d9;
     --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
     --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
   }
@@ -23,6 +24,7 @@
       --line: #32322f; --hover: #2a2a27; --chip: #2a2a27;
       --accent: #fb923c; --accent-soft: #3a2518;
       --add-bg: #262624; --del-bg: #333331;
+      --sk-bg: #1e3a5f; --sk-fg: #93c5fd; --wf-bg: #3b2a66; --wf-fg: #c4b5fd;
     }
   }
   * { box-sizing: border-box; }
@@ -221,6 +223,9 @@
   .itile { width: 32px; height: 32px; border-radius: 8px; background: var(--chip); display: inline-flex; align-items: center; justify-content: center; flex: none; }
   .pill { background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: 13px; }
   .pill.on { background: var(--hover); }
+  .pill.sk { background: var(--sk-bg); color: var(--sk-fg); border-color: transparent; }
+  .pill.wf { background: var(--wf-bg); color: var(--wf-fg); border-color: transparent; }
+  .canuse { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 2px; font-size: 13px; color: var(--muted); }
   .cpanel { background: var(--bg); border-radius: 8px; padding: 8px 10px; margin: 8px 0 2px; font-size: 13px; position: relative; }
   .cpanel table { border-collapse: collapse; }
   .cpanel td { padding: 2px 10px 2px 0; vertical-align: top; }
@@ -666,11 +671,20 @@
       ${promptHtml(scKey(full, a.id, i))}</div>`
   }
 
+  function canUseHtml(a) {
+    const c = a.can_use || { skills: [], workflows: [] };
+    return (c.skills.length || c.workflows.length ? `<div class="canuse">Can use `
+      + c.skills.map(x => `<span class="pill sk">${esc(x.name)}</span>`).join("")
+      + c.workflows.map(x => `<span class="pill wf">${esc(x.name)}</span>`).join("") + `</div>` : "")
+      + (a.access_errors || []).map(e => `<div class="berr">${esc(e)}</div>`).join("");
+  }
+
   function agentCard(full, a, cat) {
     const st = stateOf(full, a.id);
     return `<div class="card" data-agent="${esc(a.id)}">
       <div class="card-h"><span class="itile">${icon(a.icon || "smart_toy")}</span><button class="ghost cname" data-act="cabout" data-repo="${esc(full)}" data-agent="${esc(a.id)}">${esc(a.display_name)}</button>${a.general ? `<span class="tag">General · from HQ</span>` : ""}</div>
       <div class="muted">${esc(a.purpose || "")}</div>
+      ${canUseHtml(a)}
       ${st.about ? detailsHtml(a) : ""}
       ${a.shortcuts.length ? `<div class="chips">${a.shortcuts.map((_, i) => pillHtml(full, a, i)).join("")}</div>` : ""}
       ${st.sc != null && a.shortcuts[st.sc] ? scPanelHtml(full, a, st.sc) : ""}
@@ -840,10 +854,13 @@
     const k = skKey(full, s.id), b = boxes[k] || { text: "", files: [] }, inp = s.inputs || [];
     const can = (!inp.length || !!(b.text.trim() || b.files.length)) && !b.busy;
     const tags = (s.replaces ? `<span class="tag">Replaces HQ's ${esc(s.id)}</span>` : "")
-      + (s.hq_only ? `<span class="tag">HQ only</span>` : "");
+      + (s.hq_only ? `<span class="tag">HQ only</span>` : "")
+      + (s.user_only ? `<span class="tag">You only</span>` : "");
+    const users = s.user_only ? [] : ((catalogs[full] || {}).agents || [])
+      .filter(a => ((a.can_use || {}).skills || []).some(x => x.id === s.id)).map(a => a.display_name);
     const at = `data-repo="${esc(full)}" data-skill="${esc(s.id)}"`;
-    const left = `<button class="half l" data-act="skill" ${at}>${icon(s.icon || "bolt")}<span class="mid"><span class="ttl">${esc(s.display_name)}</span>
-        <span class="muted">${esc(s.purpose || "")}</span></span>${tags}<span class="verb">Details</span></button>`;
+    const left = `<button class="half l" data-act="skill" ${at}>${icon(s.user_only ? "lock" : s.icon || "bolt")}<span class="mid"><span class="ttl">${esc(s.display_name)}</span>
+        <span class="muted">${esc(s.purpose || "")}${users.length ? ` · Used by ${esc(users.join(", "))}` : ""}</span></span>${tags}<span class="verb">Details</span></button>`;
     const hint = skillHint(s);
     if (!inp.length) {
       const running = b.busy || (skillRuns[full] || []).some(r => r.skill === s.id && r.state === "running");

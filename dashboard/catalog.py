@@ -2,7 +2,9 @@
 domain's winning on a name clash), read from files — HQ's from this checkout, a domain's
 from GitHub. On a domain page HQ's stage agents are left out and HQ's general ones carry
 `general`. A skill shows only with a valid `## Card`; one with `hq-only: true` in its
-frontmatter stays on HQ's page. Formats: .claude/agents/README.md (agent cards,
+frontmatter stays on HQ's page; `disable-model-invocation: true` makes it user-only
+(`user_only`). An agent card carries `can_use` (its listed skills and workflows) and
+`access_errors` (a listed user-only skill). Formats: .claude/agents/README.md (agent cards,
 skills), orchestration/workflows.md."""
 import base64
 import importlib.util
@@ -85,23 +87,55 @@ def _card(stem, text):
     return e
 
 
+def _listed(text, field):
+    """Names in an agent's `skills:` / `workflows:` frontmatter line, in order."""
+    names = [n.strip() for n in agent_cards.frontmatter(text).get(field, "").split(",")]
+    return [n for n in names if NAME_RE.match(n)]
+
+
+def _with_access(access, text, card):
+    """Adds `can_use` and `access_errors` to an agent card."""
+    sk, wf, names = access
+    card["can_use"] = {"skills": [{"id": k, "name": names.get(k, k)} for k in _listed(text, "skills")],
+                       "workflows": [{"id": k, "name": wf.get(k, k)} for k in _listed(text, "workflows")]}
+    card["access_errors"] = [f"Lists user-only skill {k}; agents can't use it."
+                             for k in _listed(text, "skills") if k in sk and _user_only(sk[k])]
+    return card
+
+
 def agents(full, hq_full, run):
     """Cards for the agents of page `full`, sorted by id. On a domain's page, HQ's stage
     agents are left out and HQ's general ones are marked `general` (the domain's own win)."""
+    sk = _skill_texts(full, hq_full, run)
+    names = {}
+    for k, t in sk.items():
+        c = _parse(k, t)
+        if not c["fallback"] and not c["errors"]:
+            names[k] = c["display_name"]
+    access = (sk, {w["id"]: w["name"] for w in workflows(full, hq_full, run)}, names)
+
+    def card(stem, text, **extra):
+        return _with_access(access, text, dict(_card(stem, text), **extra))
     if full == hq_full:
         files = _files(full, hq_full, ".claude/agents", run)
-        return [_card(stem, files[stem]) for stem in sorted(files)]
+        return [card(stem, files[stem]) for stem in sorted(files)]
     stage = stage_agents()
-    cards = {s: dict(_card(s, t), general=True) for s, t in _local(".claude/agents") if s not in stage}
-    cards.update({s: _card(s, t) for s, t in _remote(full, ".claude/agents", run)})
+    cards = {s: card(s, t, general=True) for s, t in _local(".claude/agents") if s not in stage}
+    cards.update({s: card(s, t) for s, t in _remote(full, ".claude/agents", run)})
     return [cards[s] for s in sorted(cards)]
 
 
-def skills(full, hq_full, run):
-    """Skills of page `full`, sorted by name: HQ's (minus `hq-only: true` ones on a domain
-    page), then the domain's own over them; `replaces` marks one that displaces an HQ skill.
-    Only skills with a valid `## Card` are listed, so a card-less domain skill hides the HQ
-    skill it replaces too."""
+def _user_only(text):
+    return agent_cards.frontmatter(text).get("disable-model-invocation", "").lower() == "true"
+
+
+def _skill_texts(full, hq_full, run):
+    """Every skill SKILL.md of page `full`, carded or not: HQ's (minus `hq-only: true` ones
+    on a domain page), then the domain's own over them. Returns (id -> text)."""
+    return _skill_merge(full, hq_full, run)[0]
+
+
+def _skill_merge(full, hq_full, run):
     hq = dict(_local_skills())
     found = {}
     for k, t in hq.items():
@@ -111,6 +145,15 @@ def skills(full, hq_full, run):
     if full != hq_full:
         own = dict(_remote_skills(full, run))
         found.update(own)
+    return found, own, hq
+
+
+def skills(full, hq_full, run):
+    """Skills of page `full`, sorted by name: HQ's (minus `hq-only: true` ones on a domain
+    page), then the domain's own over them; `replaces` marks one that displaces an HQ skill.
+    Only skills with a valid `## Card` are listed, so a card-less domain skill hides the HQ
+    skill it replaces too."""
+    found, own, hq = _skill_merge(full, hq_full, run)
     out = []
     for k in sorted(found):
         card = _parse(k, found[k])
@@ -120,6 +163,7 @@ def skills(full, hq_full, run):
         out.append({"id": k, "name": fm.get("name") or k, "description": fm.get("description") or "",
                     "file": f".claude/skills/{k}/SKILL.md", "replaces": k in own and k in hq,
                     "hq_only": fm.get("hq-only", "").lower() == "true",
+                    "user_only": _user_only(found[k]),
                     "display_name": card["display_name"], "icon": card["icon"],
                     "purpose": card["purpose"], "inputs": card["inputs"],
                     "hint": card["hint"]})

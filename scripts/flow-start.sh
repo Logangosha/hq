@@ -4,12 +4,18 @@
 # Opens the run's Issue (flow:<wf>, step:<start>), then starts its first stage.
 # Prints issue=<url>.
 # Exit codes: 0 ok. 1 bad usage. 3 no such workflow. 6 the workflow has no `trigger` item.
+# 7 an agent run (HQ_RUN_AGENT set) that doesn't list the workflow in its `workflows:`.
 set -euo pipefail
 
 REPO="${1:-}"; WF="${2:-}"
 if [ -z "$REPO" ] || [ -z "$WF" ]; then
   echo "Usage: printf '%s' \"\$ASK\" | bash scripts/flow-start.sh <owner/repo> <workflow>" >&2
   exit 1
+fi
+
+if [ -n "${HQ_RUN_AGENT:-}" ] && [[ ",${HQ_RUN_WORKFLOWS:-}," != *",$WF,"* ]]; then
+  echo "Workflow $WF isn't on $HQ_RUN_AGENT's list; this run may not start it." >&2
+  exit 7
 fi
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
