@@ -7,7 +7,6 @@ Older roadmaps, open items included: `archive/features-v1.md`, `-v2.md`, `-v3.md
 
 - Connections (email, accounts) — from F10.6–F10.8 in `archive/features-v2.md`
 - Event triggers (email arrives, PR merges)
-- The Work Item lifecycle as a workflow file, once the format handles its loops, gates and
-  blockers (`orchestration/workflows.md`)
-- Workflow tests, `/capabilities`, scheduled runs, cross-domain `librarian` — F14.3–F17 in
-  `archive/features-v3.md`
+- Run the Work Item lifecycle from a workflow file, once the format handles its loops, gates and
+  blockers (today it is only drawn, view-only — #251; `orchestration/workflows.md`)
+- Scheduled workflow runs — the `schedule` trigger is documented, but nothing runs it yet (F16)
