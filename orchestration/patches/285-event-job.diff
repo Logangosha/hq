@@ -1,0 +1,36 @@
+diff --git a/.github/workflows/work-item-runner.yml b/.github/workflows/work-item-runner.yml
+index 5c3eb5c..1749059 100644
+--- a/.github/workflows/work-item-runner.yml
++++ b/.github/workflows/work-item-runner.yml
+@@ -5,6 +5,7 @@
+ #
+ # A stage: label lands on an Issue -> the agent for that stage runs -> it comments
+ # and sets the next stage: label, which starts the next run.
++# Any other label -> the event job runs scripts/runner/event.sh (event triggers).
+ #
+ # The steps' logic lives in HQ's scripts/runner/, not here. GitHub refuses to let a
+ # GitHub App push a change to a file under .github/workflows/, so anything written in
+@@ -128,3 +129,23 @@ jobs:
+           OUTCOME: ${{ steps.run_agent.outcome }}
+           EXECUTION_FILE: ${{ steps.run_agent.outputs.execution_file }}
+         run: bash .hq/scripts/runner/after-run.sh
++
++  event:
++    if: github.event.action == 'labeled' && !startsWith(github.event.label.name, 'stage:')
++    runs-on: ubuntu-latest
++    permissions:
++      actions: write
++      contents: read
++      issues: write
++    steps:
++      - uses: actions/checkout@v4
++
++      - name: Fetch HQ
++        run: git clone --depth 1 https://github.com/${{ inputs.hq_repo }}.git .hq
++
++      - name: Event triggers
++        env:
++          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
++          NUM: ${{ github.event.issue.number }}
++          LABEL: ${{ github.event.label.name }}
++        run: bash .hq/scripts/runner/event.sh
