@@ -16,7 +16,9 @@
 # .claude/skills and HQ's (.hq/.claude/skills, the repo's own winning a name clash) that
 # isn't listed, is user-only (`disable-model-invocation: true`), or is HQ's `hq-only`
 # one, goes into --disallowedTools as Skill(<name>); with none allowed, plain `Skill`.
-# The workflow list goes to $GITHUB_ENV for flow-start.sh to check.
+# The workflow list goes to $GITHUB_ENV for flow-start.sh to check. Also written: the
+# allowed skills and, on a workflow stage, the workflow and its Uses, for the Uses guard
+# (uses-hook.sh, uses-lib.sh; hq#273).
 # Usage: NAME=builder MAX_TURNS=80 [DEFAULT_MODEL=sonnet DEFAULT_EFFORT=medium] \
 #        bash .hq/scripts/runner/claude-args.sh
 # Writes args=<flags> to $GITHUB_OUTPUT (stdout when that isn't set).
@@ -69,6 +71,12 @@ done
 for F in .claude/skills/*/SKILL.md; do
   [ -f "$F" ] && SKILL_SRC["$(basename "$(dirname "$F")")"]="$F:own"
 done
+# shellcheck source=uses-lib.sh
+. "$(dirname "${BASH_SOURCE[0]}")/uses-lib.sh"
+# shellcheck source=flow-lib.sh
+. "$(dirname "${BASH_SOURCE[0]}")/flow-lib.sh"
+rm -f "$USES_SKILL_FILE"
+RUN_SKILLS=""
 ALLOWED_SKILLS=0
 for S in "${!SKILL_SRC[@]}"; do
   F="${SKILL_SRC[$S]%:*}"; WHOSE="${SKILL_SRC[$S]##*:}"
@@ -77,6 +85,7 @@ for S in "${!SKILL_SRC[@]}"; do
      && ! grep -qiE '^disable-model-invocation: *true' <<<"$FM" \
      && { [ "$WHOSE" = own ] || ! grep -qiE '^hq-only: *true' <<<"$FM"; }; then
     ALLOWED_SKILLS=$((ALLOWED_SKILLS + 1))
+    RUN_SKILLS="${RUN_SKILLS:+$RUN_SKILLS,}$S"
   else
     DISALLOWED="$DISALLOWED,Skill($S)"
   fi
@@ -97,8 +106,15 @@ if [ -f .claude/settings.local.json ]; then
   ARGS="$ARGS --settings .claude/settings.local.json"
 fi
 
+FLOW_WF=""; FLOW_USES=""
+if [ -f "$FLOW_STEP_FILE" ]; then
+  FLOW_WF="$(sed -n 's/^wf=//p' "$FLOW_STEP_FILE")"
+  FLOW_USES="$(uses_card "$(sed -n 's/^file=//p' "$FLOW_STEP_FILE")")"
+fi
+
 if [ -n "${GITHUB_ENV:-}" ]; then
-  printf 'HQ_RUN_AGENT=%s\nHQ_RUN_WORKFLOWS=%s\n' "$NAME" "$LISTED_WORKFLOWS" >> "$GITHUB_ENV"
+  printf 'HQ_RUN_AGENT=%s\nHQ_RUN_WORKFLOWS=%s\nHQ_RUN_SKILLS=%s\nHQ_FLOW_WF=%s\nHQ_FLOW_USES=%s\n' \
+    "$NAME" "$LISTED_WORKFLOWS" "$RUN_SKILLS" "$FLOW_WF" "$FLOW_USES" >> "$GITHUB_ENV"
 fi
 
 printf 'args=%s\n' "$ARGS" >> "${GITHUB_OUTPUT:-/dev/stdout}"

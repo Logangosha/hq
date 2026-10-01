@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Put HQ's output-trimming hook where the stage agent's run will pick it up.
+# Put HQ's hooks (output trimming, Uses guard) where the stage agent's run will pick it up.
 # Called by install-agents.sh, so it happens before the agent starts.
 # Usage: bash .hq/scripts/runner/install-hooks.sh   (run from the domain checkout,
 #        after HQ has been cloned into .hq)

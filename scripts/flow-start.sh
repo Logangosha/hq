@@ -5,9 +5,10 @@
 # Prints issue=<url>.
 # Exit codes: 0 ok. 1 bad usage. 3 no such workflow. 6 the workflow has no `trigger` item.
 # 8 a view-only workflow (a Work Item workflow, or Started by without `user`).
-# 9 no valid `manual` trigger in the repo's triggers/ targets the workflow.
+# 9 a skill or workflow stage in the run whose card Uses doesn't list the workflow.
+# 10 no valid `manual` trigger in the repo's triggers/ targets the workflow.
 # 7 an agent run (HQ_RUN_AGENT set) that doesn't list the workflow in its `workflows:`.
-# HQ_TRIGGER="<name> <stamp> <cron>" (set by runner/schedule.sh) skips the 8/9 checks and
+# HQ_TRIGGER="<name> <stamp> <cron>" (set by runner/schedule.sh) skips the 8/10 checks and
 # names the schedule trigger on the Issue.
 set -euo pipefail
 
@@ -17,12 +18,15 @@ if [ -z "$REPO" ] || [ -z "$WF" ]; then
   exit 1
 fi
 
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
 if [ -n "${HQ_RUN_AGENT:-}" ] && [[ ",${HQ_RUN_WORKFLOWS:-}," != *",$WF,"* ]]; then
   echo "Workflow $WF isn't on $HQ_RUN_AGENT's list; this run may not start it." >&2
   exit 7
 fi
+# shellcheck source=runner/uses-lib.sh
+. "$HERE/scripts/runner/uses-lib.sh"
+uses_check workflow "$WF" || exit 9
 
-HERE="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=lib/flow-fetch.sh
 . "$HERE/scripts/lib/flow-fetch.sh"
 # shellcheck source=runner/flow-lib.sh
@@ -47,7 +51,7 @@ if [ -z "${HQ_RUN_AGENT:-}" ] && [ -z "${HQ_TRIGGER:-}" ]; then
     *,user,*) ;;
     *) echo "$WF is view only (its Started by doesn't include user)." >&2; exit 8 ;;
   esac
-  trigger_manual_for "$REPO" "$WF" || { echo "No valid manual trigger in $REPO's triggers/ targets workflow:$WF." >&2; exit 9; }
+  trigger_manual_for "$REPO" "$WF" || { echo "No valid manual trigger in $REPO's triggers/ targets workflow:$WF." >&2; exit 10; }
 fi
 
 START="$(flow_start_of "$FILE" trigger)"

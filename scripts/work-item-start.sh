@@ -5,6 +5,7 @@
 # Usage: bash scripts/work-item-start.sh <owner/repo> <workflow> "Title" "Current" "Desired" [create-work-item args]
 # Exit codes: 1 bad usage. 3 no such workflow, or it isn't a Work Item workflow.
 # 7 an agent run (HQ_RUN_AGENT set) that doesn't list the workflow in its `workflows:`.
+# 9 a skill or workflow stage in the run whose card Uses doesn't list the workflow.
 set -euo pipefail
 
 REPO="${1:-}"; WF="${2:-}"
@@ -14,12 +15,15 @@ if [ -z "$REPO" ] || [ -z "$WF" ] || [ $# -lt 3 ]; then
 fi
 shift 2
 
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
 if [ -n "${HQ_RUN_AGENT:-}" ] && [[ ",${HQ_RUN_WORKFLOWS:-}," != *",$WF,"* ]]; then
   echo "Workflow $WF isn't on $HQ_RUN_AGENT's list; this run may not start it." >&2
   exit 7
 fi
+# shellcheck source=runner/uses-lib.sh
+. "$HERE/scripts/runner/uses-lib.sh"
+uses_check workflow "$WF" || exit 9
 
-HERE="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=lib/flow-fetch.sh
 . "$HERE/scripts/lib/flow-fetch.sh"
 # shellcheck source=runner/flow-lib.sh

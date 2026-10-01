@@ -6,6 +6,7 @@
 # On timeout waiting for the run Issue: run=<Actions run URL> only.
 #
 # Exit codes: 0 ok. 1 bad usage. 5 dispatched, but no run Issue appeared in time.
+# 9 an agent run whose skill or workflow stage's card Uses doesn't list the agent.
 set -euo pipefail
 
 REPO="${1:-}"; AGENT="${2:-}"
@@ -13,6 +14,11 @@ if [ -z "$REPO" ] || [ -z "$AGENT" ]; then
   echo "Usage: printf '%s' \"\$ASK\" | bash scripts/run-start.sh <owner/repo> <agent>" >&2
   exit 1
 fi
+
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=runner/uses-lib.sh
+. "$HERE/scripts/runner/uses-lib.sh"
+uses_check agent "$AGENT" || exit 9
 
 ASK="$(cat; printf x)"; ASK="${ASK%x}"
 
