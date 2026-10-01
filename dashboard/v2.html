@@ -660,7 +660,7 @@
     : /^text\//.test(f.type) || /\.(md|txt|docx?|csv|json)$/i.test(f.name) ? "description" : "draft";
   const fmtSize = n => n < 1024 ? n + " B" : n < 1048576 ? Math.round(n / 1024) + " KB" : (n / 1048576).toFixed(1) + " MB";
 
-  // The one input box: + (attach), text field, arrow. o: {attach, text, act, ic, title}.
+  // The one input box: + (attach), text field, arrow. o: {attach, text, act, ic, title, spin}.
   function inputBox(k, placeholder, o) {
     const b = boxes[k] || { text: "", files: [] }, hasText = o.text !== false;
     const can = !!((hasText && b.text.trim()) || b.files.length) && !b.busy;
@@ -672,7 +672,7 @@
         ${o.attach ? `<button class="addf" data-act="addfile" data-box="${esc(k)}" title="Attach files">${icon("add")}</button>
           <input type="file" multiple hidden data-fileinput="${esc(k)}">` : ""}
         ${hasText ? `<textarea rows="1" data-box-text="${esc(k)}" placeholder="${esc(placeholder)}">${esc(b.text)}</textarea>` : `<span class="hint">${esc(placeholder)}</span>`}
-        <button class="send ${can ? "has" : ""}" data-act="${o.act || "send"}" data-box="${esc(k)}" ${can ? "" : "disabled"} title="${esc(o.title || "Send")}">${icon(o.ic || "arrow_upward")}</button>
+        <button class="send ${can ? "has" : ""}" data-act="${o.act || "send"}" data-box="${esc(k)}" ${can ? "" : "disabled"} title="${esc(o.title || "Send")}">${o.spin && b.busy ? icon("progress_activity", "spin") : icon(o.ic || "arrow_upward")}</button>
       </div>${b.error ? `<div class="berr">${esc(b.error)}</div>` : ""}</div>`;
   }
   const askBox = (full, a, cat) => inputBox(full + "|" + a.id, `Ask ${a.display_name}…`, { attach: !!cat.private });
@@ -869,6 +869,7 @@
       await post("/api/skill/run", { repo: full, skill: id, text: b.text, files: b.files.map(({ name, content }) => ({ name, content })) });
       delete boxes[key];
       await loadSkillRuns(full);
+      skRepaint();
     } catch (e) { b.busy = false; b.error = e.message; skRepaint(); }
   }
   const skillHint = s => { const inp = s.inputs || [];
@@ -889,11 +890,11 @@
     if (!inp.length) {
       const running = b.busy || (skillRuns[full] || []).some(r => r.skill === s.id && r.state === "running");
       return `<div class="wrow"><div class="split">${left}`
-        + `<button class="half r" data-act="skplay" data-box="${esc(k)}" ${running ? "disabled" : ""} title="Run ${esc(s.display_name)}">${icon("play_arrow")}</button></div>`
+        + `<button class="half r" data-act="skplay" data-box="${esc(k)}" ${running ? "disabled" : ""} title="Run ${esc(s.display_name)}">${b.busy ? icon("progress_activity", "spin") : icon("play_arrow")}</button></div>`
         + `${b.error ? `<div class="berr">${esc(b.error)}</div>` : ""}</div>`;
     }
     return `<div class="wrow"><div class="split stack">${left}<div class="half b">`
-      + inputBox(k, hint, { attach: inp.includes("files"), text: inp.includes("text"), act: "skplay", ic: "play_arrow", title: `Run ${s.display_name}` })
+      + inputBox(k, hint, { attach: inp.includes("files"), text: inp.includes("text"), act: "skplay", ic: "play_arrow", spin: true, title: `Run ${s.display_name}` })
       + `</div></div></div>`;
   }
   function skillsSection(group, id, full) {
