@@ -203,10 +203,15 @@ HEADERS = {
 
 
 def parse_workflow(name, text):
-    """A workflow file as {name, purpose, triggers, inputs, stages, can_start, error}.
-    `error` is a non-empty reason when the file can't run; the rest is filled as far as it reads."""
+    """A workflow file as {name, purpose, triggers, inputs, stages, can_start, view_only, error}.
+    `name` is the `# ` heading. `view_only` (a `work-item` Trigger row) means drawn only: never
+    startable by hand. `error` is a non-empty reason when the file can't run; the rest is filled
+    as far as it reads."""
     w = {"id": name, "name": name, "purpose": "", "triggers": [], "inputs": [], "stages": [],
-         "can_start": False, "error": ""}
+         "can_start": False, "view_only": False, "error": ""}
+    h = re.search(r"^# (.+?)[ \t]*$", text, re.M)
+    if h:
+        w["name"] = h.group(1)
     m = re.search(r"^# .+\n+([^\n#|][^\n]*)", text, re.M)
     if m:
         w["purpose"] = m.group(1).strip()
@@ -235,7 +240,9 @@ def parse_workflow(name, text):
     if "Items" in parsed and not any(r[0] == "trigger" for r in parsed["Items"]):
         problems.append("## Items has no row made by trigger")
     w["error"] = "; ".join(problems)
-    w["can_start"] = not w["error"] and any(t["kind"] == "run" for t in w["triggers"])
+    w["view_only"] = any(t["kind"] == "work-item" for t in w["triggers"])
+    w["can_start"] = (not w["error"] and not w["view_only"]
+                      and any(t["kind"] == "run" for t in w["triggers"]))
     return w
 
 

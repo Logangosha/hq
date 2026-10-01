@@ -1,7 +1,8 @@
 # Workflows — the model
 
 A **workflow** is a flowchart that HQ runs. The Work Item lifecycle (`lifecycle.md`) is
-one flowchart, hard-coded today. Workflows let any domain describe its own and have the
+one flowchart, hard-coded today and drawn view-only in HQ's `workflows/work-item.md` and
+`workflows/small-work-item.md`. Workflows let any domain describe its own and have the
 same engine run it. Roadmap: F14 in `archive/features-v3.md`. The file format is below.
 
 ## Parts
@@ -58,17 +59,18 @@ Skills, agents and workflows can call one another. Finance examples:
   A domain's workflow wins over HQ's of the same name — the same rule as agents.
 - **The Issue is the memory**, as for Work Items: every result and decision goes on it.
 - **Anything outward-facing waits at a gate** — sending, applying, posting, paying.
-- **The Work Item lifecycle stays hard-coded.** `workflow-examples/work-item-lifecycle.md`
-  shows it written in the format — on paper only, not run (the small path, three strikes
-  and blockers aren't covered). Later it may become HQ's own workflow file.
-- **HQ's `workflows/`:** none yet. Examples of the format are in `workflow-examples/`.
+- **The hard-coded runner still runs Work Items.** HQ's `workflows/work-item.md` and
+  `workflows/small-work-item.md` draw it in the format — view only, not run by the engine
+  (three strikes and blockers aren't covered). The runner still does the work.
+  `workflow-examples/work-item-lifecycle.md` is an older example of the same.
+- **HQ's `workflows/`:** just those two. More examples of the format are in `workflow-examples/`.
 
 ## Format
 
 A workflow is one plain-Markdown file, `workflows/<name>.md`. **The file name is the
 workflow's name.** No frontmatter. It starts with `# <name>` and one line of purpose, then
 these `## ` sections, each holding one table. Examples: `orchestration/workflow-examples/`
-(`job-hunt.md`, `recipe-ideas.md`, and `work-item-lifecycle.md` — the lifecycle on paper).
+(`job-hunt.md`, `recipe-ideas.md`, and `work-item-lifecycle.md`, an older drawing of the lifecycle).
 
 | Section | Meaning | Required / default |
 |---|---|---|
@@ -84,6 +86,8 @@ these `## ` sections, each holding one table. Examples: `orchestration/workflow-
 - `run` — `/run <name> in <repo>`.
 - `schedule` — a cron string in backticks, UTC, e.g. `` `0 7 * * *` ``.
 - `event` — reserved for later; runners ignore it.
+- `work-item` — the workflow is view-only (see below). Value: the `create-work-item.sh`
+  command it stands for.
 
 ### Inputs — `| Input | Required | Default | Meaning |`
 
@@ -126,6 +130,14 @@ rejecting one is the latest.
 - `trigger` — each run makes one Issue (the run's), starting at the named stage.
 - `<stage>` — that stage opens one Issue per thing it finds (a job, a recipe idea), each
   starting at the named stage.
+
+### View-only workflows
+
+A workflow with a `work-item` Trigger row is only drawn. The dashboard shows a "View only"
+tag and its stages as boxes, with no ▶ Start; `/run` and the dashboard refuse it (use
+`new-work-item`). An agent with it on its `workflows:` list starts it with
+`scripts/work-item-start.sh` — the same Issue as `create-work-item.sh` (`--small` for
+`small-work-item`). Files: `workflows/work-item.md`, `workflows/small-work-item.md`.
 
 ### Stage on the Issue
 

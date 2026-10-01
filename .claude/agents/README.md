@@ -61,6 +61,7 @@ with the agent: there's no fixed number of parts or length, just cover what the 
 
 - No `skills:` / `workflows:` line = none. Nothing is allowed by default.
 - An agent run (stage, `/run` or workflow stage) is given only what its lists name. Other skills are refused by the Skill tool (`--disallowedTools`, set in `scripts/runner/claude-args.sh`); another workflow is refused by `scripts/flow-start.sh` (exit 7). Local sessions aren't limited.
+- Listing `work-item` or `small-work-item` (HQ's view-only workflows) lets the agent open a Work Item with `scripts/work-item-start.sh <repo> <workflow> "Title" "Current" "Desired"`.
 - Listed skills may be the repo's own or HQ's shared ones. HQ's `hq-only` skills aren't shared, so a domain run can't use them even if listed.
 - A user-only skill (see above) can't be listed. If listed, it's still refused, and the agent's card shows an error naming it.
 - The card shows listed skills as blue pills and workflows as purple pills ("Can use"); a skill's row says which agents use it.

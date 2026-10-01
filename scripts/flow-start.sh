@@ -4,6 +4,7 @@
 # Opens the run's Issue (flow:<wf>, step:<start>), then starts its first stage.
 # Prints issue=<url>.
 # Exit codes: 0 ok. 1 bad usage. 3 no such workflow. 6 the workflow has no `trigger` item.
+# 8 a view-only Work Item workflow (`work-item` Trigger): use new-work-item instead.
 # 7 an agent run (HQ_RUN_AGENT set) that doesn't list the workflow in its `workflows:`.
 set -euo pipefail
 
@@ -29,6 +30,11 @@ ASK="$(cat; printf x)"; ASK="${ASK%x}"
 FILE="$(mktemp)"
 trap 'rm -f "$FILE"' EXIT
 flow_fetch "$REPO" "$WF" "$FILE" >/dev/null || { echo "No workflow named $WF in $REPO or in HQ." >&2; exit 3; }
+
+if [ -n "$(flow_rows "$FILE" Trigger | awk -F'\t' '$1 == "work-item"')" ]; then
+  echo "$WF is the Work Item lifecycle — use the new-work-item skill (agents: scripts/work-item-start.sh)." >&2
+  exit 8
+fi
 
 START="$(flow_start_of "$FILE" trigger)"
 [ -n "$START" ] || { echo "Workflow $WF has no Items row made by trigger." >&2; exit 6; }
