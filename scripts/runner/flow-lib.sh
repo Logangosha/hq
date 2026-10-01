@@ -108,3 +108,11 @@ flow_move() {
   gh issue edit "$n" --repo "$repo" --remove-label "step:$from" --add-label "step:$to" >/dev/null
   flow_arrive "$repo" "$n" "$file" "$to"
 }
+
+# The Work Item lifecycle workflows are view only and started by name, not by a trigger.
+FLOW_WORK_ITEM_NAMES="work-item small-work-item"
+
+# flow_is_work_item <wf> — is it one of the Work Item lifecycle workflows?
+flow_is_work_item() {
+  [[ " $FLOW_WORK_ITEM_NAMES " == *" $1 "* ]]
+}

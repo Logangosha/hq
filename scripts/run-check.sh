@@ -9,7 +9,8 @@
 # workflow, not an agent: prints the file, source=repo|hq, kind=workflow, and one
 # required=<input> per `yes` Input.
 #
-# Exit codes: 8 the name is a view-only Work Item workflow. 0 ok. 1 bad usage. 4 repo has no Work Item workflow with
+# Exit codes: 8 the name is a view-only workflow (Work Item lifecycle, or Started by without
+# `user`). 9 a workflow with no valid manual trigger in the repo's triggers/. 0 ok. 1 bad usage. 4 repo has no Work Item workflow with
 # workflow_dispatch. 3 the agent isn't in the repo or in HQ.
 set -euo pipefail
 
@@ -46,12 +47,25 @@ fi
 . "$HERE/scripts/lib/flow-fetch.sh"
 # shellcheck source=runner/flow-lib.sh
 . "$HERE/scripts/runner/flow-lib.sh"
+# shellcheck source=runner/trigger-lib.sh
+. "$HERE/scripts/runner/trigger-lib.sh"
+# shellcheck source=lib/trigger-fetch.sh
+. "$HERE/scripts/lib/trigger-fetch.sh"
 FLOW_TMP_FILE="$(mktemp)"
 if FLOW_SRC="$(flow_fetch "$REPO" "$AGENT" "$FLOW_TMP_FILE")"; then
-  if [ -n "$(flow_rows "$FLOW_TMP_FILE" Trigger | awk -F'\t' '$1 == "work-item"')" ]; then
+  if flow_is_work_item "$AGENT"; then
     rm -f "$FLOW_TMP_FILE"
     echo "$AGENT is the Work Item lifecycle — use the new-work-item skill, not /run." >&2
     exit 8
+  fi
+  case ",$(card_started_by "$FLOW_TMP_FILE" | tr -d ' ')," in
+    *,user,*) ;;
+    *) rm -f "$FLOW_TMP_FILE"; echo "$AGENT is view only (its Started by doesn't include user)." >&2; exit 8 ;;
+  esac
+  if ! trigger_manual_for "$REPO" "$AGENT"; then
+    rm -f "$FLOW_TMP_FILE"
+    echo "No valid manual trigger in $REPO's triggers/ targets workflow:$AGENT." >&2
+    exit 9
   fi
   cat "$FLOW_TMP_FILE"
   echo "source=$FLOW_SRC"

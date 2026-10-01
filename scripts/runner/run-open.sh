@@ -28,6 +28,19 @@ if [[ "$ASK" =~ ^hq-step\ ([0-9]+)\ ([a-z0-9-]+)$ ]]; then
   exit 0
 fi
 
+# A scheduled start (`hq-issue <n>`, sent by schedule.sh) reuses the run Issue the scheduler
+# already opened — that is how a cron time is never started twice.
+if [[ "$ASK" =~ ^hq-issue\ ([0-9]+)$ ]]; then
+  N="${BASH_REMATCH[1]}"
+  if ! gh issue view "$N" --repo "$GITHUB_REPOSITORY" --json state,labels \
+    --jq 'select(.state == "OPEN" and any(.labels[]; .name == "run")) | .state' | grep -q OPEN; then
+    echo "Stale start: #$N is not an open run Issue" >&2
+    exit 1
+  fi
+  printf 'num=%s\n' "$N" >> "${GITHUB_OUTPUT:-/dev/stdout}"
+  exit 0
+fi
+
 TITLE="Run: $AGENT — $(printf '%s' "$ASK" | head -1 | cut -c1-60)"
 
 BODY_FILE="$(mktemp)"

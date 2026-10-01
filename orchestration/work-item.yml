@@ -17,6 +17,8 @@ on:
     types: [labeled, closed]
   issue_comment:
     types: [created]
+  schedule:
+    - cron: '17 * * * *'
   workflow_dispatch:
     inputs:
       agent:
@@ -62,6 +64,20 @@ jobs:
       - run: bash .hq/scripts/runner/release-blocked.sh
         env:
           GH_TOKEN: ${{ secrets.HQ_RELEASE_TOKEN }}
+
+  schedule:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: git clone --depth 1 https://github.com/__HQ_REPO__.git .hq
+      - run: bash .hq/scripts/runner/schedule.sh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   ask:
     if: github.event_name == 'workflow_dispatch'

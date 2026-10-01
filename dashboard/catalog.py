@@ -1,16 +1,18 @@
 """What a page can do: its agents, skills and workflows (HQ's plus the domain's own, the
-domain's winning on a name clash), read from files — HQ's from this checkout, a domain's
+domain's winning on a name clash) and its triggers (the repo's own `triggers/`, never HQ's
+on a domain page), read from files — HQ's from this checkout, a domain's
 from GitHub. HQ's stage agents are left out on every page; on a domain page HQ's general ones carry
 `general`. A skill shows only with a valid `## Card`; one with `hq-only: true` in its
 frontmatter stays on HQ's page; `disable-model-invocation: true` makes it user-only
 (`user_only`). Every card carries `product`, `uses`, `started_by` and `view_only`
 (orchestration/contract.md). An agent card carries `can_use` (its listed skills and workflows) and
 `access_errors` (a listed user-only skill). Formats: .claude/agents/README.md (agent cards,
-skills), orchestration/workflows.md."""
+skills), orchestration/workflows.md, triggers: orchestration/contract.md."""
 import base64
 import importlib.util
 import os
 import re
+import subprocess
 import tempfile
 from pathlib import Path
 
@@ -22,6 +24,8 @@ agent_cards = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(agent_cards)
 
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+# The Work Item lifecycle workflows: always view only (scripts/runner/flow-lib.sh).
+WORK_ITEM_NAMES = ("work-item", "small-work-item")
 
 
 def _remote(full, path, run):
@@ -197,7 +201,6 @@ def _sections(text):
 
 
 HEADERS = {
-    "Trigger": ["Kind", "Value"],
     "Inputs": ["Input", "Required", "Default", "Meaning"],
     "Stages": ["Stage", "Kind", "Agent", "Ask"],
     "Arrows": ["From", "Outcome", "To"],
@@ -207,8 +210,9 @@ HEADERS = {
 
 def parse_workflow(name, text):
     """A workflow file as {name, purpose, triggers, inputs, stages, can_start, view_only, error}.
-    `name` is the `# ` heading. `view_only` (a `work-item` Trigger row) means drawn only: never
-    startable by hand. `error` is a non-empty reason when the file can't run; the rest is filled
+    `name` is the `# ` heading. `view_only` (Started by without `user`) means drawn only: never
+    startable by hand. `triggers` and `can_start` are filled by `workflows()`, from the page's
+    trigger files. `error` is a non-empty reason when the file can't run; the rest is filled
     as far as it reads."""
     w = {"id": name, "name": name, "purpose": "", "triggers": [], "inputs": [], "stages": [],
          "can_start": False, "view_only": False, "error": "",
@@ -237,7 +241,6 @@ def parse_workflow(name, text):
             parsed[sec] = rows
             if not rows and sec != "Inputs":
                 problems.append(f"## {sec} is empty")
-    w["triggers"] = [{"kind": r[0], "value": r[1]} for r in parsed.get("Trigger", [])]
     w["inputs"] = [{"name": r[0], "required": r[1].lower() == "yes", "default": r[2], "meaning": r[3]}
                    for r in parsed.get("Inputs", [])]
     w["stages"] = [{"stage": r[0], "kind": r[1], "agent": r[2], "ask": r[3]} for r in parsed.get("Stages", [])]
@@ -267,15 +270,79 @@ def parse_workflow(name, text):
     seen = {f"agent:{x['agent']}" for x in w["stages"] if x["kind"] == "agent"}
     w["uses"] += sorted(seen - set(w["uses"]))
     w["error"] = "; ".join(problems)
-    w["view_only"] = any(t["kind"] == "work-item" for t in w["triggers"]) or "user" not in w["started_by"]
-    w["can_start"] = (not w["error"] and not w["view_only"]
-                      and any(t["kind"] == "run" for t in w["triggers"]))
+    w["view_only"] = "user" not in w["started_by"]
     return w
+
+
+def _read_trigger(name, text):
+    """Default reader: the one bash parser the scheduler uses too (scripts/runner/trigger-read.sh).
+    The server may replace this to run it through its own bash."""
+    res = subprocess.run(["bash", str(Path(HQ) / "scripts" / "runner" / "trigger-read.sh"), name],
+                         input=text, capture_output=True, text=True, cwd=HQ)
+    return res.stdout
+
+
+read_trigger = _read_trigger
+
+
+def _trigger_rows(full, hq_full, run):
+    """The repo's own trigger files, parsed: {id, name, kind, target, when, ask, error}.
+    A domain page never shows HQ's; HQ's page shows HQ's own."""
+    files = _local("triggers") if full == hq_full else _remote(full, "triggers", run)
+    out = []
+    for name, text in files:
+        f = {}
+        for line in read_trigger(name, text).splitlines():
+            k, _, v = line.partition("=")
+            f[k] = v
+        kind = f.get("kind", "")
+        err = f.get("error") if "error" in f else "trigger file could not be read"
+        out.append({"id": name, "name": name, "kind": kind, "target": f.get("target", ""),
+                    "when": "manual" if kind == "manual" else f.get("when", ""),
+                    "cron": f.get("when", "") if kind == "schedule" else "",
+                    "ask": f.get("ask", ""), "error": err or ""})
+    return out
+
+
+def triggers(full, hq_full, run):
+    """The page's triggers, one row each. Besides the file's own problems, a target that doesn't
+    exist here, or a schedule whose target's Started by lacks `schedule`, is an error (the
+    scheduler refuses the same)."""
+    rows = _trigger_rows(full, hq_full, run)
+    if not any(not r["error"] for r in rows):
+        return rows
+    skill_ids = set(_skill_texts(full, hq_full, run))
+    skill_cards = {s["id"]: s for s in skills(full, hq_full, run)}
+    agent_cards_ = {a["id"]: a for a in agents(full, hq_full, run)}
+    wf_cards = {w["id"]: w for w in workflows(full, hq_full, run)}
+    for r in rows:
+        if r["error"]:
+            continue
+        kind, _, name = r["target"].partition(":")
+        card = {"skill": skill_cards.get(name), "agent": agent_cards_.get(name),
+                "workflow": wf_cards.get(name)}[kind]
+        exists = name in skill_ids if kind == "skill" else card is not None
+        if not exists:
+            r["error"] = f"no such {kind} {name} here"
+        elif r["kind"] == "schedule" and "schedule" not in (card["started_by"] if card else ["user"]):
+            r["error"] = f"{r['target']} isn't started by schedule"
+    return rows
 
 
 def workflows(full, hq_full, run):
     files = _files(full, hq_full, "workflows", run)
-    return [parse_workflow(n, files[n]) for n in sorted(files)]
+    rows = _trigger_rows(full, hq_full, run)
+    out = []
+    for n in sorted(files):
+        w = parse_workflow(n, files[n])
+        w["triggers"] = [{"kind": t["kind"], "value": t["when"] or t["target"], "name": t["name"],
+                          "error": t["error"]}
+                         for t in rows if t["target"] == f"workflow:{n}"]
+        w["can_start"] = (not w["error"] and not w["view_only"] and n not in WORK_ITEM_NAMES
+                          and any(t["kind"] == "manual" and not t["error"] for t in w["triggers"]))
+        w["view_only"] = w["view_only"] or n in WORK_ITEM_NAMES
+        out.append(w)
+    return out
 
 
 def workflow(full, hq_full, name, run):

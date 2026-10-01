@@ -9,12 +9,39 @@ The one place that defines what a part is, what its card says, and what it may c
 | skill | A task the user or an agent asks for, done in a chat | `.claude/skills/<name>/SKILL.md` |
 | agent | A worker that does one job | `.claude/agents/<name>.md` |
 | workflow | A flowchart of agents and gates | `workflows/<name>.md` ([format](workflows.md)) |
-| trigger | What starts a part | a `Trigger` row or a `Started by` value |
+| trigger | What starts a part | `triggers/<name>.md` |
 
-### Trigger
+## Triggers
 
-A **schedule is a kind of trigger**, not a part of its own. The trigger kinds (`run`,
-`schedule`, `event`, `work-item`) are listed once, in [workflows.md](workflows.md) "Trigger".
+A trigger is its own file, `triggers/<name>.md` in the repo it belongs to; the file name is
+its name (`[a-z0-9-]`). `# <name>`, an optional purpose line, then one `| Field | Value |` table:
+
+| Field | Meaning | Required |
+|---|---|---|
+| Kind | `manual`, `schedule` or `event` | Yes |
+| Target | exactly one of `skill:<name>`, `agent:<name>`, `workflow:<name>` | Yes |
+| When | `schedule`: a 5-field cron, UTC, numbers only (`*`, `a`, `a-b`, `*/s`, `a-b/s`, lists; day of week 0–7). `event`: the event name. `manual`: leave out | By kind |
+| Ask | One line passed to the target; without it the target runs with no ask | No |
+
+- **manual** — ▶ Start and `/run` of a workflow are allowed exactly when a valid manual
+  trigger in the repo targets it and the workflow is not view only. A schedule is a kind of
+  trigger, not a part of its own.
+- **schedule** — starts its target on GitHub, once per cron time, with no dashboard open.
+  It runs only if the target exists and its `Started by` includes `schedule`. An agent is
+  dispatched like `/run`; a workflow is started like `/run`; a skill runs through the generic
+  `skill-runner` agent. The run's Issue names the trigger.
+- **event** — reserved. Listed, never run.
+- **Per repo.** A repo's triggers apply only to that repo: HQ's are not run or listed for
+  domains. A trigger's target may be HQ's own skill, agent or workflow.
+- **Broken triggers** (bad kind, target missing or not exactly one, bad cron, a schedule
+  whose target isn't started by `schedule`) still show in the dashboard's Triggers list, with
+  the reason, and never run.
+- **Timing.** The scheduler ticks hourly at :17 UTC (`scripts/runner/schedule.sh`, via the
+  stub's `schedule` job). The finest schedule honoured is hourly — a finer cron fires at most
+  once per tick. A run may start up to 2 h after its cron time; later is skipped.
+  GitHub pauses schedules in a repo idle for 60 days. A domain gets the schedule job by
+  re-running `scripts/enable-agents.sh`.
+- Examples: `orchestration/trigger-examples/` (read by nothing).
 
 ## Card fields
 
@@ -45,4 +72,4 @@ count as its Uses.
 
 A part whose Started by does not include `user` is **view only**: the dashboard shows a
 "View only" tag, with no run or ▶ Start button, and the server refuses to start it.
-A workflow with a `work-item` Trigger row is view only too.
+`work-item` and `small-work-item` are always view only.
